@@ -330,39 +330,92 @@ let S = {
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:''
 };
 
-/* ---------- aggiunta alimenti: scanner, foto, Open Food Facts ---------- */
+/* ---------- aggiunta alimenti: scanner, foto, Open Food Facts ----------
+   La lettura del codice a barre usa l'API BarcodeDetector dove c'è
+   (Chrome/Android); altrove carica al volo la libreria ZXing, così la
+   fotocamera funziona anche su iPhone/Safari. */
 const FORMATI_BARCODE = ['ean_13','ean_8','upc_a','upc_e','code_128'];
-let flussoCamera = null, cicloScan = null, rilevatore = null;
+let flussoCamera = null, cicloScan = null, rilevatore = null, zxReader = null, zxPromise = null;
 
 function formVuoto(){
   return { n:'', e:'', cho:'', f:'', p:'', ig:'medio', alcol:'no', cat:'Altro', porz:'' };
 }
 
+const scannerAttivo = () => !!(flussoCamera || zxReader);
+
+function caricaZXing(){
+  if(window.ZXing) return Promise.resolve();
+  if(zxPromise) return zxPromise;
+  zxPromise = new Promise((ok, ko) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+    s.onload = () => window.ZXing ? ok() : ko(new Error('zxing'));
+    s.onerror = () => { zxPromise = null; ko(new Error('rete')); };
+    document.head.appendChild(s);
+  });
+  return zxPromise;
+}
+
+function msgErroreCamera(e){
+  if(e && (e.name === 'NotAllowedError' || e.name === 'SecurityError'))
+    return "Il permesso per la fotocamera è stato negato. Riattivalo nelle impostazioni del browser per questo sito " +
+      "(Android: menu ⋮ → Impostazioni sito → Fotocamera; iPhone: Impostazioni → Safari/app → Fotocamera), poi riprova. " +
+      "In alternativa digita il codice qui sotto.";
+  if(e && (e.name === 'NotFoundError' || e.name === 'OverconstrainedError'))
+    return "Non trovo una fotocamera su questo dispositivo: digita il codice qui sotto o usa una foto del codice.";
+  if(e && e.message === 'rete')
+    return "Non riesco a scaricare il modulo di lettura (serve internet): digita il codice qui sotto.";
+  return "Non riesco ad avviare la fotocamera: digita il codice qui sotto oppure usa una foto del codice.";
+}
+
 async function avviaScanner(){
-  S.msgScanner = '';
-  if(!('BarcodeDetector' in window)){
-    S.msgScanner = "Su questo dispositivo la lettura con la fotocamera non è disponibile: digita il codice qui sotto.";
+  S.msgScanner = "Sto avviando la fotocamera…"; disegna();
+  if(!window.isSecureContext){
+    S.msgScanner = "La fotocamera funziona solo aprendo l'app da un indirizzo https: digita il codice qui sotto.";
+    disegna(); return;
+  }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    S.msgScanner = "Questo browser non dà accesso alla fotocamera: digita il codice qui sotto o usa una foto del codice.";
     disegna(); return;
   }
   try{
-    rilevatore = rilevatore || new BarcodeDetector({ formats: FORMATI_BARCODE });
-    flussoCamera = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
-    disegna();
-    cicloScan = setInterval(async () => {
-      const v = document.getElementById('anteprima');
-      if(!v || !v.videoWidth || S.caricamento) return;
-      try{
-        const codici = await rilevatore.detect(v);
-        if(codici.length){
-          fermaScanner();
-          S.codice = codici[0].rawValue;
-          cercaCodice(S.codice);
-        }
-      }catch(e){}
-    }, 350);
+    if('BarcodeDetector' in window){
+      rilevatore = rilevatore || new BarcodeDetector({ formats: FORMATI_BARCODE });
+      flussoCamera = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+      if(S.nuovo !== 'barcode'){ fermaScanner(); return; }
+      S.msgScanner = ''; disegna();
+      cicloScan = setInterval(async () => {
+        const v = document.getElementById('anteprima');
+        if(!v || !v.videoWidth || S.caricamento) return;
+        try{
+          const codici = await rilevatore.detect(v);
+          if(codici.length){
+            fermaScanner();
+            S.codice = codici[0].rawValue;
+            cercaCodice(S.codice);
+          }
+        }catch(e){}
+      }, 350);
+    } else {
+      await caricaZXing();
+      if(S.nuovo !== 'barcode') return;
+      zxReader = new ZXing.BrowserMultiFormatReader();
+      S.msgScanner = ''; disegna();
+      const aColpo = (ris) => {
+        if(!ris || S.caricamento) return;
+        const c = ris.getText();
+        fermaScanner();
+        S.codice = c;
+        cercaCodice(c);
+      };
+      if(zxReader.decodeFromConstraints)
+        await zxReader.decodeFromConstraints({ video:{ facingMode:'environment' } }, 'anteprima', aColpo);
+      else
+        await zxReader.decodeFromVideoDevice(undefined, 'anteprima', aColpo);
+    }
   }catch(e){
-    flussoCamera = null;
-    S.msgScanner = "Fotocamera non disponibile o permesso negato: digita il codice qui sotto.";
+    fermaScanner();
+    S.msgScanner = msgErroreCamera(e);
     disegna();
   }
 }
@@ -370,30 +423,43 @@ async function avviaScanner(){
 function fermaScanner(){
   if(cicloScan){ clearInterval(cicloScan); cicloScan = null; }
   if(flussoCamera){ flussoCamera.getTracks().forEach(t => t.stop()); flussoCamera = null; }
+  if(zxReader){ try{ zxReader.reset(); }catch(e){} zxReader = null; }
 }
 
 function fotoBarcode(){
-  if(!('BarcodeDetector' in window)){
-    alert("Su questo dispositivo la lettura delle fotografie non è disponibile: digita il codice a barre a mano.");
-    S.nuovo = 'barcode'; disegna(); return;
-  }
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*';
   inp.onchange = async () => {
     const file = inp.files[0]; if(!file) return;
+    let codice = null;
     try{
-      const img = await createImageBitmap(file);
-      rilevatore = rilevatore || new BarcodeDetector({ formats: FORMATI_BARCODE });
-      const codici = await rilevatore.detect(img);
-      if(!codici.length){
-        alert("Nella foto non si legge nessun codice a barre. Riprova con una foto nitida e ravvicinata del codice, oppure digitalo.");
-        S.nuovo = 'barcode'; disegna(); return;
+      if('BarcodeDetector' in window){
+        const img = await createImageBitmap(file);
+        rilevatore = rilevatore || new BarcodeDetector({ formats: FORMATI_BARCODE });
+        const codici = await rilevatore.detect(img);
+        if(codici.length) codice = codici[0].rawValue;
+      } else {
+        await caricaZXing();
+        const url = URL.createObjectURL(file);
+        try{
+          const ris = await new ZXing.BrowserMultiFormatReader().decodeFromImageUrl(url);
+          codice = ris.getText();
+        }catch(e){ /* nessun codice leggibile */ }
+        finally{ URL.revokeObjectURL(url); }
       }
-      S.nuovo = 'barcode'; S.codice = codici[0].rawValue; disegna();
-      cercaCodice(S.codice);
     }catch(e){
-      alert("Non riesco a leggere questa immagine.");
+      alert(e && e.message === 'rete'
+        ? "Per leggere la foto serve internet la prima volta: controlla la connessione e riprova, oppure digita il codice."
+        : "Non riesco a leggere questa immagine.");
+      return;
     }
+    if(!codice){
+      alert("Nella foto non si legge nessun codice a barre. Riprova con una foto nitida e ravvicinata del codice, oppure digitalo.");
+      S.nuovo = 'barcode'; S.msgScanner = ''; disegna(); return;
+    }
+    fermaScanner();
+    S.nuovo = 'barcode'; S.codice = codice; S.msgScanner = ''; disegna();
+    cercaCodice(codice);
   };
   inp.click();
 }
@@ -722,7 +788,7 @@ function stratoNuovo(){
   <div class="velo" data-a="chiudiNuovo">
     <div class="foglio" data-stop="1">
       ${testa('Codice a barre')}
-      ${flussoCamera ? `
+      ${scannerAttivo() ? `
         <video id="anteprima" autoplay playsinline muted
           style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:18px;background:#000;margin-bottom:8px"></video>
         <div style="font-size:14px;color:var(--ink2);text-align:center;margin-bottom:12px">Inquadra il codice a barre della confezione</div>`
@@ -809,6 +875,7 @@ function disegna(){
     const vd = document.getElementById('anteprima');
     if(vd && !vd.srcObject) vd.srcObject = flussoCamera;
   }
+  /* Il lettore ZXing gestisce da solo il proprio <video>. */
 }
 
 /* ---------- interazioni ---------- */
