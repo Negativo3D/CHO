@@ -27,6 +27,51 @@
     -webkit-text-size-adjust:100%;
   }
   h1{font-size:26px;font-weight:800;letter-spacing:-.4px;margin:0;padding:20px 16px 8px}
+
+  .hero{
+    background:linear-gradient(135deg,#12996E 0%,#0E7A57 45%,#0A5C41 100%);
+    border-radius:28px;padding:22px 20px;color:#fff;margin:14px 0;
+    box-shadow:0 10px 24px rgba(14,122,87,.28)
+  }
+  .hero .occhiello{font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:.75;text-transform:uppercase}
+  .hero .titolone{font-size:26px;font-weight:800;letter-spacing:-.4px;margin-top:4px;line-height:1.15}
+  .pastoPill{
+    display:flex;align-items:center;gap:8px;width:100%;margin-top:14px;text-align:left;
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
+    border-radius:16px;padding:10px 14px;color:#fff;font-size:14px;font-weight:600
+  }
+  .azioni{display:flex;gap:8px;margin-top:14px}
+  .azione{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+    border-radius:16px;padding:12px 4px;color:#fff;font-weight:600;font-size:12px
+  }
+  .azione .em{font-size:22px;line-height:1}
+
+  .griglia{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cella{
+    position:relative;background:var(--card);border:1px solid var(--line);border-radius:22px;
+    padding:14px;box-shadow:0 2px 6px rgba(19,32,25,.05)
+  }
+  .cella .apri{display:block;width:100%;text-align:left}
+  .cella .emg{font-size:34px;line-height:1;display:block}
+  .cella .nome2{
+    font-weight:650;font-size:14px;line-height:1.25;margin:9px 0 8px;min-height:35px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden
+  }
+  .chopill{
+    display:inline-block;background:var(--cho-soft);color:var(--cho);
+    font-weight:700;font-size:13px;padding:4px 10px;border-radius:999px
+  }
+  .cella .stella{position:absolute;top:6px;right:6px}
+
+  .fab{
+    position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom));
+    width:58px;height:58px;border-radius:20px;color:#fff;z-index:30;
+    background:linear-gradient(135deg,#12996E,#0A5C41);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 20px rgba(14,122,87,.4)
+  }
   main{padding:0 16px 120px}
   button{font-family:inherit;border:0;background:none;cursor:pointer;color:inherit}
   input{font-family:inherit}
@@ -62,8 +107,10 @@
     position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);
     border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:20
   }
-  nav button{flex:1;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink2);position:relative}
+  nav button{flex:1;padding:8px 0 8px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--ink2);position:relative}
   nav button.on{color:var(--cho)}
+  nav .ic{display:flex;align-items:center;justify-content:center;padding:4px 18px;border-radius:999px}
+  nav button.on .ic{background:var(--cho-soft)}
   nav .lab{font-size:11px;font-weight:500}
   nav button.on .lab{font-weight:700}
   .badge{position:absolute;top:4px;left:50%;margin-left:6px;background:var(--cho);color:#fff;font-size:10px;
@@ -416,14 +463,35 @@ const chip = (txt, on, azione, colore) =>
 
 /* ---------- schermata: atlante ---------- */
 function vistaAtlante(){
+  const ora = new Date().getHours();
+  const saluto = ora < 6 ? 'Notte fonda' : ora < 13 ? 'Buongiorno' : ora < 18 ? 'Buon pomeriggio' : 'Buonasera';
+  const t = totali();
+  const hero = `
+    <div class="hero">
+      <div class="occhiello">CHO · Conta carboidrati</div>
+      <div class="titolone">${saluto} 👋<br>Cosa mangi oggi?</div>
+      ${S.pasto.length ? `
+        <button class="pastoPill" data-a="tab:pasto">
+          <span style="font-size:18px">🍽️</span>
+          <span style="flex:1">Nel pasto: <b class="num">${Math.round(t.cho)} g</b> di carboidrati · ${S.pasto.length} aliment${S.pasto.length===1?'o':'i'}</span>
+          <span style="opacity:.8">›</span>
+        </button>` : ''}
+      <div class="azioni">
+        <button class="azione" data-a="nuovoBarcode"><span class="em">📷</span>Codice a barre</button>
+        <button class="azione" data-a="nuovoFoto"><span class="em">🖼️</span>Da una foto</button>
+        <button class="azione" data-a="nuovoForm"><span class="em">✍️</span>A mano</button>
+      </div>
+    </div>`;
+
   if(!FOODS.length) return `
-    <div class="card" style="padding:32px;text-align:center">
+    ${hero}
+    <div class="card" style="padding:28px 24px;text-align:center">
       <div style="font-size:36px">🧺</div>
       <div style="font-weight:700;font-size:18px;margin-top:8px">Il tuo elenco è vuoto</div>
-      <p style="color:var(--ink2);font-size:14px;margin:8px 0 20px">
-        Qui trovi solo gli alimenti che aggiungi tu: compilando un modulo, leggendo il codice a barre
-        o da una fotografia del codice. Puoi anche importare un elenco esportato in precedenza, dalla schermata Sport.</p>
-      <button class="primario" style="width:auto;padding:12px 24px" data-a="nuovo">Aggiungi il primo alimento</button>
+      <p style="color:var(--ink2);font-size:14px;margin:8px 0 0">
+        Qui trovi solo gli alimenti che aggiungi tu, con i pulsanti qui sopra: leggendo il codice a barre,
+        da una fotografia del codice o compilando un modulo. Puoi anche importare un elenco esportato
+        in precedenza, dalla schermata Sport.</p>
     </div>`;
 
   let l = FOODS;
@@ -431,14 +499,13 @@ function vistaAtlante(){
   else if(S.cat !== 'Tutti') l = l.filter(f => f.cat === S.cat);
   if(S.q.trim()) l = l.filter(f => norm(f.n).includes(norm(S.q.trim())));
 
-  const righe = l.map(f => `
-    <div class="card riga">
-      <button data-a="apri:${f.id}" style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;text-align:left">
-        <span class="em">${f.e}</span>
-        <span style="flex:1;min-width:0">
-          <span class="nome" style="display:block">${esc(f.n)}</span>
-          <span class="sotto" style="display:block">${f.cho} g carboidrati per 100 g</span>
-        </span>
+  const celle = l.map(f => `
+    <div class="cella">
+      <button class="apri" data-a="apri:${f.id}">
+        <span class="emg">${f.e}</span>
+        <span class="nome2">${esc(f.n)}</span>
+        <span class="chopill num">${f.cho} g</span>
+        <span style="font-size:11px;color:var(--ink2)"> per 100 g</span>
       </button>
       <button class="stella ${S.preferiti.includes(f.id)?'on':''}" data-a="fav:${f.id}">
         ${ico('stella',20,S.preferiti.includes(f.id))}
@@ -446,18 +513,20 @@ function vistaAtlante(){
     </div>`).join('');
 
   const vuoto = S.cat === 'Preferiti'
-    ? 'Tocca la stella accanto agli alimenti che usi spesso per ritrovarli qui.'
+    ? 'Tocca la stella sugli alimenti che usi spesso per ritrovarli qui.'
     : 'Nessun alimento con questo nome. Prova con una parola più corta.';
 
   const catInUso = ['Preferiti','Tutti', ...CATS.filter(c => FOODS.some(f => f.cat === c))];
 
   return `
-    <button class="primario" style="margin-bottom:12px" data-a="nuovo">＋ Aggiungi alimento</button>
+    ${hero}
     <div class="cerca">${ico('cerca',20)}
       <input id="q" placeholder="Cerca tra i tuoi alimenti" value="${esc(S.q)}">
     </div>
     <div class="chips">${catInUso.map(c => chip(c, S.cat===c, 'cat:'+c)).join('')}</div>
-    ${righe || `<div style="text-align:center;padding:48px 0;color:var(--ink2)">${vuoto}</div>`}`;
+    ${celle ? `<div class="griglia">${celle}</div>`
+      : `<div style="text-align:center;padding:48px 0;color:var(--ink2)">${vuoto}</div>`}
+    <button class="fab" data-a="nuovo" aria-label="Aggiungi alimento">${ico('piu',26)}</button>`;
 }
 
 /* ---------- schermata: pasto ---------- */
@@ -724,12 +793,14 @@ const TABS = [['atlante','Alimenti','cerca'],['pasto','Pasto','piatto'],['sport'
 const TITOLI = {atlante:'CHO', pasto:'Il tuo pasto', sport:'Attività fisica'};
 
 function disegna(){
-  document.getElementById('titolo').textContent = TITOLI[S.tab];
+  const h = document.getElementById('titolo');
+  h.textContent = TITOLI[S.tab];
+  h.style.display = S.tab === 'atlante' ? 'none' : '';
   const v = document.getElementById('vista');
   v.innerHTML = S.tab==='atlante' ? vistaAtlante() : S.tab==='pasto' ? vistaPasto() : vistaSport();
   document.getElementById('nav').innerHTML = TABS.map(([id,l,i]) => `
     <button class="${S.tab===id?'on':''}" data-a="tab:${id}">
-      ${ico(i)}<span class="lab">${l}</span>
+      <span class="ic">${ico(i)}</span><span class="lab">${l}</span>
       ${id==='pasto' && S.pasto.length ? `<span class="badge">${S.pasto.length}</span>` : ''}
     </button>`).join('');
   document.getElementById('strati').innerHTML =
