@@ -22,19 +22,33 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
   body{
-    background:var(--bg); color:var(--ink); font-family:var(--font);
+    background:linear-gradient(180deg,#EAF2EC 0%,var(--bg) 320px); color:var(--ink); font-family:var(--font);
     padding-top:env(safe-area-inset-top);
     -webkit-text-size-adjust:100%;
   }
+  button{transition:transform .12s ease}
+  button:active{transform:scale(.96)}
+  @keyframes su{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .anim .hero{animation:su .45s ease both}
+  .anim .cerca{animation:su .45s ease .06s both}
+  .anim .chips{animation:su .45s ease .1s both}
+  .anim .cella{animation:su .4s ease both}
   h1{font-size:26px;font-weight:800;letter-spacing:-.4px;margin:0;padding:20px 16px 8px}
 
   .hero{
-    background:linear-gradient(135deg,#12996E 0%,#0E7A57 45%,#0A5C41 100%);
-    border-radius:28px;padding:22px 20px;color:#fff;margin:14px 0;
-    box-shadow:0 10px 24px rgba(14,122,87,.28)
+    position:relative;overflow:hidden;
+    background:linear-gradient(140deg,#16B47E 0%,#0E8A61 40%,#0A5C41 85%);
+    border-radius:30px;padding:24px 20px;color:#fff;margin:14px 0;
+    box-shadow:0 14px 34px rgba(14,122,87,.35)
   }
+  .hero::before{content:'';position:absolute;width:230px;height:230px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 70%);top:-90px;right:-60px}
+  .hero::after{content:'';position:absolute;width:170px;height:170px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.14),rgba(255,255,255,0) 70%);bottom:-70px;left:-45px}
+  .hero>*{position:relative;z-index:1}
   .hero .occhiello{font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:.75;text-transform:uppercase}
-  .hero .titolone{font-size:26px;font-weight:800;letter-spacing:-.4px;margin-top:4px;line-height:1.15}
+  .hero .titolone{font-size:27px;font-weight:800;letter-spacing:-.5px;margin-top:4px;line-height:1.12}
+  .hero .datali{font-size:13px;font-weight:600;opacity:.8;margin-top:6px;text-transform:capitalize}
   .pastoPill{
     display:flex;align-items:center;gap:8px;width:100%;margin-top:14px;text-align:left;
     background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
@@ -48,31 +62,35 @@
   }
   .azione .em{font-size:22px;line-height:1}
 
-  .griglia{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .griglia{display:grid;grid-template-columns:1fr 1fr;gap:11px}
   .cella{
-    position:relative;background:var(--card);border:1px solid var(--line);border-radius:22px;
-    padding:14px;box-shadow:0 2px 6px rgba(19,32,25,.05)
+    position:relative;background:var(--card);border:1px solid var(--line);border-radius:24px;
+    padding:14px;box-shadow:0 4px 14px rgba(19,32,25,.06)
   }
   .cella .apri{display:block;width:100%;text-align:left}
-  .cella .emg{font-size:34px;line-height:1;display:block}
+  .cella .emg{
+    width:54px;height:54px;border-radius:18px;background:var(--cho-soft);
+    display:flex;align-items:center;justify-content:center;font-size:30px;line-height:1
+  }
   .cella .nome2{
     font-weight:650;font-size:14px;line-height:1.25;margin:9px 0 8px;min-height:35px;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden
   }
   .chopill{
-    display:inline-block;background:var(--cho-soft);color:var(--cho);
-    font-weight:700;font-size:13px;padding:4px 10px;border-radius:999px
+    display:inline-block;background:linear-gradient(135deg,#12996E,#0A5C41);color:#fff;
+    font-weight:700;font-size:13px;padding:4px 11px;border-radius:999px;
+    box-shadow:0 3px 8px rgba(14,122,87,.25)
   }
   .cella .stella{position:absolute;top:6px;right:6px}
 
   .fab{
-    position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom));
-    width:58px;height:58px;border-radius:20px;color:#fff;z-index:30;
-    background:linear-gradient(135deg,#12996E,#0A5C41);
+    position:fixed;right:18px;bottom:calc(94px + env(safe-area-inset-bottom));
+    width:60px;height:60px;border-radius:22px;color:#fff;z-index:30;
+    background:linear-gradient(135deg,#16B47E,#0A5C41);
     display:flex;align-items:center;justify-content:center;
-    box-shadow:0 8px 20px rgba(14,122,87,.4)
+    box-shadow:0 10px 26px rgba(14,122,87,.45), 0 0 0 6px rgba(14,122,87,.08)
   }
-  main{padding:0 16px 120px}
+  main{padding:0 16px 150px}
   button{font-family:inherit;border:0;background:none;cursor:pointer;color:inherit}
   input{font-family:inherit}
   .card{background:var(--card);border:1px solid var(--line);border-radius:20px}
@@ -92,7 +110,8 @@
     padding:9px 14px;border-radius:999px;font-size:14px;font-weight:500;white-space:nowrap;
     background:var(--card);border:1px solid var(--line);color:var(--ink2)
   }
-  .chip.on{background:var(--c,var(--cho));border-color:var(--c,var(--cho));color:#fff;font-weight:600}
+  .chip.on{background:var(--c,var(--cho));border-color:var(--c,var(--cho));color:#fff;font-weight:600;
+    box-shadow:0 4px 12px rgba(19,32,25,.16)}
   .chips-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
   .stella{padding:8px;color:#C3CCC5}
   .stella.on{color:var(--wave)}
@@ -104,8 +123,10 @@
   .avvisoBox{display:flex;gap:8px;font-size:14px;border-radius:18px;padding:14px;margin-bottom:16px;line-height:1.5}
 
   nav{
-    position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);
-    border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:20
+    position:fixed;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));
+    display:flex;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--line);border-radius:28px;z-index:20;
+    box-shadow:0 12px 32px rgba(19,32,25,.16)
   }
   nav button{flex:1;padding:8px 0 8px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--ink2);position:relative}
   nav button.on{color:var(--cho)}
@@ -503,14 +524,22 @@ const chip = (txt, on, azione, colore) =>
   `<button class="chip ${on?'on':''}" style="--c:${colore||'var(--cho)'}" data-a="${azione}">${txt}</button>`;
 
 /* ---------- schermata: atlante ---------- */
+const CAT_EMOJI = {
+  'Preferiti':'⭐','Tutti':'🍽️','Pane e cereali':'🍞','Primi e patate':'🍝','Frutta':'🍎',
+  'Verdura e legumi':'🥦','Latte e derivati':'🥛','Dolci e snack':'🍪','Fuori casa':'🍕',
+  'Bevande':'🥤','Zuccheri rapidi':'🍬','Altro':'🧺'
+};
+
 function vistaAtlante(){
   const ora = new Date().getHours();
-  const saluto = ora < 6 ? 'Notte fonda' : ora < 13 ? 'Buongiorno' : ora < 18 ? 'Buon pomeriggio' : 'Buonasera';
+  const saluto = ora < 6 ? 'Notte fonda 🌙' : ora < 13 ? 'Buongiorno 🌅' : ora < 18 ? 'Buon pomeriggio ☀️' : 'Buonasera 🌙';
+  const dataOggi = new Date().toLocaleDateString('it-IT', { weekday:'long', day:'numeric', month:'long' });
   const t = totali();
   const hero = `
     <div class="hero">
       <div class="occhiello">CHO · Conta carboidrati</div>
-      <div class="titolone">${saluto} 👋<br>Cosa mangi oggi?</div>
+      <div class="titolone">${saluto}<br>Cosa mangi oggi?</div>
+      <div class="datali">${dataOggi}</div>
       ${S.pasto.length ? `
         <button class="pastoPill" data-a="tab:pasto">
           <span style="font-size:18px">🍽️</span>
@@ -540,8 +569,8 @@ function vistaAtlante(){
   else if(S.cat !== 'Tutti') l = l.filter(f => f.cat === S.cat);
   if(S.q.trim()) l = l.filter(f => norm(f.n).includes(norm(S.q.trim())));
 
-  const celle = l.map(f => `
-    <div class="cella">
+  const celle = l.map((f,i) => `
+    <div class="cella" style="animation-delay:${Math.min(i,8)*45}ms">
       <button class="apri" data-a="apri:${f.id}">
         <span class="emg">${f.e}</span>
         <span class="nome2">${esc(f.n)}</span>
@@ -564,7 +593,7 @@ function vistaAtlante(){
     <div class="cerca">${ico('cerca',20)}
       <input id="q" placeholder="Cerca tra i tuoi alimenti" value="${esc(S.q)}">
     </div>
-    <div class="chips">${catInUso.map(c => chip(c, S.cat===c, 'cat:'+c)).join('')}</div>
+    <div class="chips">${catInUso.map(c => chip(`${CAT_EMOJI[c]||''} ${c}`, S.cat===c, 'cat:'+c)).join('')}</div>
     ${celle ? `<div class="griglia">${celle}</div>`
       : `<div style="text-align:center;padding:48px 0;color:var(--ink2)">${vuoto}</div>`}
     <button class="fab" data-a="nuovo" aria-label="Aggiungi alimento">${ico('piu',26)}</button>`;
@@ -835,6 +864,9 @@ function disegna(){
   h.textContent = TITOLI[S.tab];
   h.style.display = S.tab === 'atlante' ? 'none' : '';
   const v = document.getElementById('vista');
+  /* Le animazioni d'ingresso partono solo cambiando schermata, non a ogni tocco. */
+  v.classList.toggle('anim', S.tab !== disegna.ultimoTab);
+  disegna.ultimoTab = S.tab;
   v.innerHTML = S.tab==='atlante' ? vistaAtlante() : S.tab==='pasto' ? vistaPasto() : vistaSport();
   document.getElementById('nav').innerHTML = TABS.map(([id,l,i]) => `
     <button class="${S.tab===id?'on':''}" data-a="tab:${id}">
