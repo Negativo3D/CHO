@@ -328,6 +328,34 @@ const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
 function scrivi(patch){ try{ localStorage.setItem(CHIAVE, JSON.stringify({...leggi(), ...patch})); }catch(e){} }
 
+function esportaDati(){
+  const blob = new Blob([JSON.stringify(leggi(), null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `atlante-cho-alimenti-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function importaDati(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const dati = JSON.parse(r.result);
+      if(!dati || typeof dati !== 'object' || Array.isArray(dati)) throw new Error();
+      if('preferiti' in dati && !(Array.isArray(dati.preferiti) && dati.preferiti.every(x => typeof x === 'string'))) throw new Error();
+      scrivi(dati);
+      S.preferiti = leggi().preferiti || [];
+      disegna();
+      alert('Alimenti importati.');
+    }catch(e){
+      alert("Il file scelto non è un'esportazione valida di questa app.");
+    }
+  };
+  r.readAsText(file);
+}
+
 let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', aperto:null, gr:100,
@@ -491,7 +519,14 @@ function vistaSport(){
     </div>
     <div class="avvisoBox" style="background:var(--card);border:1px solid var(--line);color:var(--ink2)">
       <span>ℹ️</span><span>Queste quantità sono fasce di partenza, non prescrizioni. La risposta all'esercizio è molto
-      personale: annota come va nelle prime sessioni e portane i risultati al tuo team.</span></div>`;
+      personale: annota come va nelle prime sessioni e portane i risultati al tuo team.</span></div>
+    <div class="card" style="padding:20px;margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px">I tuoi alimenti su file</div>
+      <p style="font-size:14px;color:var(--ink2);margin:0 0 14px">Esporta in un file JSON gli alimenti personali
+        salvati su questo dispositivo, per conservarli o portarli su un altro telefono, e reimportali quando serve.</p>
+      <button class="primario" style="background:var(--sport);margin-bottom:10px" data-a="esporta">Esporta alimenti (JSON)</button>
+      <button class="primario" style="background:var(--card);color:var(--sport);border:1px solid var(--line)" data-a="importa">Importa alimenti da file</button>
+    </div>`;
 }
 
 /* ---------- strati sopra: porzione e avviso ---------- */
@@ -583,6 +618,14 @@ document.addEventListener('click', e => {
   else if(a==='togli') S.pasto.splice(+p1,1);
   else if(a==='svuota') S.pasto = [];
   else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
+  else if(a==='esporta'){ esportaDati(); return; }
+  else if(a==='importa'){
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/json,.json';
+    inp.onchange = () => { if(inp.files[0]) importaDati(inp.files[0]); };
+    inp.click();
+    return;
+  }
   else if(a==='ok') scrivi({avvisoVisto:true});
   disegna();
 });
