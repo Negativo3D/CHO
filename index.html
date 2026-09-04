@@ -67,6 +67,19 @@
     background:radial-gradient(circle,rgba(255,255,255,.25),rgba(255,255,255,0) 70%);top:-40px;right:-30px}
   .tile .em{font-size:40px;line-height:1;position:relative}
   .tile .nomeT{font-weight:800;font-size:13px;letter-spacing:.8px;position:relative}
+  .tile .apriT{display:flex;flex-direction:column;align-items:center;gap:9px;width:100%;color:#fff;padding:0}
+  .ingrT{position:absolute;top:6px;right:6px;z-index:2;width:30px;height:30px;border-radius:999px;
+    background:rgba(255,255,255,.24);color:#fff;display:flex;align-items:center;justify-content:center}
+
+  .tparam{width:100%;border-collapse:separate;border-spacing:4px 6px;table-layout:fixed}
+  .tparam thead th{font-size:11px;font-weight:600;color:var(--ink2);text-align:center;padding:0 2px}
+  .tparam thead th:first-child, .tparam tbody th{width:76px;text-align:left;font-size:12px;
+    font-weight:600;color:var(--ink2);white-space:nowrap;padding:0}
+  .tparam input{width:100%;padding:10px 2px;text-align:center;border:1px solid var(--line);border-radius:12px;
+    background:var(--card);font-size:16px;font-weight:600;color:var(--ink);outline:none;
+    font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+  .tparam input::-webkit-outer-spin-button,.tparam input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .tparam input:focus{border-color:var(--sport)}
 
   .eroeViola{
     position:relative;overflow:hidden;color:#fff;
@@ -316,21 +329,57 @@ const ATTIVITA = {
   trekking: { nome:'Trekking', icona:'🥾', sotto:'Camminata lunga',          oraria:10, fattorePrima:0.8 }
 };
 
+const INTENSITA = [['leggera','Leggera'],['moderata','Moderata'],['intensa','Intensa']];
+const FASCE = [['mattina','Mattina'],['pomeriggio','Pomeriggio'],['sera','Sera']];
+const DURATE = [[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']];
+
+/* Ogni sport ha una tabella di grammi di CHO compilabile dall'utente
+   (pulsante "parametri"): "prima" per intensità × fascia oraria,
+   "durante" per intensità × durata. La schermata Sport non calcola
+   nulla: richiama la cella corrispondente alle condizioni scelte.
+   I valori di partenza riproducono le vecchie fasce orientative. */
+function tabellaDefault(id){
+  const att = ATTIVITA[id] || ATTIVITA.nuoto;
+  const t = { prima:{}, durante:{} };
+  for(const [iv] of INTENSITA){
+    const fInt = iv === 'leggera' ? 0.5 : iv === 'moderata' ? 1 : 1.4;
+    t.prima[iv] = {}; t.durante[iv] = {};
+    for(const [fv] of FASCE){
+      const base = fv === 'mattina' ? 8 : fv === 'sera' ? 22 : 18;
+      t.prima[iv][fv] = Math.round(base * fInt * att.fattorePrima);
+    }
+    for(const [dv] of DURATE){
+      const ore = dv / 60;
+      t.durante[iv][dv] = ore > 1 ? Math.round(att.oraria * fInt * (ore - 0.5)) : 0;
+    }
+  }
+  return t;
+}
+function tabellaSport(id){
+  const salvata = (leggi().tabelleSport || {})[id] || {};
+  const t = tabellaDefault(id);
+  for(const sez of ['prima','durante'])
+    for(const riga in t[sez])
+      for(const col in t[sez][riga]){
+        const v = salvata[sez] && salvata[sez][riga] ? salvata[sez][riga][col] : undefined;
+        if(typeof v === 'number' && isFinite(v) && v >= 0) t[sez][riga][col] = v;
+      }
+  return t;
+}
+function salvaCella(id, sez, riga, col, val){
+  const tutte = leggi().tabelleSport || {};
+  const t = tutte[id] || (tutte[id] = {});
+  const s = t[sez] || (t[sez] = {});
+  const r = s[riga] || (s[riga] = {});
+  const n = parseFloat(String(val).replace(',', '.'));
+  if(isFinite(n) && n >= 0) r[col] = Math.round(n); else delete r[col];
+  scrivi({ tabelleSport: tutte });
+}
+
 function calcolaSport({ attivita, intensita, durata, fascia }) {
-  const att = ATTIVITA[attivita] || ATTIVITA.nuoto;
-  const fattoreInt = intensita === "leggera" ? 0.5 : intensita === "moderata" ? 1 : 1.4;
-  const ore = durata / 60;
-
-  // La mattina, spesso a digiuno, il fabbisogno prima di partire è più
-  // basso; la sera la fascia sale perché l'insulina dei pasti della
-  // giornata è più spesso ancora in circolo.
-  let prima;
-  if (fascia === "mattina") prima = [0, 15];
-  else if (fascia === "sera") prima = [15, 30];
-  else prima = [10, 25];
-  prima = prima.map(x => Math.round(x * fattoreInt * att.fattorePrima));
-
-  const durante = ore > 1 ? Math.round(att.oraria * fattoreInt * (ore - 0.5)) : 0;
+  const t = tabellaSport(attivita);
+  const prima = t.prima[intensita][fascia];
+  const durante = t.durante[intensita][durata];
 
   // Profilo basale: forma della riduzione temporanea e anticipo.
   let rid = intensita === "leggera" ? (durata <= 30 ? null : [10, 30])
@@ -359,6 +408,7 @@ const IC = {
   cestino:'<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
   meno:'<path d="M5 12h14"/>', piu:'<path d="M12 5v14M5 12h14"/>', chiudi:'<path d="M6 6l12 12M18 6L6 18"/>',
   barcode:'<path d="M4 6v12M8 6v12M11 6v9M14 6v12M17 6v9M20 6v12"/>',
+  regola:'<path d="M4 8h8M18 8h2M4 16h2M12 16h8"/><circle cx="15" cy="8" r="2.5"/><circle cx="9" cy="16" r="2.5"/>',
   camera:'<path d="M3 8a1 1 0 0 1 1-1h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="12" cy="13" r="3.5"/>'
 };
 function ico(n, s=22, pieno=false){
@@ -369,7 +419,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-04.11';
+const VERSIONE = '2026-09-04.12';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -481,6 +531,7 @@ let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', aperto:null, gr:100,
   sport:{ attivita:null, intensita:'moderata', durata:60, fascia:'pomeriggio' },
+  paramSport:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:''
 };
 
@@ -844,61 +895,94 @@ function vistaSport(){
     </div>
     <div class="attivita">
       ${Object.entries(ATTIVITA).map(([id,a],i) => `
-        <button class="tile" style="animation-delay:${i*60}ms" data-a="att:${id}">
-          <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
-        </button>`).join('')}
+        <div class="tile" style="animation-delay:${i*60}ms">
+          <button class="apriT" data-a="att:${id}">
+            <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
+          </button>
+          <button class="ingrT" data-a="param:${id}" aria-label="Parametri ${a.nome}">${ico('regola',16)}</button>
+        </div>`).join('')}
     </div>
     ${versione}`;
 
   const att = ATTIVITA[s.attivita];
   const r = calcolaSport(s);
+  /* Tutto in una schermata, senza scorrimento: spaziature compatte. */
   const G = (lab, opzioni, campo) => `
-    <div style="margin-bottom:16px">
-      <div style="font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:8px">${lab}</div>
-      <div class="chips-wrap" style="margin:0">
+    <div style="margin-bottom:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:5px">${lab}</div>
+      <div class="chips-wrap" style="margin:0;gap:6px">
         ${opzioni.map(([v,t]) => chip(t, s[campo]===v, `sp:${campo}:${v}`, 'var(--sport)')).join('')}</div>
     </div>`;
 
   return `
-    <div class="card" style="padding:20px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line)">
-        <span style="width:58px;height:58px;border-radius:18px;background:var(--sport-soft);display:flex;
-          align-items:center;justify-content:center;font-size:32px;line-height:1">${att.icona}</span>
-        <div style="flex:1">
-          <div style="font-weight:800;font-size:21px;letter-spacing:-.3px">${att.nome}</div>
-          <div style="font-size:13px;color:var(--ink2)">${att.sotto}</div>
+    <div class="card" style="padding:14px 16px 8px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)">
+        <span style="width:44px;height:44px;border-radius:14px;background:var(--sport-soft);display:flex;
+          align-items:center;justify-content:center;font-size:25px;line-height:1;flex:none">${att.icona}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:18px;letter-spacing:-.3px">${att.nome}</div>
+          <div style="font-size:12px;color:var(--ink2)">${att.sotto}</div>
         </div>
-        <button class="chip" data-a="att:" style="--c:var(--sport)">‹ Cambia</button>
+        <button class="chip" data-a="param:${s.attivita}" aria-label="Parametri ${att.nome}"
+          style="--c:var(--sport);display:flex;align-items:center;gap:5px">${ico('regola',15)}</button>
+        <button class="chip" data-a="att:" style="--c:var(--sport)">‹</button>
       </div>
-      ${G('Intensità', [['leggera','Leggera'],['moderata','Moderata'],['intensa','Intensa']], 'intensita')}
-      ${G('Durata', [[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']], 'durata')}
-      ${G('Fascia oraria', [['mattina','Mattina'],['pomeriggio','Pomeriggio'],['sera','Sera']], 'fascia')}
+      ${G('Intensità', INTENSITA, 'intensita')}
+      ${G('Durata', DURATE, 'durata')}
+      ${G('Fascia oraria', FASCE, 'fascia')}
     </div>
-    <div class="box eroeViola">
-      <div style="display:flex;align-items:baseline;gap:8px">
-        <span class="num" style="font-size:50px;font-weight:800;line-height:1">${r.prima[0]===r.prima[1]?r.prima[0]:r.prima[0]+'-'+r.prima[1]}</span>
-        <span style="font-weight:600">g prima</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="box eroeViola" style="margin:0;padding:14px 16px">
+        <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.prima}<span style="font-size:17px;font-weight:700"> g</span></div>
+        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.prima===0 ? 'niente prima di partire' : 'prima, senza bolo'}</div>
       </div>
-      <div style="font-size:14px;opacity:.9;margin-top:4px">${r.prima[1]===0
-        ? 'Nessun carboidrato aggiuntivo previsto prima di partire.'
-        : 'Carboidrati da assumere senza bolo, circa 15 minuti prima.'}</div>
-      ${r.durante>0 ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.25)">
-        <span class="num" style="font-size:30px;font-weight:700">${r.durante} g</span>
-        <span style="font-weight:600;margin-left:8px">durante</span>
-        <div style="font-size:14px;opacity:.9;margin-top:4px">Distribuiti nel corso dell'attività.</div></div>` : ''}
+      <div class="box" style="margin:0;padding:14px 16px;background:var(--sport);color:#fff;box-shadow:0 4px 14px rgba(75,79,184,.3)">
+        <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.durante}<span style="font-size:17px;font-weight:700"> g</span></div>
+        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.durante===0 ? 'niente durante' : 'durante, distribuiti'}</div>
+      </div>
     </div>
-    <div class="box" style="background:var(--sport-soft);box-shadow:0 4px 14px rgba(75,79,184,.12)">
-      <div style="font-weight:700;color:var(--sport);margin-bottom:12px">💧 Profilo basale da applicare</div>
-      <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-bottom:10px">
+    <div class="box" style="background:var(--sport-soft);padding:12px 16px;margin-bottom:6px;box-shadow:none">
+      <div style="font-weight:700;color:var(--sport);font-size:13px;margin-bottom:6px">💧 Profilo basale da applicare</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px">
         <span style="color:var(--ink2);flex:none">Tipo di profilo</span>
         <b style="text-align:right">${r.basale.profilo}</b></div>
-      <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px">
+      <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:4px">
         <span style="color:var(--ink2);flex:none">Quanto tempo prima</span>
         <b style="text-align:right">${r.basale.anticipo}</b></div>
-      <p style="font-size:12px;color:var(--ink2);margin:12px 0 0">La riduzione la imposti sul microinfusore, in percentuale
-        sul tuo profilo: qui nessuna unità, solo la forma.</p>
     </div>
     ${versione}`;
+}
+
+/* ---------- strato: parametri dello sport ---------- */
+function stratoParametri(){
+  const id = S.paramSport; if(!id || !ATTIVITA[id]) return '';
+  const a = ATTIVITA[id];
+  const t = tabellaSport(id);
+  const tab = (sez, cols, titolo, sotto) => `
+    <div style="font-weight:700;margin:16px 0 2px">${titolo}</div>
+    <div style="font-size:12px;color:var(--ink2);margin-bottom:8px">${sotto}</div>
+    <table class="tparam">
+      <thead><tr><th></th>${cols.map(([,l]) => `<th>${l}</th>`).join('')}</tr></thead>
+      <tbody>${INTENSITA.map(([iv,il]) => `<tr><th>${il}</th>${cols.map(([cv]) => `
+        <td><input type="number" inputmode="numeric" min="0" id="pt-${sez}-${iv}-${cv}" value="${t[sez][iv][cv]}"></td>`).join('')}</tr>`).join('')}
+      </tbody></table>`;
+  return `
+  <div class="velo" data-a="chiudiParam">
+    <div class="foglio" data-stop="1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <span style="font-size:32px;line-height:1">${a.icona}</span>
+          <div style="font-weight:800;font-size:19px">Parametri ${a.nome}</div>
+        </div>
+        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiParam">${ico('chiudi',20)}</button>
+      </div>
+      <p style="font-size:13px;color:var(--ink2)">Grammi di carboidrati per ogni condizione: la schermata Sport
+        richiama la cella che corrisponde a intensità, durata e fascia scelte. Si salvano da soli su questo telefono.</p>
+      ${tab('prima', FASCE, 'CHO prima di partire', 'Grammi per intensità (righe) e fascia oraria (colonne).')}
+      ${tab('durante', DURATE, "CHO durante l'attività", 'Grammi totali della sessione, per intensità e durata.')}
+      <button class="primario" style="background:var(--sport);margin-top:18px" data-a="chiudiParam">Fatto</button>
+    </div>
+  </div>`;
 }
 
 /* ---------- strati sopra: porzione e avviso ---------- */
@@ -1057,7 +1141,8 @@ function disegna(){
       ${id==='pasto' && S.pasto.length ? `<span class="badge">${S.pasto.length}</span>` : ''}
     </button>`).join('');
   document.getElementById('strati').innerHTML =
-    (S.aperto ? stratoPorzione() : '') + stratoNuovo() + (leggi().avvisoVisto ? '' : stratoAvviso());
+    (S.aperto ? stratoPorzione() : '') + stratoNuovo() + (S.paramSport ? stratoParametri() : '') +
+    (leggi().avvisoVisto ? '' : stratoAvviso());
   if(S.nuovo === 'barcode' && flussoCamera){
     const vd = document.getElementById('anteprima');
     if(vd && !vd.srcObject) vd.srcObject = flussoCamera;
@@ -1074,6 +1159,7 @@ document.addEventListener('click', e => {
   if(a==='tab'){
     /* Rientrando in Sport si riparte sempre dal menu di scelta dell'attività. */
     if(p1 === 'sport' && S.tab !== 'sport') S.sport.attivita = null;
+    S.paramSport = null;
     S.tab = p1;
   }
   else if(a==='cat') S.cat = p1;
@@ -1093,6 +1179,8 @@ document.addEventListener('click', e => {
   else if(a==='svuota') S.pasto = [];
   else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
   else if(a==='att') S.sport.attivita = p1 || null;
+  else if(a==='param') S.paramSport = p1;
+  else if(a==='chiudiParam') S.paramSport = null;
   else if(a==='nuovo') S.nuovo = 'menu';
   else if(a==='chiudiNuovo'){ fermaScanner(); S.nuovo = null; S.form = null; S.editId = null; S.caricamento = false; }
   else if(a==='nuovoForm'){ S.form = formVuoto(); S.editId = null; S.nuovo = 'form'; }
@@ -1136,6 +1224,12 @@ document.addEventListener('input', e => {
   }
   else if(id === 'fbarcode') S.codice = e.target.value;
   else if(id.startsWith('fi-') && S.form) S.form[id.slice(3)] = e.target.value;
+  else if(id.startsWith('pt-') && S.paramSport){
+    /* Cella della tabella parametri: si salva subito, senza ridisegnare
+       (il ridisegno farebbe perdere il focus mentre si scrive). */
+    const [, sez, riga, col] = id.split('-');
+    salvaCella(S.paramSport, sez, riga, col, e.target.value);
+  }
 });
 
 disegna();
