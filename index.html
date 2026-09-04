@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>CHO</title>
+<meta name="theme-color" content="#0E7A57">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CHO">
+<link rel="apple-touch-icon" href="icona-180.png">
+<link rel="icon" href="icona-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  :root{
+    --bg:#F2F4F1; --card:#FFFFFF; --ink:#132019; --ink2:#4A5A50; --line:#DDE3DC;
+    --cho:#0E7A57; --cho-soft:#E3F2EB; --wave:#A85B0C; --wave-soft:#FBEFDD;
+    --sport:#4B4FB8; --sport-soft:#E8E9F8; --hypo:#B02418; --hypo-soft:#FBE7E4;
+    --font: ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--font);
+    padding-top:env(safe-area-inset-top);
+    -webkit-text-size-adjust:100%;
+  }
+  h1{font-size:26px;font-weight:800;letter-spacing:-.4px;margin:0;padding:20px 16px 8px}
+  main{padding:0 16px 120px}
+  button{font-family:inherit;border:0;background:none;cursor:pointer;color:inherit}
+  input{font-family:inherit}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px}
+  .riga{display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px}
+  .riga .em{font-size:30px;line-height:1}
+  .riga .nome{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .riga .sotto{font-size:12px;color:var(--ink2)}
+  .cerca{position:relative;margin-bottom:12px}
+  .cerca input{
+    width:100%;padding:15px 16px 15px 44px;border-radius:18px;border:1px solid var(--line);
+    background:var(--card);font-size:16px;color:var(--ink);outline:none
+  }
+  .cerca svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--ink2)}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:0 16px 12px;margin:0 -16px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{
+    padding:9px 14px;border-radius:999px;font-size:14px;font-weight:500;white-space:nowrap;
+    background:var(--card);border:1px solid var(--line);color:var(--ink2)
+  }
+  .chip.on{background:var(--c,var(--cho));border-color:var(--c,var(--cho));color:#fff;font-weight:600}
+  .chips-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .stella{padding:8px;color:#C3CCC5}
+  .stella.on{color:var(--wave)}
+  .num{font-variant-numeric:tabular-nums}
+
+  .totale{background:var(--cho);color:#fff;border-radius:24px;padding:24px;text-align:center;margin-bottom:16px}
+  .totale .big{font-size:64px;font-weight:800;line-height:1}
+  .box{border-radius:24px;padding:20px;margin-bottom:16px}
+  .avvisoBox{display:flex;gap:8px;font-size:14px;border-radius:18px;padding:14px;margin-bottom:16px;line-height:1.5}
+
+  nav{
+    position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);
+    border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:20
+  }
+  nav button{flex:1;padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink2);position:relative}
+  nav button.on{color:var(--cho)}
+  nav .lab{font-size:11px;font-weight:500}
+  nav button.on .lab{font-weight:700}
+  .badge{position:absolute;top:4px;left:50%;margin-left:6px;background:var(--cho);color:#fff;font-size:10px;
+    font-weight:700;width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+
+  .velo{position:fixed;inset:0;background:rgba(19,32,25,.5);z-index:40;display:flex;align-items:flex-end}
+  .foglio{width:100%;background:var(--bg);border-radius:26px 26px 0 0;padding:20px 20px 34px;max-height:88vh;overflow-y:auto}
+  .stepper{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .stepper button{width:56px;height:56px;border-radius:18px;background:var(--card);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:600}
+  .primario{width:100%;padding:16px;border-radius:18px;background:var(--cho);color:#fff;font-weight:700;font-size:17px}
+  .centro{position:fixed;inset:0;background:rgba(19,32,25,.6);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px}
+  .modale{background:var(--card);border-radius:24px;padding:24px;max-width:420px;width:100%}
+  ul{margin:8px 0 0;padding-left:18px}
+  li{margin-bottom:8px;font-size:14px;line-height:1.5}
+  p{line-height:1.55;margin:0 0 10px}
+</style>
+</head>
+<body>
+<h1 id="titolo">CHO</h1>
+<main id="vista"></main>
+<nav id="nav"></nav>
+<div id="strati"></div>
+
+<script>
+const FOODS = [
+  // --- Pane e cereali ---
+  { id:"pane_bianco", n:"Pane bianco", cat:"Pane e cereali", e:"🍞", cho:55, f:0.5, p:8, ig:"alto", porz:[["1 fetta",30],["1 panino",70],["1 rosetta",50]] },
+  { id:"pane_integrale", n:"Pane integrale", cat:"Pane e cereali", e:"🍞", cho:45, f:1.5, p:8, ig:"medio", porz:[["1 fetta",35],["1 panino",70]] },
+  { id:"pane_cassetta", n:"Pan carré", cat:"Pane e cereali", e:"🍞", cho:50, f:4, p:8, ig:"alto", porz:[["1 fetta",25],["2 fette",50]] },
+  { id:"fette_bisc", n:"Fette biscottate", cat:"Pane e cereali", e:"🍘", cho:78, f:6, p:11, ig:"alto", porz:[["1 fetta",8],["3 fette",24]] },
+  { id:"cracker", n:"Cracker", cat:"Pane e cereali", e:"🍘", cho:70, f:12, p:9, ig:"alto", porz:[["1 pacchetto",25]] },
+  { id:"grissini", n:"Grissini", cat:"Pane e cereali", e:"🥖", cho:72, f:12, p:12, ig:"alto", porz:[["1 grissino",5],["4 grissini",20]] },
+  { id:"piadina", n:"Piadina", cat:"Pane e cereali", e:"🫓", cho:55, f:9, p:8, ig:"alto", porz:[["1 piadina",100]] },
+  { id:"cornflakes", n:"Fiocchi di mais", cat:"Pane e cereali", e:"🥣", cho:84, f:1, p:7, ig:"alto", porz:[["1 porzione",30]] },
+  { id:"muesli", n:"Muesli", cat:"Pane e cereali", e:"🥣", cho:60, f:10, p:10, ig:"medio", porz:[["1 porzione",40]] },
+  { id:"avena", n:"Fiocchi d'avena", cat:"Pane e cereali", e:"🥣", cho:62, f:7, p:13, ig:"basso", porz:[["1 porzione",40]] },
+
+  // --- Primi e patate ---
+  { id:"pasta_cotta", n:"Pasta cotta", cat:"Primi e patate", e:"🍝", cho:30, f:0.6, p:5, ig:"medio", porz:[["porzione piccola",150],["porzione media",200],["porzione grande",280]] },
+  { id:"pasta_cruda", n:"Pasta secca (da crudo)", cat:"Primi e patate", e:"🍝", cho:75, f:1.5, p:11, ig:"medio", porz:[["70 g",70],["80 g",80],["100 g",100]] },
+  { id:"riso_cotto", n:"Riso cotto", cat:"Primi e patate", e:"🍚", cho:28, f:0.2, p:2.5, ig:"alto", porz:[["porzione media",200],["porzione grande",280]] },
+  { id:"riso_crudo", n:"Riso (da crudo)", cat:"Primi e patate", e:"🍚", cho:78, f:0.5, p:7, ig:"alto", porz:[["70 g",70],["80 g",80]] },
+  { id:"gnocchi", n:"Gnocchi di patate", cat:"Primi e patate", e:"🥟", cho:35, f:0.5, p:3, ig:"alto", porz:[["porzione media",200]] },
+  { id:"risotto", n:"Risotto", cat:"Primi e patate", e:"🍚", cho:20, f:6, p:4, ig:"alto", porz:[["porzione media",250]] },
+  { id:"lasagne", n:"Lasagne al forno", cat:"Primi e patate", e:"🍲", cho:15, f:9, p:9, ig:"medio", porz:[["porzione media",250]] },
+  { id:"patate_lesse", n:"Patate lesse", cat:"Primi e patate", e:"🥔", cho:17, f:0.1, p:2, ig:"alto", porz:[["1 patata media",150],["porzione",200]] },
+  { id:"patate_forno", n:"Patate al forno", cat:"Primi e patate", e:"🥔", cho:22, f:4, p:2.5, ig:"alto", porz:[["porzione",150]] },
+  { id:"patatine_fritte", n:"Patatine fritte", cat:"Primi e patate", e:"🍟", cho:35, f:15, p:3.5, ig:"alto", porz:[["porzione piccola",100],["porzione media",150]] },
+  { id:"pure", n:"Purè", cat:"Primi e patate", e:"🥔", cho:15, f:4, p:2, ig:"alto", porz:[["porzione",200]] },
+  { id:"polenta", n:"Polenta", cat:"Primi e patate", e:"🌽", cho:13, f:0.4, p:1.5, ig:"alto", porz:[["porzione",250]] },
+  { id:"couscous", n:"Cous cous cotto", cat:"Primi e patate", e:"🍚", cho:23, f:0.2, p:4, ig:"medio", porz:[["porzione",200]] },
+
+  // --- Frutta ---
+  { id:"mela", n:"Mela", cat:"Frutta", e:"🍎", cho:13, f:0.2, p:0.3, ig:"basso", porz:[["1 piccola",120],["1 media",180],["1 grande",230]] },
+  { id:"pera", n:"Pera", cat:"Frutta", e:"🍐", cho:12, f:0.2, p:0.3, ig:"basso", porz:[["1 media",180]] },
+  { id:"banana", n:"Banana (sbucciata)", cat:"Frutta", e:"🍌", cho:23, f:0.3, p:1.1, ig:"medio", porz:[["1 piccola",90],["1 media",120],["1 grande",160]] },
+  { id:"arancia", n:"Arancia (polpa)", cat:"Frutta", e:"🍊", cho:9, f:0.1, p:0.9, ig:"basso", porz:[["1 media",180]] },
+  { id:"mandarino", n:"Mandarino", cat:"Frutta", e:"🍊", cho:13, f:0.2, p:0.8, ig:"basso", porz:[["1 frutto",70],["3 frutti",210]] },
+  { id:"kiwi", n:"Kiwi", cat:"Frutta", e:"🥝", cho:11, f:0.5, p:1.1, ig:"basso", porz:[["1 frutto",80]] },
+  { id:"fragole", n:"Fragole", cat:"Frutta", e:"🍓", cho:5, f:0.4, p:0.7, ig:"basso", porz:[["1 coppetta",150]] },
+  { id:"uva", n:"Uva", cat:"Frutta", e:"🍇", cho:16, f:0.2, p:0.5, ig:"medio", porz:[["1 grappolino",100]] },
+  { id:"pesca", n:"Pesca", cat:"Frutta", e:"🍑", cho:9, f:0.2, p:0.8, ig:"basso", porz:[["1 media",150]] },
+  { id:"albicocca", n:"Albicocche", cat:"Frutta", e:"🍑", cho:10, f:0.1, p:0.9, ig:"basso", porz:[["1 frutto",40],["3 frutti",120]] },
+  { id:"anguria", n:"Anguria", cat:"Frutta", e:"🍉", cho:7, f:0.2, p:0.4, ig:"alto", porz:[["1 fetta",300]] },
+  { id:"melone", n:"Melone", cat:"Frutta", e:"🍈", cho:8, f:0.2, p:0.8, ig:"alto", porz:[["1 fetta",200]] },
+  { id:"ciliegie", n:"Ciliegie", cat:"Frutta", e:"🍒", cho:13, f:0.3, p:0.9, ig:"basso", porz:[["1 coppetta",120]] },
+  { id:"ananas", n:"Ananas", cat:"Frutta", e:"🍍", cho:12, f:0.1, p:0.5, ig:"medio", porz:[["1 fetta",100]] },
+  { id:"mandorle", n:"Mandorle", cat:"Frutta", e:"🌰", cho:5, f:50, p:21, ig:"basso", porz:[["1 manciata",30]] },
+  { id:"noci", n:"Noci", cat:"Frutta", e:"🌰", cho:5, f:65, p:15, ig:"basso", porz:[["1 manciata",30]] },
+
+  // --- Verdura e legumi ---
+  { id:"insalata", n:"Insalata", cat:"Verdura e legumi", e:"🥬", cho:2, f:0.2, p:1.5, ig:"basso", porz:[["1 piatto",100]] },
+  { id:"pomodoro", n:"Pomodori", cat:"Verdura e legumi", e:"🍅", cho:3, f:0.2, p:1, ig:"basso", porz:[["1 piatto",150]] },
+  { id:"zucchine", n:"Zucchine", cat:"Verdura e legumi", e:"🥒", cho:2, f:0.1, p:1.3, ig:"basso", porz:[["porzione",200]] },
+  { id:"carote", n:"Carote", cat:"Verdura e legumi", e:"🥕", cho:8, f:0.2, p:1, ig:"medio", porz:[["porzione",150]] },
+  { id:"broccoli", n:"Broccoli", cat:"Verdura e legumi", e:"🥦", cho:4, f:0.4, p:3, ig:"basso", porz:[["porzione",200]] },
+  { id:"zucca", n:"Zucca", cat:"Verdura e legumi", e:"🎃", cho:4, f:0.1, p:1, ig:"alto", porz:[["porzione",200]] },
+  { id:"mais", n:"Mais in scatola", cat:"Verdura e legumi", e:"🌽", cho:19, f:1.2, p:3, ig:"medio", porz:[["2 cucchiai",50]] },
+  { id:"piselli", n:"Piselli", cat:"Verdura e legumi", e:"🫛", cho:10, f:0.5, p:5.5, ig:"basso", porz:[["porzione",150]] },
+  { id:"ceci", n:"Ceci lessati", cat:"Verdura e legumi", e:"🫘", cho:17, f:2.5, p:7, ig:"basso", porz:[["porzione",150]] },
+  { id:"fagioli", n:"Fagioli lessati", cat:"Verdura e legumi", e:"🫘", cho:17, f:0.6, p:8, ig:"basso", porz:[["porzione",150]] },
+  { id:"lenticchie", n:"Lenticchie lessate", cat:"Verdura e legumi", e:"🫘", cho:17, f:0.5, p:7, ig:"basso", porz:[["porzione",150]] },
+
+  // --- Latte e derivati ---
+  { id:"latte_intero", n:"Latte intero", cat:"Latte e derivati", e:"🥛", cho:5, f:3.6, p:3.2, ig:"basso", porz:[["1 tazza",200],["1 bicchiere",125]] },
+  { id:"latte_scremato", n:"Latte scremato", cat:"Latte e derivati", e:"🥛", cho:5, f:0.2, p:3.4, ig:"basso", porz:[["1 tazza",200]] },
+  { id:"yogurt_bianco", n:"Yogurt bianco", cat:"Latte e derivati", e:"🥣", cho:4, f:3.5, p:3.5, ig:"basso", porz:[["1 vasetto",125]] },
+  { id:"yogurt_greco", n:"Yogurt greco 0%", cat:"Latte e derivati", e:"🥣", cho:4, f:0, p:9, ig:"basso", porz:[["1 vasetto",150]] },
+  { id:"yogurt_frutta", n:"Yogurt alla frutta", cat:"Latte e derivati", e:"🥣", cho:13, f:2.5, p:3, ig:"medio", porz:[["1 vasetto",125]] },
+  { id:"mozzarella", n:"Mozzarella", cat:"Latte e derivati", e:"🧀", cho:1, f:20, p:18, ig:"basso", porz:[["1 mozzarella",125]] },
+  { id:"ricotta", n:"Ricotta", cat:"Latte e derivati", e:"🧀", cho:3, f:11, p:8, ig:"basso", porz:[["porzione",100]] },
+  { id:"parmigiano", n:"Parmigiano", cat:"Latte e derivati", e:"🧀", cho:0, f:28, p:33, ig:"basso", porz:[["1 cucchiaio",10],["porzione",50]] },
+  { id:"gelato", n:"Gelato", cat:"Latte e derivati", e:"🍨", cho:24, f:13, p:4, ig:"medio", porz:[["coppetta piccola",80],["coppetta media",120],["cono",150]] },
+
+  // --- Dolci e snack ---
+  { id:"biscotti", n:"Biscotti secchi", cat:"Dolci e snack", e:"🍪", cho:70, f:13, p:7, ig:"alto", porz:[["1 biscotto",8],["4 biscotti",32]] },
+  { id:"frollini_cioc", n:"Biscotti al cioccolato", cat:"Dolci e snack", e:"🍪", cho:65, f:22, p:6, ig:"medio", porz:[["1 biscotto",12],["3 biscotti",36]] },
+  { id:"croissant", n:"Cornetto vuoto", cat:"Dolci e snack", e:"🥐", cho:45, f:20, p:8, ig:"medio", porz:[["1 cornetto",50]] },
+  { id:"croissant_crema", n:"Cornetto alla crema", cat:"Dolci e snack", e:"🥐", cho:47, f:20, p:7, ig:"medio", porz:[["1 cornetto",75]] },
+  { id:"nutella", n:"Crema alle nocciole", cat:"Dolci e snack", e:"🍫", cho:57, f:31, p:6, ig:"medio", porz:[["1 cucchiaino",15],["1 cucchiaio",30]] },
+  { id:"cioc_latte", n:"Cioccolato al latte", cat:"Dolci e snack", e:"🍫", cho:55, f:32, p:7, ig:"medio", porz:[["1 quadratino",5],["mezza tavoletta",50]] },
+  { id:"cioc_fondente", n:"Cioccolato fondente", cat:"Dolci e snack", e:"🍫", cho:30, f:40, p:8, ig:"basso", porz:[["1 quadratino",5],["4 quadratini",20]] },
+  { id:"merendina", n:"Merendina", cat:"Dolci e snack", e:"🧁", cho:55, f:18, p:6, ig:"medio", porz:[["1 pezzo",35]] },
+  { id:"crostata", n:"Crostata", cat:"Dolci e snack", e:"🥧", cho:60, f:12, p:5, ig:"medio", porz:[["1 fetta",80]] },
+  { id:"torta", n:"Torta margherita", cat:"Dolci e snack", e:"🍰", cho:55, f:15, p:7, ig:"medio", porz:[["1 fetta",80]] },
+  { id:"patatine", n:"Patatine in busta", cat:"Dolci e snack", e:"🥔", cho:50, f:33, p:6, ig:"alto", porz:[["busta piccola",25],["busta media",50]] },
+  { id:"barretta", n:"Barretta ai cereali", cat:"Dolci e snack", e:"🍫", cho:65, f:12, p:6, ig:"medio", porz:[["1 barretta",25]] },
+
+  // --- Fuori casa ---
+  { id:"pizza_marg", n:"Pizza margherita", cat:"Fuori casa", e:"🍕", cho:33, f:8, p:12, ig:"alto", porz:[["mezza pizza",150],["1 pizza",300],["1 pizza grande",400]] },
+  { id:"pizza_taglio", n:"Pizza al taglio", cat:"Fuori casa", e:"🍕", cho:35, f:10, p:11, ig:"alto", porz:[["1 trancio",150]] },
+  { id:"focaccia", n:"Focaccia", cat:"Fuori casa", e:"🫓", cho:50, f:14, p:7, ig:"alto", porz:[["1 pezzo",100]] },
+  { id:"panino_farcito", n:"Panino prosciutto e formaggio", cat:"Fuori casa", e:"🥪", cho:30, f:12, p:15, ig:"alto", porz:[["1 panino",150]] },
+  { id:"hamburger", n:"Hamburger nel pane", cat:"Fuori casa", e:"🍔", cho:20, f:12, p:13, ig:"alto", porz:[["1 hamburger",200]] },
+  { id:"sushi", n:"Sushi (nigiri e maki)", cat:"Fuori casa", e:"🍣", cho:30, f:2, p:5, ig:"alto", porz:[["6 pezzi",150],["10 pezzi",250]] },
+  { id:"cotoletta", n:"Cotoletta impanata", cat:"Fuori casa", e:"🍖", cho:12, f:18, p:20, ig:"medio", porz:[["1 porzione",150]] },
+  { id:"carne_pesce", n:"Carne o pesce (semplice)", cat:"Fuori casa", e:"🍖", cho:0, f:6, p:22, ig:"basso", porz:[["1 porzione",150]] },
+  { id:"uova", n:"Uova", cat:"Fuori casa", e:"🥚", cho:0.5, f:11, p:13, ig:"basso", porz:[["1 uovo",55],["2 uova",110]] },
+
+  // --- Bevande ---
+  { id:"succo", n:"Succo di frutta", cat:"Bevande", e:"🧃", cho:11, f:0, p:0.2, ig:"alto", porz:[["1 brik",200],["1 bicchiere",125]] },
+  { id:"spremuta", n:"Spremuta d'arancia", cat:"Bevande", e:"🍹", cho:9, f:0, p:0.7, ig:"medio", porz:[["1 bicchiere",200]] },
+  { id:"cola", n:"Cola", cat:"Bevande", e:"🥤", cho:11, f:0, p:0, ig:"alto", porz:[["1 lattina",330],["1 bicchiere",200]] },
+  { id:"aranciata", n:"Aranciata", cat:"Bevande", e:"🥤", cho:10, f:0, p:0, ig:"alto", porz:[["1 lattina",330]] },
+  { id:"the_freddo", n:"Tè freddo", cat:"Bevande", e:"🧋", cho:7, f:0, p:0, ig:"alto", porz:[["1 bottiglietta",250]] },
+  { id:"birra", n:"Birra", cat:"Bevande", e:"🍺", cho:3.5, f:0, p:0.5, ig:"medio", alcol:true, porz:[["1 media",400],["1 piccola",200]] },
+  { id:"vino", n:"Vino", cat:"Bevande", e:"🍷", cho:0.6, f:0, p:0.1, ig:"basso", alcol:true, porz:[["1 bicchiere",125]] },
+
+  // --- Zuccheri rapidi ---
+  { id:"zucchero", n:"Zucchero", cat:"Zuccheri rapidi", e:"🍬", cho:100, f:0, p:0, ig:"alto", rapido:true, porz:[["1 zolletta",5],["1 cucchiaino",5],["3 zollette",15]] },
+  { id:"glucosio", n:"Tavolette di glucosio", cat:"Zuccheri rapidi", e:"💊", cho:90, f:0, p:0, ig:"alto", rapido:true, porz:[["1 tavoletta",4],["4 tavolette",16]] },
+  { id:"miele", n:"Miele", cat:"Zuccheri rapidi", e:"🍯", cho:80, f:0, p:0.3, ig:"alto", rapido:true, porz:[["1 cucchiaino",10],["1 cucchiaio",20]] },
+  { id:"marmellata", n:"Marmellata", cat:"Zuccheri rapidi", e:"🍓", cho:60, f:0, p:0.5, ig:"alto", rapido:true, porz:[["1 cucchiaino",15],["1 cucchiaio",25]] },
+];
+
+
+const CATS = ["Tutti","Pane e cereali","Primi e patate","Frutta","Verdura e legumi","Latte e derivati","Dolci e snack","Fuori casa","Bevande","Zuccheri rapidi"];
+function calcolaBolo(cho, grassi, proteine, igPrevalente) {
+  const kcalGP = grassi * 9 + proteine * 4;
+  const ugp = kcalGP / 100;
+
+  let tipo, split, durata, spiega;
+
+  if (cho < 5 && ugp < 1) {
+    tipo = "Nessun bolo per i carboidrati";
+    split = null; durata = null;
+    spiega = "Il pasto contiene pochissimi carboidrati e pochi grassi.";
+  } else if (ugp < 1) {
+    tipo = "Bolo immediato";
+    split = null; durata = null;
+    spiega = "Pasto magro: l'assorbimento è rapido e si concentra nella prima ora.";
+  } else if (ugp < 2) {
+    tipo = "Onda doppia";
+    split = [60, 40]; durata = "3 ore";
+    spiega = "Grassi e proteine rallentano lo svuotamento gastrico: una coda di insulina copre la seconda fase.";
+  } else if (ugp < 3) {
+    tipo = "Onda doppia";
+    split = [60, 40]; durata = "4 ore";
+    spiega = "Quantità importante di grassi e proteine: il rialzo tardivo è la parte più difficile da coprire.";
+  } else if (ugp < 4) {
+    tipo = "Onda doppia";
+    split = [50, 50]; durata = "5 ore";
+    spiega = "Pasto ricco e lento. Metà insulina subito, metà distribuita sulle ore successive.";
+  } else {
+    tipo = "Onda doppia lunga";
+    split = [50, 50]; durata = "6-8 ore";
+    spiega = "Pasto molto grasso e abbondante: l'effetto sulla glicemia può durare tutta la sera e la notte.";
+  }
+
+  // Pochi carboidrati ma molti grassi/proteine: la quota immediata serve poco.
+  if (cho < 15 && ugp >= 2) {
+    tipo = "Onda quadra";
+    split = null; durata = "4-6 ore";
+    spiega = "Quasi nessun carboidrato rapido, ma un grande carico di grassi e proteine che alza la glicemia in ritardo.";
+  }
+
+  let prebolo;
+  if (tipo === "Nessun bolo per i carboidrati") prebolo = null;
+  else if (ugp >= 2) prebolo = "0-10 minuti prima";
+  else if (igPrevalente === "alto") prebolo = "15-20 minuti prima";
+  else if (igPrevalente === "medio") prebolo = "10-15 minuti prima";
+  else prebolo = "0-10 minuti prima";
+
+  return { ugp, tipo, split, durata, prebolo, spiega };
+}
+
+/* ---------------------------------------------------------------
+   LOGICA SPORT
+   Fasce orientative di carboidrati aggiuntivi in base al tipo di
+   attività, all'intensità, alla durata e all'insulina ancora attiva.
+   --------------------------------------------------------------- */
+function calcolaSport({ tipo, intensita, durata, bolo }) {
+  const note = [];
+  let prima = [0, 0], durante = 0, dopo = null;
+
+  const fattoreInt = intensita === "leggera" ? 0.5 : intensita === "moderata" ? 1 : 1.4;
+  const ore = durata / 60;
+
+  if (tipo === "aerobica") {
+    if (bolo === "attivo") {
+      prima = [20, 40];
+      note.push("Con insulina ancora attiva il rischio di ipoglicemia è alto: questi carboidrati vanno assunti senza bolo.");
+      note.push("Se il microinfusore lo consente, valuta con il tuo team una basale temporanea ridotta impostata 60-90 minuti prima.");
+    } else if (bolo === "digiuno") {
+      prima = [0, 15];
+      note.push("A digiuno la mattina presto molte persone non hanno bisogno di nulla per sessioni brevi e leggere.");
+    } else {
+      prima = [10, 20];
+    }
+    durante = ore > 1 ? Math.round(15 * fattoreInt * (ore - 0.5)) : 0;
+    if (durata >= 90) note.push("Oltre l'ora e mezza conviene frazionare: piccole quantità ogni 30 minuti invece di una sola assunzione.");
+  }
+
+  if (tipo === "anaerobica") {
+    prima = bolo === "attivo" ? [10, 20] : [0, 10];
+    durante = 0;
+    note.push("Forza e sforzi brevi e intensi spesso fanno salire la glicemia durante l'allenamento, per via degli ormoni dello stress.");
+    note.push("Il calo può arrivare dopo, a distanza di ore: è quello il momento da presidiare.");
+  }
+
+  if (tipo === "mista") {
+    prima = bolo === "attivo" ? [15, 30] : [10, 20];
+    durante = ore >= 1 ? Math.round(12 * fattoreInt * ore) : 0;
+    note.push("Negli sport di squadra le fasi si alternano: la glicemia può salire negli scatti e scendere nei recuperi lunghi.");
+  }
+
+  if (intensita === "intensa" && tipo !== "anaerobica") {
+    note.push("Ad alta intensità il fabbisogno cresce ma l'assorbimento intestinale peggiora: meglio zuccheri liquidi che solidi.");
+  }
+
+  if (durata >= 60 || intensita === "intensa") {
+    dopo = "Spuntino con carboidrati a lento assorbimento e una quota di proteine (per esempio pane integrale con formaggio, o yogurt con avena). La sensibilità all'insulina resta aumentata per molte ore e il rischio di ipoglicemia notturna è concreto.";
+  } else {
+    dopo = "Per sessioni brevi e leggere spesso non serve nulla, ma un controllo prima di dormire resta utile.";
+  }
+
+  return { prima, durante, dopo, note };
+}
+
+const SPUNTINI_RAPIDI = ["banana","succo","barretta","biscotti","fette_bisc","miele"];
+const SPUNTINI_LENTI = ["pane_integrale","yogurt_greco","avena","mandorle","mela","ricotta"];
+
+
+
+/* ---------- icone ---------- */
+const IC = {
+  cerca:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  piatto:'<circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/>',
+  sport:'<path d="M4 12h3l2-6 4 12 2-6h5"/>',
+  stella:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  cestino:'<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
+  meno:'<path d="M5 12h14"/>', piu:'<path d="M12 5v14M5 12h14"/>', chiudi:'<path d="M6 6l12 12M18 6L6 18"/>'
+};
+function ico(n, s=22, pieno=false){
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${pieno?'currentColor':'none'}"
+    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[n]}</svg>`;
+}
+
+/* ---------- memoria sul telefono ---------- */
+const CHIAVE = 'atlante-cho-v1';
+function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
+function scrivi(patch){ try{ localStorage.setItem(CHIAVE, JSON.stringify({...leggi(), ...patch})); }catch(e){} }
+
+let S = {
+  tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
+  q:'', cat:'Tutti', aperto:null, gr:100,
+  sport:{ tipo:'aerobica', intensita:'moderata', durata:60, bolo:'attivo' }
+};
+
+const norm = t => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const esc = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const cibo = id => FOODS.find(f => f.id === id);
+const chip = (txt, on, azione, colore) =>
+  `<button class="chip ${on?'on':''}" style="--c:${colore||'var(--cho)'}" data-a="${azione}">${txt}</button>`;
+
+/* ---------- schermata: atlante ---------- */
+function vistaAtlante(){
+  let l = FOODS;
+  if(S.cat === 'Preferiti') l = l.filter(f => S.preferiti.includes(f.id));
+  else if(S.cat !== 'Tutti') l = l.filter(f => f.cat === S.cat);
+  if(S.q.trim()) l = l.filter(f => norm(f.n).includes(norm(S.q.trim())));
+
+  const righe = l.map(f => `
+    <div class="card riga">
+      <button data-a="apri:${f.id}" style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;text-align:left">
+        <span class="em">${f.e}</span>
+        <span style="flex:1;min-width:0">
+          <span class="nome" style="display:block">${esc(f.n)}</span>
+          <span class="sotto" style="display:block">${f.cho} g carboidrati per 100 g</span>
+        </span>
+      </button>
+      <button class="stella ${S.preferiti.includes(f.id)?'on':''}" data-a="fav:${f.id}">
+        ${ico('stella',20,S.preferiti.includes(f.id))}
+      </button>
+    </div>`).join('');
+
+  const vuoto = S.cat === 'Preferiti'
+    ? 'Tocca la stella accanto agli alimenti che usi spesso per ritrovarli qui.'
+    : 'Nessun alimento con questo nome. Prova con una parola più corta.';
+
+  return `
+    <div class="cerca">${ico('cerca',20)}
+      <input id="q" placeholder="Cerca un alimento" value="${esc(S.q)}">
+    </div>
+    <div class="chips">${['Preferiti',...CATS].map(c => chip(c, S.cat===c, 'cat:'+c)).join('')}</div>
+    ${righe || `<div style="text-align:center;padding:48px 0;color:var(--ink2)">${vuoto}</div>`}`;
+}
+
+/* ---------- schermata: pasto ---------- */
+function totali(){
+  let cho=0,f=0,p=0,max=0,ig='medio',alcol=false;
+  S.pasto.forEach(v => {
+    const c = v.cibo.cho*v.g/100;
+    cho+=c; f+=v.cibo.f*v.g/100; p+=v.cibo.p*v.g/100;
+    if(c>max){ max=c; ig=v.cibo.ig; }
+    if(v.cibo.alcol) alcol=true;
+  });
+  return {cho,f,p,ig,alcol};
+}
+
+function vistaPasto(){
+  if(!S.pasto.length) return `
+    <div class="card" style="padding:32px;text-align:center">
+      <div style="font-size:36px">🍽️</div>
+      <div style="font-weight:700;font-size:18px;margin-top:8px">Il pasto è vuoto</div>
+      <p style="color:var(--ink2);font-size:14px;margin:8px 0 20px">
+        Aggiungi gli alimenti per vedere il totale dei carboidrati e la forma di bolo suggerita.</p>
+      <button class="primario" style="width:auto;padding:12px 24px" data-a="tab:atlante">Apri gli alimenti</button>
+    </div>`;
+
+  const t = totali();
+  const b = calcolaBolo(t.cho, t.f, t.p, t.ig);
+
+  const lista = S.pasto.map((v,i) => `
+    <div class="card riga">
+      <span class="em" style="font-size:24px">${v.cibo.e}</span>
+      <div style="flex:1;min-width:0">
+        <div class="nome">${esc(v.cibo.n)}</div><div class="sotto">${v.g} g</div>
+      </div>
+      <div style="font-weight:700;color:var(--cho)" class="num">${Math.round(v.cibo.cho*v.g/100)} g</div>
+      <button style="padding:8px;color:#B9C2BB" data-a="togli:${i}">${ico('cestino',18)}</button>
+    </div>`).join('');
+
+  const barra = b.split ? `
+    <div style="display:flex;height:36px;border-radius:12px;overflow:hidden;border:1px solid #EBD5B4;margin-bottom:8px">
+      <div style="width:${b.split[0]}%;background:var(--wave);color:#fff;font-weight:700;font-size:13px;
+        display:flex;align-items:center;justify-content:center">${b.split[0]}% subito</div>
+      <div style="width:${b.split[1]}%;background:#F3DFBF;color:var(--wave);font-weight:700;font-size:13px;
+        display:flex;align-items:center;justify-content:center">${b.split[1]}% esteso</div>
+    </div>
+    <div style="font-size:12px;color:var(--ink2);margin-bottom:8px">Durata della coda: ${b.durata}</div>`
+    : (b.durata ? `<p style="font-size:14px">Erogazione distribuita su ${b.durata}.</p>` : '');
+
+  return `
+    <div class="totale">
+      <div class="big num">${Math.round(t.cho)}</div>
+      <div style="font-weight:600;margin-top:4px">grammi di carboidrati</div>
+      <div style="font-size:14px;opacity:.85;margin-top:4px">
+        ${Math.round(t.f)} g grassi · ${Math.round(t.p)} g proteine · ${b.ugp.toFixed(1)} UGP</div>
+    </div>
+    ${lista}
+    <div class="box" style="background:var(--wave-soft);border:1px solid #F0DFC4;margin-top:16px">
+      <div style="font-weight:700;color:var(--wave);margin-bottom:12px">${b.tipo}</div>
+      ${barra}
+      ${b.prebolo ? `<p style="font-size:14px">Momento del bolo: ${b.prebolo}.</p>` : ''}
+      <p style="font-size:14px;color:var(--ink2);margin:0">${b.spiega}</p>
+    </div>
+    ${t.alcol ? `<div class="avvisoBox" style="background:var(--hypo-soft);color:var(--hypo)">
+      <span>⚠️</span><span>Il pasto contiene alcol. L'ipoglicemia può presentarsi diverse ore dopo, tipicamente di notte.</span></div>` : ''}
+    <div class="avvisoBox" style="background:var(--card);border:1px solid var(--line);color:var(--ink2)">
+      <span>ℹ️</span><span>Inserisci i grammi di carboidrati nel microinfusore: sarà lui a calcolare le unità con i rapporti
+      impostati dal tuo diabetologo. Percentuali e durate qui sopra sono un punto di partenza da tarare con il tuo team.</span></div>
+    <button class="card" style="width:100%;padding:14px;color:var(--ink2);font-weight:600" data-a="svuota">Svuota il pasto</button>`;
+}
+
+/* ---------- schermata: sport ---------- */
+function vistaSport(){
+  const s = S.sport;
+  const r = calcolaSport(s);
+  const rap = FOODS.filter(f => SPUNTINI_RAPIDI.includes(f.id));
+  const len = FOODS.filter(f => SPUNTINI_LENTI.includes(f.id));
+  const el = (t,g) => `<div style="display:flex;align-items:center;gap:12px;font-size:14px;margin-bottom:10px">
+      <span style="font-size:20px">${t.e}</span><span style="flex:1">${esc(t.n)} — ${t.porz[0][0]}</span>
+      <span style="font-weight:700;color:var(--cho)">${Math.round(t.cho*g/100)} g</span></div>`;
+  const G = (lab, opzioni, campo) => `
+    <div style="margin-bottom:16px">
+      <div style="font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:8px">${lab}</div>
+      <div class="chips-wrap" style="margin:0">
+        ${opzioni.map(([v,t]) => chip(t, s[campo]===v, `sp:${campo}:${v}`, 'var(--sport)')).join('')}</div>
+    </div>`;
+
+  return `
+    <div class="card" style="padding:20px;margin-bottom:16px">
+      ${G('Che tipo di attività', [['aerobica','Aerobica'],['anaerobica','Forza'],['mista','Sport di squadra']], 'tipo')}
+      ${G('Intensità', [['leggera','Leggera'],['moderata','Moderata'],['intensa','Intensa']], 'intensita')}
+      ${G('Durata', [[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']], 'durata')}
+      ${G('Insulina del pasto', [['attivo','Bolo fatto da poco'],['lontano','Lontano dai pasti'],['digiuno','A digiuno']], 'bolo')}
+    </div>
+    <div class="box" style="background:var(--sport);color:#fff">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <span class="num" style="font-size:50px;font-weight:800;line-height:1">${r.prima[0]===r.prima[1]?r.prima[0]:r.prima[0]+'-'+r.prima[1]}</span>
+        <span style="font-weight:600">g prima</span>
+      </div>
+      <div style="font-size:14px;opacity:.9;margin-top:4px">${r.prima[1]===0
+        ? 'Nessun carboidrato aggiuntivo previsto prima di partire.'
+        : 'Carboidrati da assumere senza bolo, circa 15 minuti prima.'}</div>
+      ${r.durante>0 ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.25)">
+        <span class="num" style="font-size:30px;font-weight:700">${r.durante} g</span>
+        <span style="font-weight:600;margin-left:8px">durante</span>
+        <div style="font-size:14px;opacity:.9;margin-top:4px">Distribuiti nel corso dell'attività.</div></div>` : ''}
+    </div>
+    <div class="card" style="padding:20px;margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px">Dopo l'attività</div>
+      <p style="font-size:14px;color:var(--ink2);margin:0">${r.dopo}</p>
+    </div>
+    ${r.note.length ? `<div class="box" style="background:var(--sport-soft)">
+      <div style="font-weight:700;color:var(--sport);margin-bottom:4px">Da tenere presente</div>
+      <ul>${r.note.map(n => `<li>${n}</li>`).join('')}</ul></div>` : ''}
+    <div class="card" style="padding:20px;margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:12px">Cosa mangiare prima o durante</div>
+      ${rap.map(f => el(f, f.porz[0][1])).join('')}
+      <div style="font-weight:700;margin:18px 0 12px">Per lo spuntino dopo</div>
+      ${len.map(f => el(f, f.porz[0][1])).join('')}
+    </div>
+    <div class="avvisoBox" style="background:var(--card);border:1px solid var(--line);color:var(--ink2)">
+      <span>ℹ️</span><span>Queste quantità sono fasce di partenza, non prescrizioni. La risposta all'esercizio è molto
+      personale: annota come va nelle prime sessioni e portane i risultati al tuo team.</span></div>`;
+}
+
+/* ---------- strati sopra: porzione e avviso ---------- */
+function stratoPorzione(){
+  const f = cibo(S.aperto); if(!f) return '';
+  const cho = Math.round(f.cho * S.gr / 100);
+  return `
+  <div class="velo" data-a="chiudi">
+    <div class="foglio" data-stop="1">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+        <div style="display:flex;gap:12px;align-items:center">
+          <span style="font-size:40px">${f.e}</span>
+          <div><div style="font-weight:700;font-size:19px">${esc(f.n)}</div>
+          <div style="font-size:12px;color:var(--ink2)">${f.cho} g CHO · ${f.f} g grassi · ${f.p} g proteine per 100 g</div></div>
+        </div>
+        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudi">${ico('chiudi',20)}</button>
+      </div>
+      <div style="background:var(--cho-soft);border-radius:24px;padding:20px;text-align:center;margin-bottom:16px">
+        <div class="num" style="font-size:54px;font-weight:800;color:var(--cho);line-height:1">${cho}</div>
+        <div style="font-size:14px;font-weight:600;color:var(--cho);margin-top:4px">grammi di carboidrati</div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:4px">da inserire nel microinfusore</div>
+      </div>
+      <div class="stepper">
+        <button data-a="g:-">${ico('meno')}</button>
+        <div style="flex:1;text-align:center">
+          <div class="num" style="font-size:28px;font-weight:700">${S.gr} g</div>
+          <div style="font-size:12px;color:var(--ink2)">quantità</div>
+        </div>
+        <button data-a="g:+">${ico('piu')}</button>
+      </div>
+      <div class="chips-wrap">${f.porz.map(([l,v]) => chip(l, S.gr===v, 'gset:'+v)).join('')}</div>
+      ${f.alcol ? `<div class="avvisoBox" style="background:var(--hypo-soft);color:var(--hypo)">
+        <span>⚠️</span><span>L'alcol può causare ipoglicemie anche molte ore dopo, soprattutto di notte.</span></div>` : ''}
+      <button class="primario" data-a="aggiungi">Aggiungi al pasto</button>
+    </div>
+  </div>`;
+}
+
+function stratoAvviso(){
+  return `
+  <div class="centro">
+    <div class="modale">
+      <div style="font-size:28px">⚠️</div>
+      <div style="font-size:20px;font-weight:700;margin:8px 0 10px">Uno strumento di conteggio, non di dosaggio</div>
+      <p style="font-size:14px;color:var(--ink2)">Questa app calcola i grammi di carboidrati di un pasto e suggerisce
+      una forma di bolo. Non calcola unità di insulina: quelle restano al microinfusore, con i rapporti impostati dal
+      tuo diabetologo.</p>
+      <p style="font-size:14px;color:var(--ink2);margin-bottom:20px">I valori degli alimenti sono indicativi e cambiano
+      con marca, ricetta e cottura. Verifica sempre le etichette e concorda schemi e correzioni con il tuo team.</p>
+      <button class="primario" style="background:var(--ink)" data-a="ok">Ho capito</button>
+    </div>
+  </div>`;
+}
+
+/* ---------- disegno ---------- */
+const TABS = [['atlante','Alimenti','cerca'],['pasto','Pasto','piatto'],['sport','Sport','sport']];
+const TITOLI = {atlante:'CHO', pasto:'Il tuo pasto', sport:'Attività fisica'};
+
+function disegna(){
+  document.getElementById('titolo').textContent = TITOLI[S.tab];
+  const v = document.getElementById('vista');
+  v.innerHTML = S.tab==='atlante' ? vistaAtlante() : S.tab==='pasto' ? vistaPasto() : vistaSport();
+  document.getElementById('nav').innerHTML = TABS.map(([id,l,i]) => `
+    <button class="${S.tab===id?'on':''}" data-a="tab:${id}">
+      ${ico(i)}<span class="lab">${l}</span>
+      ${id==='pasto' && S.pasto.length ? `<span class="badge">${S.pasto.length}</span>` : ''}
+    </button>`).join('');
+  document.getElementById('strati').innerHTML =
+    (S.aperto ? stratoPorzione() : '') + (leggi().avvisoVisto ? '' : stratoAvviso());
+}
+
+/* ---------- interazioni ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-a]'); if(!b) return;
+  if(b.classList.contains('velo') && e.target !== b) return;
+  const [a, p1, p2] = b.dataset.a.split(':');
+
+  if(a==='tab') S.tab = p1;
+  else if(a==='cat') S.cat = p1;
+  else if(a==='fav'){
+    S.preferiti = S.preferiti.includes(p1) ? S.preferiti.filter(x=>x!==p1) : [...S.preferiti, p1];
+    scrivi({preferiti: S.preferiti});
+  }
+  else if(a==='apri'){ S.aperto = p1; S.gr = cibo(p1).porz[0][1]; }
+  else if(a==='chiudi') S.aperto = null;
+  else if(a==='g'){ const passo = S.gr>=100?10:5; S.gr = p1==='+' ? S.gr+passo : Math.max(passo, S.gr-passo); }
+  else if(a==='gset') S.gr = +p1;
+  else if(a==='aggiungi'){ S.pasto.push({cibo: cibo(S.aperto), g: S.gr}); S.aperto = null; }
+  else if(a==='togli') S.pasto.splice(+p1,1);
+  else if(a==='svuota') S.pasto = [];
+  else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
+  else if(a==='ok') scrivi({avvisoVisto:true});
+  disegna();
+});
+
+document.addEventListener('input', e => {
+  if(e.target.id === 'q'){
+    S.q = e.target.value;
+    const v = document.getElementById('vista');
+    v.innerHTML = vistaAtlante();
+    const q = document.getElementById('q');
+    q.focus(); q.setSelectionRange(q.value.length, q.value.length);
+  }
+});
+
+disegna();
+</script>
+</body>
+</html>
