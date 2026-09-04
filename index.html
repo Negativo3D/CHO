@@ -313,7 +313,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-04.7';
+const VERSIONE = '2026-09-04.8';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -344,37 +344,81 @@ function sanificaAlimento(o){
 
 let FOODS = (leggi().alimenti || []).map(sanificaAlimento).filter(Boolean);
 
+/* ---------- esportazione in PDF ----------
+   PDF generato a mano (nessuna libreria): font base Helvetica con
+   codifica WinAnsi, quindi solo testo latino — le emoji vengono
+   omesse. Una tabella per pagina A4, multi-pagina se serve. */
+function pdfTesto(t){
+  return String(t).normalize('NFC').split('')
+    .filter(c => c.charCodeAt(0) >= 32 && c.charCodeAt(0) <= 255).join('')
+    .replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)').trim();
+}
+
+function costruisciPdf(pagine){
+  const oggetti = [];
+  const idPagine = pagine.map((_, k) => 5 + 2*k);
+  oggetti[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  oggetti[2] = `<< /Type /Pages /Kids [${idPagine.map(id => id + ' 0 R').join(' ')}] /Count ${pagine.length} >>`;
+  oggetti[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+  oggetti[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  pagine.forEach((cont, k) => {
+    oggetti[5 + 2*k] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${6 + 2*k} 0 R >>`;
+    oggetti[6 + 2*k] = { stream: cont };
+  });
+  let pdf = '%PDF-1.4\n';
+  const offset = [];
+  for(let i = 1; i < oggetti.length; i++){
+    offset[i] = pdf.length;
+    const o = oggetti[i];
+    pdf += typeof o === 'string'
+      ? `${i} 0 obj\n${o}\nendobj\n`
+      : `${i} 0 obj\n<< /Length ${o.stream.length} >>\nstream\n${o.stream}endstream\nendobj\n`;
+  }
+  const xref = pdf.length;
+  pdf += `xref\n0 ${oggetti.length}\n0000000000 65535 f \n`;
+  for(let i = 1; i < oggetti.length; i++) pdf += String(offset[i]).padStart(10,'0') + ' 00000 n \n';
+  pdf += `trailer\n<< /Size ${oggetti.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Uint8Array.from(pdf, c => c.charCodeAt(0) & 0xFF);
+}
+
 function esportaDati(){
-  const blob = new Blob([JSON.stringify(leggi(), null, 2)], {type:'application/json'});
+  if(!FOODS.length){ alert('Non ci sono ancora alimenti da esportare.'); return; }
+  const dataIt = new Date().toLocaleDateString('it-IT');
+  const ordinati = [...FOODS].sort((a,b) => a.n.localeCompare(b.n, 'it'));
+  const col = [40, 330, 392, 452, 515];
+  const perPagina = 38;
+  const nPagine = Math.ceil(ordinati.length / perPagina);
+  const pagine = [];
+  for(let i = 0; i < nPagine; i++){
+    let s = '';
+    const T = (x, y, f, dim, testo) => { s += `BT /${f} ${dim} Tf ${x} ${y} Td (${pdfTesto(testo)}) Tj ET\n`; };
+    let y = 782;
+    if(i === 0){
+      T(40, y, 'F2', 20, 'CHO - I miei alimenti'); y -= 18;
+      T(40, y, 'F1', 10, `Esportato il ${dataIt} - ${ordinati.length} alimenti - valori per 100 g`); y -= 28;
+    }
+    T(col[0], y, 'F2', 10, 'Alimento'); T(col[1], y, 'F2', 10, 'CHO');
+    T(col[2], y, 'F2', 10, 'Grassi'); T(col[3], y, 'F2', 10, 'Proteine');
+    T(col[4], y, 'F2', 10, 'Porzione'); y -= 7;
+    s += `0.6 w 40 ${y} m 555 ${y} l S\n`; y -= 15;
+    for(const f of ordinati.slice(i*perPagina, (i+1)*perPagina)){
+      T(col[0], y, 'F1', 10, f.n.slice(0, 46) + (f.alcol ? ' (alcol)' : ''));
+      T(col[1], y, 'F1', 10, `${gr1(f.cho)} g`);
+      T(col[2], y, 'F1', 10, `${gr1(f.f)} g`);
+      T(col[3], y, 'F1', 10, `${gr1(f.p)} g`);
+      T(col[4], y, 'F1', 10, f.porz[0][1] !== 100 ? `${gr1(f.porz[0][1])} g` : '-');
+      y -= 17;
+    }
+    T(40, 34, 'F1', 8, `CHO - versione ${VERSIONE} - pagina ${i+1} di ${nPagine} - valori indicativi, verifica le etichette`);
+    pagine.push(s);
+  }
+  const blob = new Blob([costruisciPdf(pagine)], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `atlante-cho-alimenti-${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `atlante-cho-alimenti-${new Date().toISOString().slice(0,10)}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function importaDati(file){
-  const r = new FileReader();
-  r.onload = () => {
-    try{
-      const dati = JSON.parse(r.result);
-      if(!dati || typeof dati !== 'object' || Array.isArray(dati)) throw new Error();
-      if('preferiti' in dati && !(Array.isArray(dati.preferiti) && dati.preferiti.every(x => typeof x === 'string'))) throw new Error();
-      if('alimenti' in dati){
-        if(!Array.isArray(dati.alimenti)) throw new Error();
-        dati.alimenti = dati.alimenti.map(sanificaAlimento).filter(Boolean);
-      }
-      scrivi(dati);
-      S.preferiti = leggi().preferiti || [];
-      FOODS = (leggi().alimenti || []).map(sanificaAlimento).filter(Boolean);
-      disegna();
-      alert('Alimenti importati.');
-    }catch(e){
-      alert("Il file scelto non è un'esportazione valida di questa app.");
-    }
-  };
-  r.readAsText(file);
 }
 
 let S = {
@@ -622,8 +666,7 @@ function vistaAtlante(){
       <div style="font-weight:700;font-size:18px;margin-top:8px">Il tuo elenco è vuoto</div>
       <p style="color:var(--ink2);font-size:14px;margin:8px 0 0">
         Qui trovi solo gli alimenti che aggiungi tu, con i pulsanti qui sopra: leggendo il codice a barre,
-        da una fotografia del codice o compilando un modulo. Puoi anche importare un elenco esportato
-        in precedenza, dalla schermata Sport.</p>
+        da una fotografia del codice o compilando un modulo.</p>
     </div>`;
 
   let l = FOODS;
@@ -658,6 +701,9 @@ function vistaAtlante(){
     <div class="chips">${catInUso.map(c => chip(`${CAT_EMOJI[c]||''} ${c}`, S.cat===c, 'cat:'+c)).join('')}</div>
     ${celle ? `<div class="griglia">${celle}</div>`
       : `<div style="text-align:center;padding:48px 0;color:var(--ink2)">${vuoto}</div>`}
+    <button class="card" style="width:100%;padding:14px;margin-top:14px;font-weight:600;color:var(--ink2);
+      display:flex;align-items:center;justify-content:center;gap:8px" data-a="esporta">
+      📄 Esporta i tuoi alimenti in PDF</button>
     <button class="fab" data-a="nuovo" aria-label="Aggiungi alimento">${ico('piu',26)}</button>`;
 }
 
@@ -732,14 +778,6 @@ function vistaPasto(){
 /* ---------- schermata: sport ---------- */
 function vistaSport(){
   const s = S.sport;
-  const exportCard = `
-    <div class="card" style="padding:20px;margin-bottom:16px">
-      <div style="font-weight:700;margin-bottom:8px">I tuoi alimenti su file</div>
-      <p style="font-size:14px;color:var(--ink2);margin:0 0 14px">Esporta in un file JSON gli alimenti personali
-        salvati su questo dispositivo, per conservarli o portarli su un altro telefono, e reimportali quando serve.</p>
-      <button class="primario" style="background:var(--sport);margin-bottom:10px" data-a="esporta">Esporta alimenti (JSON)</button>
-      <button class="primario" style="background:var(--card);color:var(--sport);border:1px solid var(--line)" data-a="importa">Importa alimenti da file</button>
-    </div>`;
   const versione = `<div style="text-align:center;font-size:12px;color:var(--ink2);padding:4px 0 8px">CHO · versione ${VERSIONE}</div>`;
 
   if(!s.attivita) return `
@@ -754,7 +792,6 @@ function vistaSport(){
           <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
         </button>`).join('')}
     </div>
-    ${exportCard}
     ${versione}`;
 
   const att = ATTIVITA[s.attivita];
@@ -1027,13 +1064,6 @@ document.addEventListener('click', e => {
     }
   }
   else if(a==='esporta'){ esportaDati(); return; }
-  else if(a==='importa'){
-    const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = 'application/json,.json';
-    inp.onchange = () => { if(inp.files[0]) importaDati(inp.files[0]); };
-    inp.click();
-    return;
-  }
   else if(a==='ok') scrivi({avvisoVisto:true});
   disegna();
 });
