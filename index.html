@@ -53,6 +53,8 @@
   .hero .occhiello{font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:.75;text-transform:uppercase}
   .hero .titolone{font-size:27px;font-weight:800;letter-spacing:-.5px;margin-top:4px;line-height:1.12}
   .hero .datali{font-size:13px;font-weight:600;opacity:.8;margin-top:6px;text-transform:capitalize}
+  .hero.blu{background:linear-gradient(140deg,#2D9BD8 0%,#1C6FA8 45%,#12496F 100%);
+    box-shadow:0 14px 34px rgba(28,111,168,.4)}
   .hero.viola{background:linear-gradient(140deg,#7A7EF0 0%,#4B4FB8 45%,#34378C 100%);
     box-shadow:0 14px 34px rgba(75,79,184,.4)}
 
@@ -301,6 +303,7 @@ const IC = {
   cerca:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   piatto:'<circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/>',
   piatti:'<path d="M4 15h16a8 8 0 0 1-16 0z"/><path d="M9 4c0 2 2 2.5 2 4.5M14 4c0 2 2 2.5 2 4.5"/>',
+  peso:'<path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/>',
   sport:'<path d="M4 12h3l2-6 4 12 2-6h5"/>',
   stella:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
   cestino:'<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
@@ -314,7 +317,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-04.9';
+const VERSIONE = '2026-09-04.10';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -376,6 +379,17 @@ function sanificaPiatto(o){
 }
 
 let PIATTI = (leggi().piatti || []).map(sanificaPiatto).filter(Boolean);
+
+/* ---------- registro del peso ---------- */
+function sanificaPeso(o){
+  if(!o || typeof o !== 'object') return null;
+  const t = typeof o.t === 'string' ? new Date(o.t) : null;
+  const kg = Math.round(+o.kg*10)/10;
+  if(!t || isNaN(t) || !(kg >= 20 && kg <= 300)) return null;
+  return { t: o.t, kg };
+}
+let PESO = (leggi().peso || []).map(sanificaPeso).filter(Boolean)
+  .sort((a,b) => new Date(a.t) - new Date(b.t));
 
 const grIng = i => i.modo === 'pezzi' ? i.pezzi * i.gPezzo : i.g;
 function totaliPiatto(ing){
@@ -487,7 +501,8 @@ let S = {
   q:'', cat:'Tutti', aperto:null, gr:100,
   sport:{ attivita:null, intensita:'moderata', durata:60, fascia:'pomeriggio' },
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
-  uso:null, pform:null, editPiattoId:null, pingQ:''
+  uso:null, pform:null, editPiattoId:null, pingQ:'',
+  pesoData:'', pesoOra:'', pesoKg:'', pesoRange:'6m', pesoTip:null
 };
 
 /* ---------- aggiunta alimenti: scanner, foto, Open Food Facts ----------
@@ -1030,6 +1045,128 @@ function stratoPiattoForm(){
   </div>`;
 }
 
+/* ---------- schermata: peso ---------- */
+function graficoPeso(dati){
+  const W = 340, H = 200, mL = 36, mR = 16, mT = 16, mB = 26;
+  const xs = dati.map(v => new Date(v.t).getTime());
+  const ys = dati.map(v => v.kg);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  if(y1 - y0 < 2){ const c = (y0+y1)/2; y0 = c-1; y1 = c+1; }
+  else { const pad = (y1-y0)*.15; y0 -= pad; y1 += pad; }
+  const X = t => x1 === x0 ? mL + (W-mL-mR)/2 : mL + (t-x0)/(x1-x0)*(W-mL-mR);
+  const Y = v => mT + (y1-v)/(y1-y0)*(H-mT-mB);
+
+  const passo = [0.5,1,2,5,10,20].find(p => (y1-y0)/p <= 5) || 20;
+  const ticks = [];
+  for(let v = Math.ceil(y0/passo)*passo; v <= y1 + 1e-9; v += passo) ticks.push(Math.round(v*10)/10);
+  const dataIt = t => new Date(t).toLocaleDateString('it-IT', {day:'numeric', month:'short'});
+  const xTicks = x1 === x0 ? [x0] : (x1-x0 > 45*86400000 ? [x0,(x0+x1)/2,x1] : [x0,x1]);
+
+  const punti = dati.map((v,i) => [X(xs[i]), Y(v.kg)]);
+  const linea = punti.map((p,i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const yBase = Y(y0);
+  const area = dati.length > 1
+    ? `M${punti[0][0].toFixed(1)} ${yBase} ` + punti.map(p => `L${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
+      + ` L${punti[punti.length-1][0].toFixed(1)} ${yBase} Z` : '';
+
+  let tip = '';
+  if(S.pesoTip != null && dati[S.pesoTip]){
+    const v = dati[S.pesoTip], p = punti[S.pesoTip];
+    const testo = `${gr1(v.kg)} kg · ${dataIt(v.t)}`;
+    const larg = testo.length*5.6 + 16;
+    let tx = p[0] - larg/2;
+    tx = Math.max(4, Math.min(W - larg - 4, tx));
+    const ty = p[1] > 52 ? p[1] - 40 : p[1] + 14;
+    tip = `
+      <rect x="${tx}" y="${ty}" width="${larg}" height="24" rx="8" fill="var(--ink)"/>
+      <text x="${tx + larg/2}" y="${ty + 16}" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">${testo}</text>`;
+  }
+
+  const ultimo = dati[dati.length-1];
+  const pu = punti[punti.length-1];
+  const labUltimo = dati.length > 1
+    ? `<text x="${W-mR}" y="${Math.max(mT+9, pu[1]-12).toFixed(1)}" text-anchor="end"
+        font-size="11" font-weight="700" fill="var(--ink)" class="num">${gr1(ultimo.kg)}</text>` : '';
+
+  return `
+  <svg id="gpeso" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" font-family="inherit">
+    ${ticks.map(v => `
+      <line x1="${mL}" y1="${Y(v).toFixed(1)}" x2="${W-mR}" y2="${Y(v).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+      <text x="${mL-5}" y="${(Y(v)+3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--ink2)" class="num">${v}</text>`).join('')}
+    ${xTicks.map(t => `<text x="${X(t).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--ink2)">${dataIt(t)}</text>`).join('')}
+    ${area ? `<path d="${area}" fill="var(--cho)" opacity=".1"/>` : ''}
+    ${dati.length > 1 ? `<path d="${linea}" fill="none" stroke="var(--cho)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+    ${punti.map((p,i) => `
+      <circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4.5" fill="var(--cho)" stroke="var(--card)" stroke-width="2"/>
+      <circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="14" fill="transparent" style="cursor:pointer" data-a="pesoTip:${i}"/>`).join('')}
+    ${labUltimo}
+    ${tip}
+  </svg>`;
+}
+
+function vistaPeso(){
+  const adesso = new Date();
+  if(!S.pesoData){
+    S.pesoData = `${adesso.getFullYear()}-${String(adesso.getMonth()+1).padStart(2,'0')}-${String(adesso.getDate()).padStart(2,'0')}`;
+    S.pesoOra = adesso.toTimeString().slice(0,5);
+  }
+  const giorni = S.pesoRange === '1m' ? 30 : S.pesoRange === '6m' ? 183 : Infinity;
+  const dati = PESO.filter(v => (adesso - new Date(v.t)) / 86400000 <= giorni);
+
+  const ultimo = PESO[PESO.length-1], prec = PESO[PESO.length-2];
+  const delta = ultimo && prec ? Math.round((ultimo.kg - prec.kg)*10)/10 : null;
+  const hero = `
+    <div class="hero blu">
+      <div class="occhiello">Registro del peso</div>
+      ${ultimo ? `
+        <div class="titolone"><span class="num">${gr1(ultimo.kg)}</span> kg</div>
+        <div class="datali" style="text-transform:none">${new Date(ultimo.t).toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}
+          alle ${new Date(ultimo.t).toTimeString().slice(0,5)}${delta !== null ? ` · ${delta > 0 ? '+' : ''}${gr1(delta)} kg rispetto alla volta prima` : ''}</div>`
+      : `
+        <div class="titolone">Il tuo peso ⚖️</div>
+        <div class="datali" style="text-transform:none">Registra data, ora e peso: qui vedrai l'andamento nel tempo.</div>`}
+    </div>`;
+
+  const righe = PESO.map((v,i) => ({v,i})).reverse().slice(0,30).map(({v,i}) => `
+    <div class="card riga" style="padding:10px 12px">
+      <div style="flex:1;min-width:0">
+        <div class="nome num" style="font-size:15px">${gr1(v.kg)} kg</div>
+        <div class="sotto">${new Date(v.t).toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short',year:'numeric'})} · ${new Date(v.t).toTimeString().slice(0,5)}</div>
+      </div>
+      <button style="padding:8px;color:#B9C2BB" data-a="pesoTogli:${i}">${ico('cestino',18)}</button>
+    </div>`).join('');
+
+  return `
+    ${hero}
+    <div class="card" style="padding:18px;margin-bottom:16px">
+      <div class="etich" style="margin-bottom:10px">Nuova misurazione</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <div style="flex:1.3;min-width:0"><div class="etich">Data</div><input id="peso-data" type="date" class="campo" style="min-width:0" value="${esc(S.pesoData)}"></div>
+        <div style="flex:1;min-width:0"><div class="etich">Ora</div><input id="peso-ora" type="time" class="campo" style="min-width:0" value="${esc(S.pesoOra)}"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div style="flex:1;min-width:0"><div class="etich">Peso (kg)</div><input id="peso-kg" class="campo" inputmode="decimal" placeholder="78,4" value="${esc(S.pesoKg)}"></div>
+        <button class="primario" style="flex:1.4;background:#1C6FA8" data-a="pesoSalva">Registra</button>
+      </div>
+    </div>
+    ${PESO.length ? `
+    <div class="card" style="padding:18px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-weight:700">Andamento del peso (kg)</div>
+      </div>
+      <div class="chips-wrap" style="margin-bottom:6px">
+        ${[['1m','30 giorni'],['6m','6 mesi'],['tutto','Tutto']].map(([v,t]) => chip(t, S.pesoRange===v, `pesoRange:${v}`)).join('')}
+      </div>
+      ${dati.length ? graficoPeso(dati)
+        : `<p style="font-size:13px;color:var(--ink2);margin:8px 0 0">Nessuna misurazione in questo intervallo.</p>`}
+      <p style="font-size:12px;color:var(--ink2);margin:10px 0 0">Tocca un punto per vedere il valore.</p>
+    </div>
+    <div style="font-weight:700;margin:0 0 8px">Le misurazioni</div>
+    ${righe}
+    ${PESO.length > 30 ? `<p style="font-size:12px;color:var(--ink2);text-align:center">Mostro le ultime 30 misurazioni; il grafico le usa tutte.</p>` : ''}` : ''}`;
+}
+
 /* ---------- schermata: sport ---------- */
 function vistaSport(){
   const s = S.sport;
@@ -1241,8 +1378,8 @@ function stratoAvviso(){
 }
 
 /* ---------- disegno ---------- */
-const TABS = [['atlante','Alimenti','cerca'],['piatti','Piatti','piatti'],['pasto','Pasto','piatto'],['sport','Sport','sport']];
-const TITOLI = {atlante:'CHO', piatti:'I miei piatti', pasto:'Il tuo pasto', sport:'Attività fisica'};
+const TABS = [['atlante','Alimenti','cerca'],['piatti','Piatti','piatti'],['pasto','Pasto','piatto'],['sport','Sport','sport'],['peso','Peso','peso']];
+const TITOLI = {atlante:'CHO', piatti:'I miei piatti', pasto:'Il tuo pasto', sport:'Attività fisica', peso:'Il tuo peso'};
 
 function disegna(){
   const h = document.getElementById('titolo');
@@ -1253,7 +1390,7 @@ function disegna(){
   v.classList.toggle('anim', S.tab !== disegna.ultimoTab);
   disegna.ultimoTab = S.tab;
   v.innerHTML = S.tab==='atlante' ? vistaAtlante() : S.tab==='piatti' ? vistaPiatti()
-    : S.tab==='pasto' ? vistaPasto() : vistaSport();
+    : S.tab==='pasto' ? vistaPasto() : S.tab==='peso' ? vistaPeso() : vistaSport();
   document.getElementById('nav').innerHTML = TABS.map(([id,l,i]) => `
     <button class="${S.tab===id?'on':''}" data-a="tab:${id}">
       <span class="ic">${ico(i)}</span><span class="lab">${l}</span>
@@ -1381,6 +1518,25 @@ document.addEventListener('click', e => {
     }
   }
   else if(a==='salvaPiatto'){ salvaPiatto(); return; }
+  else if(a==='pesoSalva'){
+    const kg = Math.round(parseFloat(String(S.pesoKg).replace(',','.'))*10)/10;
+    if(!(kg >= 20 && kg <= 300)){ alert('Inserisci un peso in chilogrammi, ad esempio 78,4.'); return; }
+    const t = `${S.pesoData}T${S.pesoOra || '12:00'}`;
+    if(isNaN(new Date(t))){ alert('Controlla data e ora.'); return; }
+    PESO = [...PESO, { t, kg }].sort((x,y) => new Date(x.t) - new Date(y.t));
+    scrivi({ peso: PESO });
+    S.pesoKg = ''; S.pesoData = ''; S.pesoOra = ''; S.pesoTip = null;
+  }
+  else if(a==='pesoTogli'){
+    const v = PESO[+p1];
+    if(v && confirm(`Eliminare la misurazione del ${new Date(v.t).toLocaleDateString('it-IT')} (${gr1(v.kg)} kg)?`)){
+      PESO.splice(+p1, 1);
+      scrivi({ peso: PESO });
+      S.pesoTip = null;
+    }
+  }
+  else if(a==='pesoRange'){ S.pesoRange = p1; S.pesoTip = null; }
+  else if(a==='pesoTip') S.pesoTip = S.pesoTip === +p1 ? null : +p1;
   else if(a==='esporta'){ esportaDati(); return; }
   else if(a==='ok') scrivi({avvisoVisto:true});
   disegna();
@@ -1397,6 +1553,9 @@ document.addEventListener('input', e => {
   }
   else if(id === 'fbarcode') S.codice = e.target.value;
   else if(id.startsWith('fi-') && S.form) S.form[id.slice(3)] = e.target.value;
+  else if(id === 'peso-data') S.pesoData = e.target.value;
+  else if(id === 'peso-ora') S.pesoOra = e.target.value;
+  else if(id === 'peso-kg') S.pesoKg = e.target.value;
   else if(id === 'pf-n' && S.pform) S.pform.n = e.target.value;
   else if(id === 'pf-e' && S.pform) S.pform.e = e.target.value;
   else if(id === 'pf-cerca' && S.pform){
