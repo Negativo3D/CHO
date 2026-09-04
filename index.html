@@ -69,6 +69,19 @@
     background:radial-gradient(circle,rgba(255,255,255,.25),rgba(255,255,255,0) 70%);top:-40px;right:-30px}
   .tile .em{font-size:40px;line-height:1;position:relative}
   .tile .nomeT{font-weight:800;font-size:13px;letter-spacing:.8px;position:relative}
+  .tile .apriT{display:flex;flex-direction:column;align-items:center;gap:9px;width:100%;color:#fff;padding:0}
+  .ingrT{position:absolute;top:6px;right:6px;z-index:2;width:30px;height:30px;border-radius:999px;
+    background:rgba(255,255,255,.24);color:#fff;display:flex;align-items:center;justify-content:center}
+
+  .tparam{width:100%;border-collapse:separate;border-spacing:4px 6px;table-layout:fixed}
+  .tparam thead th{font-size:11px;font-weight:600;color:var(--ink2);text-align:center;padding:0 2px}
+  .tparam thead th:first-child, .tparam tbody th{width:76px;text-align:left;font-size:12px;
+    font-weight:600;color:var(--ink2);white-space:nowrap;padding:0}
+  .tparam input{width:100%;padding:10px 2px;text-align:center;border:1px solid var(--line);border-radius:12px;
+    background:var(--card);font-size:16px;font-weight:600;color:var(--ink);outline:none;
+    font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+  .tparam input::-webkit-outer-spin-button,.tparam input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .tparam input:focus{border-color:var(--sport)}
 
   .eroeViola{
     position:relative;overflow:hidden;color:#fff;
@@ -191,9 +204,63 @@
   ul{margin:8px 0 0;padding-left:18px}
   li{margin-bottom:8px;font-size:14px;line-height:1.5}
   p{line-height:1.55;margin:0 0 10px}
+
+  /* ---------- splash di avvio ---------- */
+  #splash{
+    position:fixed;inset:0;z-index:100;
+    background:linear-gradient(140deg,#16B47E 0%,#0E8A61 40%,#0A5C41 85%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+    transition:opacity .5s ease, visibility .5s ease
+  }
+  #splash.via{opacity:0;visibility:hidden;pointer-events:none}
+  .s-piatto{
+    position:relative;width:150px;height:150px;border-radius:50%;background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 18px 50px rgba(6,50,35,.4), inset 0 0 0 10px #F2F4F1, inset 0 0 0 11px #DDE3DC;
+    animation:s-pop .55s cubic-bezier(.34,1.56,.64,1) both
+  }
+  .s-logo{font-size:42px;font-weight:800;letter-spacing:-1px;color:var(--cho)}
+  .s-orbita{position:absolute;inset:-46px;animation:s-gira 10s linear infinite}
+  .s-orbita span{position:absolute;left:50%;top:50%;width:0;height:0;
+    display:flex;align-items:center;justify-content:center;
+    transform:rotate(var(--a)) translateY(-121px)}
+  .s-orbita b{font-size:29px;line-height:1;font-weight:400;
+    animation:s-controgira 10s linear infinite}
+  .s-orbita i{display:block;font-style:normal;animation:s-pop .5s cubic-bezier(.34,1.56,.64,1) both;
+    animation-delay:var(--r)}
+  @keyframes s-gira{to{transform:rotate(360deg)}}
+  @keyframes s-controgira{
+    from{transform:rotate(calc(var(--a) * -1))}
+    to{transform:rotate(calc(var(--a) * -1 - 360deg))}
+  }
+  @keyframes s-pop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:scale(1)}}
+  .s-tag{color:#fff;opacity:.82;font-size:12px;font-weight:700;letter-spacing:2.5px;
+    text-transform:uppercase;margin-top:58px;animation:s-pop .5s ease .35s both}
+  .s-punti{display:flex;gap:8px;animation:s-pop .5s ease .5s both}
+  .s-punti i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.9);
+    animation:s-salta 1s ease-in-out infinite;animation-delay:var(--r)}
+  @keyframes s-salta{0%,60%,100%{transform:none;opacity:.55}30%{transform:translateY(-8px);opacity:1}}
+  @media (prefers-reduced-motion: reduce){
+    #splash *{animation-duration:.01s !important;animation-iteration-count:1 !important}
+  }
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true">
+  <div class="s-piatto">
+    <div class="s-orbita">
+      <span style="--a:0deg"><b><i style="--r:.10s">🍞</i></b></span>
+      <span style="--a:60deg"><b><i style="--r:.18s">🍎</i></b></span>
+      <span style="--a:120deg"><b><i style="--r:.26s">🍝</i></b></span>
+      <span style="--a:180deg"><b><i style="--r:.34s">🥛</i></b></span>
+      <span style="--a:240deg"><b><i style="--r:.42s">🥦</i></b></span>
+      <span style="--a:300deg"><b><i style="--r:.50s">🍪</i></b></span>
+    </div>
+    <div class="s-logo">CHO</div>
+  </div>
+  <div class="s-tag">Conteggio carboidrati</div>
+  <div class="s-punti"><i style="--r:0s"></i><i style="--r:.15s"></i><i style="--r:.3s"></i></div>
+</div>
 <h1 id="titolo">CHO</h1>
 <main id="vista"></main>
 <nav id="nav"></nav>
@@ -264,21 +331,57 @@ const ATTIVITA = {
   trekking: { nome:'Trekking', icona:'🥾', sotto:'Camminata lunga',          oraria:10, fattorePrima:0.8 }
 };
 
+const INTENSITA = [['leggera','Leggera'],['moderata','Moderata'],['intensa','Intensa']];
+const FASCE = [['mattina','Mattina'],['pomeriggio','Pomeriggio'],['sera','Sera']];
+const DURATE = [[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']];
+
+/* Ogni sport ha una tabella di grammi di CHO compilabile dall'utente
+   (pulsante "parametri"): "prima" per intensità × fascia oraria,
+   "durante" per intensità × durata. La schermata Sport non calcola
+   nulla: richiama la cella corrispondente alle condizioni scelte.
+   I valori di partenza riproducono le vecchie fasce orientative. */
+function tabellaDefault(id){
+  const att = ATTIVITA[id] || ATTIVITA.nuoto;
+  const t = { prima:{}, durante:{} };
+  for(const [iv] of INTENSITA){
+    const fInt = iv === 'leggera' ? 0.5 : iv === 'moderata' ? 1 : 1.4;
+    t.prima[iv] = {}; t.durante[iv] = {};
+    for(const [fv] of FASCE){
+      const base = fv === 'mattina' ? 8 : fv === 'sera' ? 22 : 18;
+      t.prima[iv][fv] = Math.round(base * fInt * att.fattorePrima);
+    }
+    for(const [dv] of DURATE){
+      const ore = dv / 60;
+      t.durante[iv][dv] = ore > 1 ? Math.round(att.oraria * fInt * (ore - 0.5)) : 0;
+    }
+  }
+  return t;
+}
+function tabellaSport(id){
+  const salvata = (leggi().tabelleSport || {})[id] || {};
+  const t = tabellaDefault(id);
+  for(const sez of ['prima','durante'])
+    for(const riga in t[sez])
+      for(const col in t[sez][riga]){
+        const v = salvata[sez] && salvata[sez][riga] ? salvata[sez][riga][col] : undefined;
+        if(typeof v === 'number' && isFinite(v) && v >= 0) t[sez][riga][col] = v;
+      }
+  return t;
+}
+function salvaCella(id, sez, riga, col, val){
+  const tutte = leggi().tabelleSport || {};
+  const t = tutte[id] || (tutte[id] = {});
+  const s = t[sez] || (t[sez] = {});
+  const r = s[riga] || (s[riga] = {});
+  const n = parseFloat(String(val).replace(',', '.'));
+  if(isFinite(n) && n >= 0) r[col] = Math.round(n); else delete r[col];
+  scrivi({ tabelleSport: tutte });
+}
+
 function calcolaSport({ attivita, intensita, durata, fascia }) {
-  const att = ATTIVITA[attivita] || ATTIVITA.nuoto;
-  const fattoreInt = intensita === "leggera" ? 0.5 : intensita === "moderata" ? 1 : 1.4;
-  const ore = durata / 60;
-
-  // La mattina, spesso a digiuno, il fabbisogno prima di partire è più
-  // basso; la sera la fascia sale perché l'insulina dei pasti della
-  // giornata è più spesso ancora in circolo.
-  let prima;
-  if (fascia === "mattina") prima = [0, 15];
-  else if (fascia === "sera") prima = [15, 30];
-  else prima = [10, 25];
-  prima = prima.map(x => Math.round(x * fattoreInt * att.fattorePrima));
-
-  const durante = ore > 1 ? Math.round(att.oraria * fattoreInt * (ore - 0.5)) : 0;
+  const t = tabellaSport(attivita);
+  const prima = t.prima[intensita][fascia];
+  const durante = t.durante[intensita][durata];
 
   // Profilo basale: forma della riduzione temporanea e anticipo.
   let rid = intensita === "leggera" ? (durata <= 30 ? null : [10, 30])
@@ -307,7 +410,11 @@ const IC = {
   sport:'<path d="M4 12h3l2-6 4 12 2-6h5"/>',
   stella:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
   cestino:'<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
-  meno:'<path d="M5 12h14"/>', piu:'<path d="M12 5v14M5 12h14"/>', chiudi:'<path d="M6 6l12 12M18 6L6 18"/>'
+  meno:'<path d="M5 12h14"/>', piu:'<path d="M12 5v14M5 12h14"/>', chiudi:'<path d="M6 6l12 12M18 6L6 18"/>',
+  barcode:'<path d="M4 6v12M8 6v12M11 6v9M14 6v12M17 6v9M20 6v12"/>',
+  regola:'<path d="M4 8h8M18 8h2M4 16h2M12 16h8"/><circle cx="15" cy="8" r="2.5"/><circle cx="9" cy="16" r="2.5"/>',
+  casa:'<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-6h4v6"/>',
+  camera:'<path d="M3 8a1 1 0 0 1 1-1h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="12" cy="13" r="3.5"/>'
 };
 function ico(n, s=22, pieno=false){
   return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${pieno?'currentColor':'none'}"
@@ -317,7 +424,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-04.10';
+const VERSIONE = '2026-09-04.15';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -500,6 +607,7 @@ let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', aperto:null, gr:100,
   sport:{ attivita:null, intensita:'moderata', durata:60, fascia:'pomeriggio' },
+  paramSport:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
   uso:null, pform:null, editPiattoId:null, pingQ:'',
   pesoData:'', pesoOra:'', pesoKg:'', pesoRange:'6m', pesoTip:null
@@ -719,6 +827,7 @@ function vistaAtlante(){
   const dataOggi = new Date().toLocaleDateString('it-IT', { weekday:'long', day:'numeric', month:'long' });
   const t = totali();
   const hero = `
+    <div style="text-align:center;font-size:11px;color:var(--ink2);padding:10px 0 0">CHO · versione ${VERSIONE}</div>
     <div class="hero">
       <div class="occhiello">CHO · Conta carboidrati</div>
       <div class="titolone">${saluto}<br>Cosa mangi oggi?</div>
@@ -730,9 +839,9 @@ function vistaAtlante(){
           <span style="opacity:.8">›</span>
         </button>` : ''}
       <div class="azioni">
-        <button class="azione" data-a="nuovoBarcode"><span class="em">📷</span>Codice a barre</button>
-        <button class="azione" data-a="nuovoFoto"><span class="em">🖼️</span>Da una foto</button>
-        <button class="azione" data-a="nuovoForm"><span class="em">✍️</span>A mano</button>
+        <button class="azione" data-a="nuovoBarcode" aria-label="Codice a barre">${ico('barcode',26)}</button>
+        <button class="azione" data-a="nuovoFoto" aria-label="Da una fotografia">${ico('camera',26)}</button>
+        <button class="azione" data-a="nuovoForm" aria-label="Aggiungi a mano">${ico('piu',26)}</button>
       </div>
     </div>`;
 
@@ -952,7 +1061,7 @@ function stratoPiattoUso(){
 
 function stratiHTML(){
   return (S.aperto ? stratoPorzione() : '') + stratoNuovo() + stratoPiattoUso() + stratoPiattoForm()
-    + (leggi().avvisoVisto ? '' : stratoAvviso());
+    + (S.paramSport ? stratoParametri() : '') + (leggi().avvisoVisto ? '' : stratoAvviso());
 }
 
 function salvaPiatto(){
@@ -1170,7 +1279,6 @@ function vistaPeso(){
 /* ---------- schermata: sport ---------- */
 function vistaSport(){
   const s = S.sport;
-  const versione = `<div style="text-align:center;font-size:12px;color:var(--ink2);padding:4px 0 8px">CHO · versione ${VERSIONE}</div>`;
 
   if(!s.attivita) return `
     <div class="hero viola">
@@ -1180,64 +1288,92 @@ function vistaSport(){
     </div>
     <div class="attivita">
       ${Object.entries(ATTIVITA).map(([id,a],i) => `
-        <button class="tile" style="animation-delay:${i*60}ms" data-a="att:${id}">
-          <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
-        </button>`).join('')}
-    </div>
-    ${versione}`;
+        <div class="tile" style="animation-delay:${i*60}ms">
+          <button class="apriT" data-a="att:${id}">
+            <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
+          </button>
+          <button class="ingrT" data-a="param:${id}" aria-label="Parametri ${a.nome}">${ico('regola',16)}</button>
+        </div>`).join('')}
+    </div>`;
 
   const att = ATTIVITA[s.attivita];
   const r = calcolaSport(s);
+  /* Tutto in una schermata, senza scorrimento: spaziature compatte. */
   const G = (lab, opzioni, campo) => `
-    <div style="margin-bottom:16px">
-      <div style="font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:8px">${lab}</div>
-      <div class="chips-wrap" style="margin:0">
+    <div style="margin-bottom:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:5px">${lab}</div>
+      <div class="chips-wrap" style="margin:0;gap:6px">
         ${opzioni.map(([v,t]) => chip(t, s[campo]===v, `sp:${campo}:${v}`, 'var(--sport)')).join('')}</div>
     </div>`;
 
   return `
-    <div class="card" style="padding:20px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line)">
-        <span style="width:58px;height:58px;border-radius:18px;background:var(--sport-soft);display:flex;
-          align-items:center;justify-content:center;font-size:32px;line-height:1">${att.icona}</span>
-        <div style="flex:1">
-          <div style="font-weight:800;font-size:21px;letter-spacing:-.3px">${att.nome}</div>
-          <div style="font-size:13px;color:var(--ink2)">${att.sotto}</div>
+    <div class="card" style="padding:14px 16px 8px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)">
+        <span style="width:44px;height:44px;border-radius:14px;background:var(--sport-soft);display:flex;
+          align-items:center;justify-content:center;font-size:25px;line-height:1;flex:none">${att.icona}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:18px;letter-spacing:-.3px">${att.nome}</div>
+          <div style="font-size:12px;color:var(--ink2)">${att.sotto}</div>
         </div>
-        <button class="chip" data-a="att:" style="--c:var(--sport)">‹ Cambia</button>
+        <button class="chip" data-a="param:${s.attivita}" aria-label="Parametri ${att.nome}"
+          style="--c:var(--sport);display:flex;align-items:center;gap:5px">${ico('regola',15)}</button>
+        <button class="chip" data-a="att:" style="--c:var(--sport)">‹</button>
       </div>
-      ${G('Intensità', [['leggera','Leggera'],['moderata','Moderata'],['intensa','Intensa']], 'intensita')}
-      ${G('Durata', [[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']], 'durata')}
-      ${G('Fascia oraria', [['mattina','Mattina'],['pomeriggio','Pomeriggio'],['sera','Sera']], 'fascia')}
+      ${G('Intensità', INTENSITA, 'intensita')}
+      ${G('Durata', DURATE, 'durata')}
+      ${G('Fascia oraria', FASCE, 'fascia')}
     </div>
-    <div class="box eroeViola">
-      <div style="display:flex;align-items:baseline;gap:8px">
-        <span class="num" style="font-size:50px;font-weight:800;line-height:1">${r.prima[0]===r.prima[1]?r.prima[0]:r.prima[0]+'-'+r.prima[1]}</span>
-        <span style="font-weight:600">g prima</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="box eroeViola" style="margin:0;padding:14px 16px">
+        <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.prima}<span style="font-size:17px;font-weight:700"> g</span></div>
+        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.prima===0 ? 'niente prima di partire' : 'prima, senza bolo'}</div>
       </div>
-      <div style="font-size:14px;opacity:.9;margin-top:4px">${r.prima[1]===0
-        ? 'Nessun carboidrato aggiuntivo previsto prima di partire.'
-        : 'Carboidrati da assumere senza bolo, circa 15 minuti prima.'}</div>
-      ${r.durante>0 ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.25)">
-        <span class="num" style="font-size:30px;font-weight:700">${r.durante} g</span>
-        <span style="font-weight:600;margin-left:8px">durante</span>
-        <div style="font-size:14px;opacity:.9;margin-top:4px">Distribuiti nel corso dell'attività.</div></div>` : ''}
+      <div class="box" style="margin:0;padding:14px 16px;background:var(--sport);color:#fff;box-shadow:0 4px 14px rgba(75,79,184,.3)">
+        <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.durante}<span style="font-size:17px;font-weight:700"> g</span></div>
+        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.durante===0 ? 'niente durante' : 'durante, distribuiti'}</div>
+      </div>
     </div>
-    <div class="box" style="background:var(--sport-soft);box-shadow:0 4px 14px rgba(75,79,184,.12)">
-      <div style="font-weight:700;color:var(--sport);margin-bottom:12px">💧 Profilo basale da applicare</div>
-      <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-bottom:10px">
+    <div class="box" style="background:var(--sport-soft);padding:12px 16px;margin-bottom:6px;box-shadow:none">
+      <div style="font-weight:700;color:var(--sport);font-size:13px;margin-bottom:6px">💧 Profilo basale da applicare</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px">
         <span style="color:var(--ink2);flex:none">Tipo di profilo</span>
         <b style="text-align:right">${r.basale.profilo}</b></div>
-      <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px">
+      <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:4px">
         <span style="color:var(--ink2);flex:none">Quanto tempo prima</span>
         <b style="text-align:right">${r.basale.anticipo}</b></div>
-      <p style="font-size:12px;color:var(--ink2);margin:12px 0 0">La riduzione la imposti sul microinfusore, in percentuale
-        sul tuo profilo: qui nessuna unità, solo la forma.</p>
+    </div>`;
+}
+
+/* ---------- strato: parametri dello sport ---------- */
+function stratoParametri(){
+  const id = S.paramSport; if(!id || !ATTIVITA[id]) return '';
+  const a = ATTIVITA[id];
+  const t = tabellaSport(id);
+  const tab = (sez, cols, titolo, sotto) => `
+    <div style="font-weight:700;margin:16px 0 2px">${titolo}</div>
+    <div style="font-size:12px;color:var(--ink2);margin-bottom:8px">${sotto}</div>
+    <table class="tparam">
+      <thead><tr><th></th>${cols.map(([,l]) => `<th>${l}</th>`).join('')}</tr></thead>
+      <tbody>${INTENSITA.map(([iv,il]) => `<tr><th>${il}</th>${cols.map(([cv]) => `
+        <td><input type="number" inputmode="numeric" min="0" id="pt-${sez}-${iv}-${cv}" value="${t[sez][iv][cv]}"></td>`).join('')}</tr>`).join('')}
+      </tbody></table>`;
+  return `
+  <div class="velo" data-a="chiudiParam">
+    <div class="foglio" data-stop="1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <span style="font-size:32px;line-height:1">${a.icona}</span>
+          <div style="font-weight:800;font-size:19px">Parametri ${a.nome}</div>
+        </div>
+        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiParam">${ico('chiudi',20)}</button>
+      </div>
+      <p style="font-size:13px;color:var(--ink2)">Grammi di carboidrati per ogni condizione: la schermata Sport
+        richiama la cella che corrisponde a intensità, durata e fascia scelte. Si salvano da soli su questo telefono.</p>
+      ${tab('prima', FASCE, 'CHO prima di partire', 'Grammi per intensità (righe) e fascia oraria (colonne).')}
+      ${tab('durante', DURATE, "CHO durante l'attività", 'Grammi totali della sessione, per intensità e durata.')}
+      <button class="primario" style="background:var(--sport);margin-top:18px" data-a="chiudiParam">Fatto</button>
     </div>
-    <div class="avvisoBox" style="background:var(--card);border:1px solid var(--line);color:var(--ink2)">
-      <span>ℹ️</span><span>Quantità e riduzioni sono fasce di partenza, non prescrizioni. La risposta all'esercizio è molto
-      personale: annota come va nelle prime sessioni e portane i risultati al tuo team.</span></div>
-    ${versione}`;
+  </div>`;
 }
 
 /* ---------- strati sopra: porzione e avviso ---------- */
@@ -1378,7 +1514,7 @@ function stratoAvviso(){
 }
 
 /* ---------- disegno ---------- */
-const TABS = [['atlante','Alimenti','cerca'],['piatti','Piatti','piatti'],['pasto','Pasto','piatto'],['sport','Sport','sport'],['peso','Peso','peso']];
+const TABS = [['atlante','Home','casa'],['piatti','Piatti','piatti'],['pasto','Pasto','piatto'],['sport','Sport','sport'],['peso','Peso','peso']];
 const TITOLI = {atlante:'CHO', piatti:'I miei piatti', pasto:'Il tuo pasto', sport:'Attività fisica', peso:'Il tuo peso'};
 
 function disegna(){
@@ -1411,7 +1547,12 @@ document.addEventListener('click', e => {
   if(b.classList.contains('velo') && e.target !== b) return;
   const [a, p1, p2] = b.dataset.a.split(':');
 
-  if(a==='tab') S.tab = p1;
+  if(a==='tab'){
+    /* Rientrando in Sport si riparte sempre dal menu di scelta dell'attività. */
+    if(p1 === 'sport' && S.tab !== 'sport') S.sport.attivita = null;
+    S.paramSport = null;
+    S.tab = p1;
+  }
   else if(a==='cat') S.cat = p1;
   else if(a==='fav'){
     S.preferiti = S.preferiti.includes(p1) ? S.preferiti.filter(x=>x!==p1) : [...S.preferiti, p1];
@@ -1429,6 +1570,8 @@ document.addEventListener('click', e => {
   else if(a==='svuota') S.pasto = [];
   else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
   else if(a==='att') S.sport.attivita = p1 || null;
+  else if(a==='param') S.paramSport = p1;
+  else if(a==='chiudiParam') S.paramSport = null;
   else if(a==='nuovo') S.nuovo = 'menu';
   else if(a==='chiudiNuovo'){ fermaScanner(); S.nuovo = null; S.form = null; S.editId = null; S.caricamento = false; }
   else if(a==='nuovoForm'){ S.form = formVuoto(); S.editId = null; S.nuovo = 'form'; }
@@ -1553,6 +1696,12 @@ document.addEventListener('input', e => {
   }
   else if(id === 'fbarcode') S.codice = e.target.value;
   else if(id.startsWith('fi-') && S.form) S.form[id.slice(3)] = e.target.value;
+  else if(id.startsWith('pt-') && S.paramSport){
+    /* Cella della tabella parametri: si salva subito, senza ridisegnare
+       (il ridisegno farebbe perdere il focus mentre si scrive). */
+    const [, sez, riga, col] = id.split('-');
+    salvaCella(S.paramSport, sez, riga, col, e.target.value);
+  }
   else if(id === 'peso-data') S.pesoData = e.target.value;
   else if(id === 'peso-ora') S.pesoOra = e.target.value;
   else if(id === 'peso-kg') S.pesoKg = e.target.value;
@@ -1578,6 +1727,20 @@ document.addEventListener('input', e => {
 });
 
 disegna();
+
+/* ---------- splash di avvio ----------
+   La schermata è già visibile dal primo istante (è HTML statico prima
+   dell'app): qui si lascia solo il tempo di godersi l'animazione e poi
+   la si dissolve. Con "riduci movimento" attivo sparisce quasi subito. */
+(function(){
+  const sp = document.getElementById('splash');
+  if(!sp) return;
+  const veloce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setTimeout(() => {
+    sp.classList.add('via');
+    setTimeout(() => sp.remove(), 600);
+  }, veloce ? 250 : 1700);
+})();
 
 /* ---------- controllo aggiornamenti ----------
    La shortcut in home spesso riapre la pagina rimasta in memoria senza
