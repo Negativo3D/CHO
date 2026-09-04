@@ -420,7 +420,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-04.13';
+const VERSIONE = '2026-09-04.14';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -750,6 +750,7 @@ function vistaAtlante(){
   const dataOggi = new Date().toLocaleDateString('it-IT', { weekday:'long', day:'numeric', month:'long' });
   const t = totali();
   const hero = `
+    <div style="text-align:center;font-size:11px;color:var(--ink2);padding:10px 0 0">CHO · versione ${VERSIONE}</div>
     <div class="hero">
       <div class="occhiello">CHO · Conta carboidrati</div>
       <div class="titolone">${saluto}<br>Cosa mangi oggi?</div>
@@ -886,7 +887,6 @@ function vistaPasto(){
 /* ---------- schermata: sport ---------- */
 function vistaSport(){
   const s = S.sport;
-  const versione = `<div style="text-align:center;font-size:12px;color:var(--ink2);padding:4px 0 8px">CHO · versione ${VERSIONE}</div>`;
 
   if(!s.attivita) return `
     <div class="hero viola">
@@ -902,8 +902,7 @@ function vistaSport(){
           </button>
           <button class="ingrT" data-a="param:${id}" aria-label="Parametri ${a.nome}">${ico('regola',16)}</button>
         </div>`).join('')}
-    </div>
-    ${versione}`;
+    </div>`;
 
   const att = ATTIVITA[s.attivita];
   const r = calcolaSport(s);
@@ -950,8 +949,7 @@ function vistaSport(){
       <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:4px">
         <span style="color:var(--ink2);flex:none">Quanto tempo prima</span>
         <b style="text-align:right">${r.basale.anticipo}</b></div>
-    </div>
-    ${versione}`;
+    </div>`;
 }
 
 /* ---------- strato: parametri dello sport ---------- */
