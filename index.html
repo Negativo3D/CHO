@@ -33,6 +33,10 @@
   .anim .cerca{animation:su .45s ease .06s both}
   .anim .chips{animation:su .45s ease .1s both}
   .anim .cella{animation:su .4s ease both}
+  .anim .tile{animation:su .4s ease both}
+  .anim .totale{animation:su .45s ease both}
+  .anim>.card{animation:su .45s ease .05s both}
+  .anim .box{animation:su .45s ease .1s both}
   h1{font-size:26px;font-weight:800;letter-spacing:-.4px;margin:0;padding:20px 16px 8px}
 
   .hero{
@@ -49,6 +53,32 @@
   .hero .occhiello{font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:.75;text-transform:uppercase}
   .hero .titolone{font-size:27px;font-weight:800;letter-spacing:-.5px;margin-top:4px;line-height:1.12}
   .hero .datali{font-size:13px;font-weight:600;opacity:.8;margin-top:6px;text-transform:capitalize}
+  .hero.viola{background:linear-gradient(140deg,#7A7EF0 0%,#4B4FB8 45%,#34378C 100%);
+    box-shadow:0 14px 34px rgba(75,79,184,.4)}
+
+  .attivita{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
+  .tile{
+    position:relative;overflow:hidden;border-radius:24px;padding:20px 6px 16px;color:#fff;
+    background:linear-gradient(150deg,#7A7EF0,#4B4FB8 55%,#34378C);
+    box-shadow:0 10px 24px rgba(75,79,184,.35);
+    display:flex;flex-direction:column;align-items:center;gap:9px
+  }
+  .tile::before{content:'';position:absolute;width:110px;height:110px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.25),rgba(255,255,255,0) 70%);top:-40px;right:-30px}
+  .tile .em{font-size:40px;line-height:1;position:relative}
+  .tile .nomeT{font-weight:800;font-size:13px;letter-spacing:.8px;position:relative}
+
+  .eroeViola{
+    position:relative;overflow:hidden;color:#fff;
+    background:linear-gradient(140deg,#7A7EF0 0%,#4B4FB8 45%,#34378C 100%);
+    box-shadow:0 14px 30px rgba(75,79,184,.35)
+  }
+  .eroeViola::before{content:'';position:absolute;width:200px;height:200px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.2),rgba(255,255,255,0) 70%);top:-70px;right:-50px}
+  .eroeViola>*{position:relative}
+
+  .emt{width:46px;height:46px;border-radius:15px;background:var(--cho-soft);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1}
   .pastoPill{
     display:flex;align-items:center;gap:8px;width:100%;margin-top:14px;text-align:left;
     background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
@@ -117,7 +147,15 @@
   .stella.on{color:var(--wave)}
   .num{font-variant-numeric:tabular-nums}
 
-  .totale{background:var(--cho);color:#fff;border-radius:24px;padding:24px;text-align:center;margin-bottom:16px}
+  .totale{
+    position:relative;overflow:hidden;color:#fff;text-align:center;margin:14px 0 16px;
+    background:linear-gradient(140deg,#16B47E 0%,#0E8A61 45%,#0A5C41 100%);
+    border-radius:30px;padding:26px 24px;
+    box-shadow:0 14px 34px rgba(14,122,87,.35)
+  }
+  .totale::before{content:'';position:absolute;width:220px;height:220px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.2),rgba(255,255,255,0) 70%);top:-80px;right:-55px}
+  .totale>*{position:relative}
   .totale .big{font-size:64px;font-weight:800;line-height:1}
   .box{border-radius:24px;padding:20px;margin-bottom:16px}
   .avvisoBox{display:flex;gap:8px;font-size:14px;border-radius:18px;padding:14px;margin-bottom:16px;line-height:1.5}
@@ -267,12 +305,19 @@ function calcolaBolo(cho, grassi, proteine, igPrevalente) {
 }
 
 /* ---------------------------------------------------------------
-   LOGICA SPORT — nuoto
-   Fasce orientative di carboidrati aggiuntivi per una sessione di
-   nuoto (attività aerobica), in base a intensità, durata e fascia
-   oraria della giornata.
+   LOGICA SPORT
+   Fasce orientative di carboidrati aggiuntivi e forma del profilo
+   basale (riduzione percentuale e anticipo, mai unità) per attività
+   aerobiche, in base a intensità, durata e fascia oraria.
    --------------------------------------------------------------- */
-function calcolaSport({ intensita, durata, fascia }) {
+const ATTIVITA = {
+  nuoto:    { nome:'Nuoto',    icona:'🏊', sotto:'Aerobica in acqua',        oraria:15, fattorePrima:1 },
+  corsa:    { nome:'Corsa',    icona:'🏃', sotto:'Aerobica ad alto consumo', oraria:18, fattorePrima:1.2 },
+  trekking: { nome:'Trekking', icona:'🥾', sotto:'Camminata lunga',          oraria:10, fattorePrima:0.8 }
+};
+
+function calcolaSport({ attivita, intensita, durata, fascia }) {
+  const att = ATTIVITA[attivita] || ATTIVITA.nuoto;
   const fattoreInt = intensita === "leggera" ? 0.5 : intensita === "moderata" ? 1 : 1.4;
   const ore = durata / 60;
 
@@ -283,11 +328,24 @@ function calcolaSport({ intensita, durata, fascia }) {
   if (fascia === "mattina") prima = [0, 15];
   else if (fascia === "sera") prima = [15, 30];
   else prima = [10, 25];
-  prima = prima.map(x => Math.round(x * fattoreInt));
+  prima = prima.map(x => Math.round(x * fattoreInt * att.fattorePrima));
 
-  const durante = ore > 1 ? Math.round(15 * fattoreInt * (ore - 0.5)) : 0;
+  const durante = ore > 1 ? Math.round(att.oraria * fattoreInt * (ore - 0.5)) : 0;
 
-  return { prima, durante };
+  // Profilo basale: forma della riduzione temporanea e anticipo.
+  let rid = intensita === "leggera" ? (durata <= 30 ? null : [10, 30])
+    : intensita === "moderata" ? [30, 50] : [50, 70];
+  if (rid && durata >= 90) rid = [Math.min(rid[0] + 10, 80), Math.min(rid[1] + 10, 80)];
+  const basale = rid ? {
+    profilo: `Basale temporanea ridotta del ${rid[0]}-${rid[1]}%`,
+    anticipo: intensita === "leggera" ? "30-60 minuti prima"
+      : intensita === "moderata" ? "60-90 minuti prima" : "Circa 90 minuti prima"
+  } : {
+    profilo: "Profilo abituale, nessuna riduzione",
+    anticipo: "Nessun anticipo necessario"
+  };
+
+  return { prima, durante, basale };
 }
 
 
@@ -309,7 +367,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-04.7';
+const VERSIONE = '2026-09-04.8';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -340,43 +398,87 @@ function sanificaAlimento(o){
 
 let FOODS = (leggi().alimenti || []).map(sanificaAlimento).filter(Boolean);
 
+/* ---------- esportazione in PDF ----------
+   PDF generato a mano (nessuna libreria): font base Helvetica con
+   codifica WinAnsi, quindi solo testo latino — le emoji vengono
+   omesse. Una tabella per pagina A4, multi-pagina se serve. */
+function pdfTesto(t){
+  return String(t).normalize('NFC').split('')
+    .filter(c => c.charCodeAt(0) >= 32 && c.charCodeAt(0) <= 255).join('')
+    .replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)').trim();
+}
+
+function costruisciPdf(pagine){
+  const oggetti = [];
+  const idPagine = pagine.map((_, k) => 5 + 2*k);
+  oggetti[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  oggetti[2] = `<< /Type /Pages /Kids [${idPagine.map(id => id + ' 0 R').join(' ')}] /Count ${pagine.length} >>`;
+  oggetti[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+  oggetti[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  pagine.forEach((cont, k) => {
+    oggetti[5 + 2*k] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${6 + 2*k} 0 R >>`;
+    oggetti[6 + 2*k] = { stream: cont };
+  });
+  let pdf = '%PDF-1.4\n';
+  const offset = [];
+  for(let i = 1; i < oggetti.length; i++){
+    offset[i] = pdf.length;
+    const o = oggetti[i];
+    pdf += typeof o === 'string'
+      ? `${i} 0 obj\n${o}\nendobj\n`
+      : `${i} 0 obj\n<< /Length ${o.stream.length} >>\nstream\n${o.stream}endstream\nendobj\n`;
+  }
+  const xref = pdf.length;
+  pdf += `xref\n0 ${oggetti.length}\n0000000000 65535 f \n`;
+  for(let i = 1; i < oggetti.length; i++) pdf += String(offset[i]).padStart(10,'0') + ' 00000 n \n';
+  pdf += `trailer\n<< /Size ${oggetti.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Uint8Array.from(pdf, c => c.charCodeAt(0) & 0xFF);
+}
+
 function esportaDati(){
-  const blob = new Blob([JSON.stringify(leggi(), null, 2)], {type:'application/json'});
+  if(!FOODS.length){ alert('Non ci sono ancora alimenti da esportare.'); return; }
+  const dataIt = new Date().toLocaleDateString('it-IT');
+  const ordinati = [...FOODS].sort((a,b) => a.n.localeCompare(b.n, 'it'));
+  const col = [40, 330, 392, 452, 515];
+  const perPagina = 38;
+  const nPagine = Math.ceil(ordinati.length / perPagina);
+  const pagine = [];
+  for(let i = 0; i < nPagine; i++){
+    let s = '';
+    const T = (x, y, f, dim, testo) => { s += `BT /${f} ${dim} Tf ${x} ${y} Td (${pdfTesto(testo)}) Tj ET\n`; };
+    let y = 782;
+    if(i === 0){
+      T(40, y, 'F2', 20, 'CHO - I miei alimenti'); y -= 18;
+      T(40, y, 'F1', 10, `Esportato il ${dataIt} - ${ordinati.length} alimenti - valori per 100 g`); y -= 28;
+    }
+    T(col[0], y, 'F2', 10, 'Alimento'); T(col[1], y, 'F2', 10, 'CHO');
+    T(col[2], y, 'F2', 10, 'Grassi'); T(col[3], y, 'F2', 10, 'Proteine');
+    T(col[4], y, 'F2', 10, 'Porzione'); y -= 7;
+    s += `0.6 w 40 ${y} m 555 ${y} l S\n`; y -= 15;
+    for(const f of ordinati.slice(i*perPagina, (i+1)*perPagina)){
+      T(col[0], y, 'F1', 10, f.n.slice(0, 46) + (f.alcol ? ' (alcol)' : ''));
+      T(col[1], y, 'F1', 10, `${gr1(f.cho)} g`);
+      T(col[2], y, 'F1', 10, `${gr1(f.f)} g`);
+      T(col[3], y, 'F1', 10, `${gr1(f.p)} g`);
+      T(col[4], y, 'F1', 10, f.porz[0][1] !== 100 ? `${gr1(f.porz[0][1])} g` : '-');
+      y -= 17;
+    }
+    T(40, 34, 'F1', 8, `CHO - versione ${VERSIONE} - pagina ${i+1} di ${nPagine} - valori indicativi, verifica le etichette`);
+    pagine.push(s);
+  }
+  const blob = new Blob([costruisciPdf(pagine)], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `atlante-cho-alimenti-${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `atlante-cho-alimenti-${new Date().toISOString().slice(0,10)}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function importaDati(file){
-  const r = new FileReader();
-  r.onload = () => {
-    try{
-      const dati = JSON.parse(r.result);
-      if(!dati || typeof dati !== 'object' || Array.isArray(dati)) throw new Error();
-      if('preferiti' in dati && !(Array.isArray(dati.preferiti) && dati.preferiti.every(x => typeof x === 'string'))) throw new Error();
-      if('alimenti' in dati){
-        if(!Array.isArray(dati.alimenti)) throw new Error();
-        dati.alimenti = dati.alimenti.map(sanificaAlimento).filter(Boolean);
-      }
-      scrivi(dati);
-      S.preferiti = leggi().preferiti || [];
-      FOODS = (leggi().alimenti || []).map(sanificaAlimento).filter(Boolean);
-      disegna();
-      alert('Alimenti importati.');
-    }catch(e){
-      alert("Il file scelto non è un'esportazione valida di questa app.");
-    }
-  };
-  r.readAsText(file);
 }
 
 let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', aperto:null, gr:100,
-  sport:{ intensita:'moderata', durata:60, fascia:'pomeriggio' },
+  sport:{ attivita:null, intensita:'moderata', durata:60, fascia:'pomeriggio' },
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:''
 };
 
@@ -618,8 +720,7 @@ function vistaAtlante(){
       <div style="font-weight:700;font-size:18px;margin-top:8px">Il tuo elenco è vuoto</div>
       <p style="color:var(--ink2);font-size:14px;margin:8px 0 0">
         Qui trovi solo gli alimenti che aggiungi tu, con i pulsanti qui sopra: leggendo il codice a barre,
-        da una fotografia del codice o compilando un modulo. Puoi anche importare un elenco esportato
-        in precedenza, dalla schermata Sport.</p>
+        da una fotografia del codice o compilando un modulo.</p>
     </div>`;
 
   let l = FOODS;
@@ -654,6 +755,9 @@ function vistaAtlante(){
     <div class="chips">${catInUso.map(c => chip(`${CAT_EMOJI[c]||''} ${c}`, S.cat===c, 'cat:'+c)).join('')}</div>
     ${celle ? `<div class="griglia">${celle}</div>`
       : `<div style="text-align:center;padding:48px 0;color:var(--ink2)">${vuoto}</div>`}
+    <button class="card" style="width:100%;padding:14px;margin-top:14px;font-weight:600;color:var(--ink2);
+      display:flex;align-items:center;justify-content:center;gap:8px" data-a="esporta">
+      📄 Esporta i tuoi alimenti in PDF</button>
     <button class="fab" data-a="nuovo" aria-label="Aggiungi alimento">${ico('piu',26)}</button>`;
 }
 
@@ -671,24 +775,25 @@ function totali(){
 
 function vistaPasto(){
   if(!S.pasto.length) return `
-    <div class="card" style="padding:32px;text-align:center">
-      <div style="font-size:36px">🍽️</div>
-      <div style="font-weight:700;font-size:18px;margin-top:8px">Il pasto è vuoto</div>
-      <p style="color:var(--ink2);font-size:14px;margin:8px 0 20px">
-        Aggiungi gli alimenti per vedere il totale dei carboidrati e la forma di bolo suggerita.</p>
-      <button class="primario" style="width:auto;padding:12px 24px" data-a="tab:atlante">Apri gli alimenti</button>
+    <div class="hero" style="text-align:center">
+      <div style="font-size:44px">🍽️</div>
+      <div class="titolone" style="margin-top:6px">Il pasto è vuoto</div>
+      <div class="datali" style="text-transform:none">Aggiungi gli alimenti per vedere il totale dei carboidrati
+        e la forma di bolo suggerita.</div>
+      <button class="primario" style="width:auto;padding:12px 26px;margin-top:16px;background:rgba(255,255,255,.18);
+        border:1px solid rgba(255,255,255,.3)" data-a="tab:atlante">Apri gli alimenti</button>
     </div>`;
 
   const t = totali();
   const b = calcolaBolo(t.cho, t.f, t.p, t.ig);
 
   const lista = S.pasto.map((v,i) => `
-    <div class="card riga">
-      <span class="em" style="font-size:24px">${v.cibo.e}</span>
+    <div class="card riga" style="border-radius:22px;box-shadow:0 3px 10px rgba(19,32,25,.05)">
+      <span class="emt">${v.cibo.e}</span>
       <div style="flex:1;min-width:0">
         <div class="nome">${esc(v.cibo.n)}</div><div class="sotto">${gr1(v.g)} g</div>
       </div>
-      <div style="font-weight:700;color:var(--cho)" class="num">${gr1(v.cibo.cho*v.g/100)} g</div>
+      <span class="chopill num">${gr1(v.cibo.cho*v.g/100)} g</span>
       <button style="padding:8px;color:#B9C2BB" data-a="togli:${i}">${ico('cestino',18)}</button>
     </div>`).join('');
 
@@ -710,8 +815,8 @@ function vistaPasto(){
         ${gr1(t.f)} g grassi · ${gr1(t.p)} g proteine · ${b.ugp.toFixed(1)} UGP</div>
     </div>
     ${lista}
-    <div class="box" style="background:var(--wave-soft);border:1px solid #F0DFC4;margin-top:16px">
-      <div style="font-weight:700;color:var(--wave);margin-bottom:12px">${b.tipo}</div>
+    <div class="box" style="background:var(--wave-soft);border:1px solid #F0DFC4;margin-top:16px;box-shadow:0 4px 14px rgba(168,91,12,.1)">
+      <div style="font-weight:700;color:var(--wave);margin-bottom:12px">🌊 ${b.tipo}</div>
       ${barra}
       ${b.prebolo ? `<p style="font-size:14px">Momento del bolo: ${b.prebolo}.</p>` : ''}
       <p style="font-size:14px;color:var(--ink2);margin:0">${b.spiega}</p>
@@ -727,6 +832,23 @@ function vistaPasto(){
 /* ---------- schermata: sport ---------- */
 function vistaSport(){
   const s = S.sport;
+  const versione = `<div style="text-align:center;font-size:12px;color:var(--ink2);padding:4px 0 8px">CHO · versione ${VERSIONE}</div>`;
+
+  if(!s.attivita) return `
+    <div class="hero viola">
+      <div class="occhiello">Attività fisica</div>
+      <div class="titolone">Che attività<br>fai oggi?</div>
+      <div class="datali" style="text-transform:none">Scegli lo sport: ti dico carboidrati e profilo basale.</div>
+    </div>
+    <div class="attivita">
+      ${Object.entries(ATTIVITA).map(([id,a],i) => `
+        <button class="tile" style="animation-delay:${i*60}ms" data-a="att:${id}">
+          <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
+        </button>`).join('')}
+    </div>
+    ${versione}`;
+
+  const att = ATTIVITA[s.attivita];
   const r = calcolaSport(s);
   const G = (lab, opzioni, campo) => `
     <div style="margin-bottom:16px">
@@ -738,17 +860,19 @@ function vistaSport(){
   return `
     <div class="card" style="padding:20px;margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line)">
-        <span style="font-size:38px;line-height:1">🏊</span>
-        <div>
-          <div style="font-weight:800;font-size:21px;letter-spacing:-.3px">Nuoto</div>
-          <div style="font-size:13px;color:var(--ink2)">Attività aerobica</div>
+        <span style="width:58px;height:58px;border-radius:18px;background:var(--sport-soft);display:flex;
+          align-items:center;justify-content:center;font-size:32px;line-height:1">${att.icona}</span>
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:21px;letter-spacing:-.3px">${att.nome}</div>
+          <div style="font-size:13px;color:var(--ink2)">${att.sotto}</div>
         </div>
+        <button class="chip" data-a="att:" style="--c:var(--sport)">‹ Cambia</button>
       </div>
       ${G('Intensità', [['leggera','Leggera'],['moderata','Moderata'],['intensa','Intensa']], 'intensita')}
       ${G('Durata', [[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']], 'durata')}
       ${G('Fascia oraria', [['mattina','Mattina'],['pomeriggio','Pomeriggio'],['sera','Sera']], 'fascia')}
     </div>
-    <div class="box" style="background:var(--sport);color:#fff">
+    <div class="box eroeViola">
       <div style="display:flex;align-items:baseline;gap:8px">
         <span class="num" style="font-size:50px;font-weight:800;line-height:1">${r.prima[0]===r.prima[1]?r.prima[0]:r.prima[0]+'-'+r.prima[1]}</span>
         <span style="font-weight:600">g prima</span>
@@ -761,17 +885,21 @@ function vistaSport(){
         <span style="font-weight:600;margin-left:8px">durante</span>
         <div style="font-size:14px;opacity:.9;margin-top:4px">Distribuiti nel corso dell'attività.</div></div>` : ''}
     </div>
-    <div class="avvisoBox" style="background:var(--card);border:1px solid var(--line);color:var(--ink2)">
-      <span>ℹ️</span><span>Queste quantità sono fasce di partenza, non prescrizioni. La risposta all'esercizio è molto
-      personale: annota come va nelle prime sessioni e portane i risultati al tuo team.</span></div>
-    <div class="card" style="padding:20px;margin-bottom:16px">
-      <div style="font-weight:700;margin-bottom:8px">I tuoi alimenti su file</div>
-      <p style="font-size:14px;color:var(--ink2);margin:0 0 14px">Esporta in un file JSON gli alimenti personali
-        salvati su questo dispositivo, per conservarli o portarli su un altro telefono, e reimportali quando serve.</p>
-      <button class="primario" style="background:var(--sport);margin-bottom:10px" data-a="esporta">Esporta alimenti (JSON)</button>
-      <button class="primario" style="background:var(--card);color:var(--sport);border:1px solid var(--line)" data-a="importa">Importa alimenti da file</button>
+    <div class="box" style="background:var(--sport-soft);box-shadow:0 4px 14px rgba(75,79,184,.12)">
+      <div style="font-weight:700;color:var(--sport);margin-bottom:12px">💧 Profilo basale da applicare</div>
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-bottom:10px">
+        <span style="color:var(--ink2);flex:none">Tipo di profilo</span>
+        <b style="text-align:right">${r.basale.profilo}</b></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px">
+        <span style="color:var(--ink2);flex:none">Quanto tempo prima</span>
+        <b style="text-align:right">${r.basale.anticipo}</b></div>
+      <p style="font-size:12px;color:var(--ink2);margin:12px 0 0">La riduzione la imposti sul microinfusore, in percentuale
+        sul tuo profilo: qui nessuna unità, solo la forma.</p>
     </div>
-    <div style="text-align:center;font-size:12px;color:var(--ink2);padding:4px 0 8px">CHO · versione ${VERSIONE}</div>`;
+    <div class="avvisoBox" style="background:var(--card);border:1px solid var(--line);color:var(--ink2)">
+      <span>ℹ️</span><span>Quantità e riduzioni sono fasce di partenza, non prescrizioni. La risposta all'esercizio è molto
+      personale: annota come va nelle prime sessioni e portane i risultati al tuo team.</span></div>
+    ${versione}`;
 }
 
 /* ---------- strati sopra: porzione e avviso ---------- */
@@ -882,9 +1010,6 @@ function stratoNuovo(){
         ${numero('fi-f','Grassi', F.f)}
         ${numero('fi-p','Proteine', F.p)}
       </div>
-      <div class="etich">Indice glicemico</div>
-      <div class="chips-wrap" style="margin-bottom:12px">
-        ${[['basso','Basso'],['medio','Medio'],['alto','Alto']].map(([v,t]) => chip(t, F.ig===v, `fset:ig:${v}`)).join('')}</div>
       <div class="etich">Contiene alcol</div>
       <div class="chips-wrap" style="margin-bottom:12px">
         ${[['no','No'],['si','Sì']].map(([v,t]) => chip(t, F.alcol===v, `fset:alcol:${v}`)).join('')}</div>
@@ -964,6 +1089,7 @@ document.addEventListener('click', e => {
   else if(a==='togli') S.pasto.splice(+p1,1);
   else if(a==='svuota') S.pasto = [];
   else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
+  else if(a==='att') S.sport.attivita = p1 || null;
   else if(a==='nuovo') S.nuovo = 'menu';
   else if(a==='chiudiNuovo'){ fermaScanner(); S.nuovo = null; S.form = null; S.editId = null; S.caricamento = false; }
   else if(a==='nuovoForm'){ S.form = formVuoto(); S.editId = null; S.nuovo = 'form'; }
@@ -992,13 +1118,6 @@ document.addEventListener('click', e => {
     }
   }
   else if(a==='esporta'){ esportaDati(); return; }
-  else if(a==='importa'){
-    const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = 'application/json,.json';
-    inp.onchange = () => { if(inp.files[0]) importaDati(inp.files[0]); };
-    inp.click();
-    return;
-  }
   else if(a==='ok') scrivi({avvisoVisto:true});
   disegna();
 });
