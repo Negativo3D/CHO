@@ -192,56 +192,27 @@ function calcolaBolo(cho, grassi, proteine, igPrevalente) {
 }
 
 /* ---------------------------------------------------------------
-   LOGICA SPORT
-   Fasce orientative di carboidrati aggiuntivi in base al tipo di
-   attività, all'intensità, alla durata e all'insulina ancora attiva.
+   LOGICA SPORT — nuoto
+   Fasce orientative di carboidrati aggiuntivi per una sessione di
+   nuoto (attività aerobica), in base a intensità, durata e fascia
+   oraria della giornata.
    --------------------------------------------------------------- */
-function calcolaSport({ tipo, intensita, durata, bolo }) {
-  const note = [];
-  let prima = [0, 0], durante = 0, dopo = null;
-
+function calcolaSport({ intensita, durata, fascia }) {
   const fattoreInt = intensita === "leggera" ? 0.5 : intensita === "moderata" ? 1 : 1.4;
   const ore = durata / 60;
 
-  if (tipo === "aerobica") {
-    if (bolo === "attivo") {
-      prima = [20, 40];
-      note.push("Con insulina ancora attiva il rischio di ipoglicemia è alto: questi carboidrati vanno assunti senza bolo.");
-      note.push("Se il microinfusore lo consente, valuta con il tuo team una basale temporanea ridotta impostata 60-90 minuti prima.");
-    } else if (bolo === "digiuno") {
-      prima = [0, 15];
-      note.push("A digiuno la mattina presto molte persone non hanno bisogno di nulla per sessioni brevi e leggere.");
-    } else {
-      prima = [10, 20];
-    }
-    durante = ore > 1 ? Math.round(15 * fattoreInt * (ore - 0.5)) : 0;
-    if (durata >= 90) note.push("Oltre l'ora e mezza conviene frazionare: piccole quantità ogni 30 minuti invece di una sola assunzione.");
-  }
+  // La mattina, spesso a digiuno, il fabbisogno prima di partire è più
+  // basso; la sera la fascia sale perché l'insulina dei pasti della
+  // giornata è più spesso ancora in circolo.
+  let prima;
+  if (fascia === "mattina") prima = [0, 15];
+  else if (fascia === "sera") prima = [15, 30];
+  else prima = [10, 25];
+  prima = prima.map(x => Math.round(x * fattoreInt));
 
-  if (tipo === "anaerobica") {
-    prima = bolo === "attivo" ? [10, 20] : [0, 10];
-    durante = 0;
-    note.push("Forza e sforzi brevi e intensi spesso fanno salire la glicemia durante l'allenamento, per via degli ormoni dello stress.");
-    note.push("Il calo può arrivare dopo, a distanza di ore: è quello il momento da presidiare.");
-  }
+  const durante = ore > 1 ? Math.round(15 * fattoreInt * (ore - 0.5)) : 0;
 
-  if (tipo === "mista") {
-    prima = bolo === "attivo" ? [15, 30] : [10, 20];
-    durante = ore >= 1 ? Math.round(12 * fattoreInt * ore) : 0;
-    note.push("Negli sport di squadra le fasi si alternano: la glicemia può salire negli scatti e scendere nei recuperi lunghi.");
-  }
-
-  if (intensita === "intensa" && tipo !== "anaerobica") {
-    note.push("Ad alta intensità il fabbisogno cresce ma l'assorbimento intestinale peggiora: meglio zuccheri liquidi che solidi.");
-  }
-
-  if (durata >= 60 || intensita === "intensa") {
-    dopo = "Spuntino con carboidrati a lento assorbimento e una quota di proteine (per esempio pane integrale con formaggio, o yogurt con avena). La sensibilità all'insulina resta aumentata per molte ore e il rischio di ipoglicemia notturna è concreto.";
-  } else {
-    dopo = "Per sessioni brevi e leggere spesso non serve nulla, ma un controllo prima di dormire resta utile.";
-  }
-
-  return { prima, durante, dopo, note };
+  return { prima, durante };
 }
 
 
@@ -275,7 +246,7 @@ function sanificaAlimento(o){
   if(cho === null || cho > 100) return null;
   const porz = Array.isArray(o.porz) && o.porz.length &&
     o.porz.every(pz => Array.isArray(pz) && typeof pz[0] === 'string' && +pz[1] > 0)
-    ? o.porz.map(pz => [pz[0], Math.round(+pz[1])]) : [["100 g",100]];
+    ? o.porz.map(pz => [pz[0], Math.round(+pz[1]*10)/10]) : [["100 g",100]];
   return {
     id: typeof o.id === 'string' && o.id ? o.id : nuovoId(),
     n: o.n.trim(),
@@ -326,7 +297,7 @@ function importaDati(file){
 let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', aperto:null, gr:100,
-  sport:{ tipo:'aerobica', intensita:'moderata', durata:60, bolo:'attivo' },
+  sport:{ intensita:'moderata', durata:60, fascia:'pomeriggio' },
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:''
 };
 
@@ -340,6 +311,8 @@ let flussoCamera = null, cicloScan = null, rilevatore = null, zxReader = null, z
 function formVuoto(){
   return { n:'', e:'', cho:'', f:'', p:'', ig:'medio', alcol:'no', cat:'Altro', porz:'' };
 }
+
+const EMOJI_CIBO = ['🍞','🥐','🥖','🍝','🍚','🥔','🍕','🥪','🍔','🍎','🍌','🍊','🍇','🍓','🍑','🥝','🥦','🥕','🍅','🫘','🥛','🧀','🥣','🥚','🍖','🐟','🍪','🍫','🍰','🍨','🍯','🍬','🥤','🧃','🍺','🍷'];
 
 const scannerAttivo = () => !!(flussoCamera || zxReader);
 
@@ -502,7 +475,7 @@ function salvaAlimento(){
   if(!nome){ alert("Dai un nome all'alimento."); return; }
   if(!(cho >= 0 && cho <= 100)){ alert("Indica i carboidrati per 100 g: un numero da 0 a 100."); return; }
   const num = v => { const x = dec(v); return x >= 0 && x <= 100 ? Math.round(x*10)/10 : 0; };
-  const porzG = Math.round(dec(F.porz));
+  const porzG = Math.round(dec(F.porz)*10)/10;
   const dati = sanificaAlimento({
     id: S.editId || undefined,
     n: nome, e: F.e, cat: F.cat,
@@ -522,6 +495,8 @@ function salvaAlimento(){
 }
 
 const norm = t => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+/* pesi con al massimo un decimale, virgola all'italiana */
+const gr1 = x => { const v = Math.round(x*10)/10; return Number.isInteger(v) ? String(v) : v.toFixed(1).replace('.',','); };
 const esc = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 const cibo = id => FOODS.find(f => f.id === id);
 const chip = (txt, on, azione, colore) =>
@@ -539,7 +514,7 @@ function vistaAtlante(){
       ${S.pasto.length ? `
         <button class="pastoPill" data-a="tab:pasto">
           <span style="font-size:18px">🍽️</span>
-          <span style="flex:1">Nel pasto: <b class="num">${Math.round(t.cho)} g</b> di carboidrati · ${S.pasto.length} aliment${S.pasto.length===1?'o':'i'}</span>
+          <span style="flex:1">Nel pasto: <b class="num">${gr1(t.cho)} g</b> di carboidrati · ${S.pasto.length} aliment${S.pasto.length===1?'o':'i'}</span>
           <span style="opacity:.8">›</span>
         </button>` : ''}
       <div class="azioni">
@@ -624,9 +599,9 @@ function vistaPasto(){
     <div class="card riga">
       <span class="em" style="font-size:24px">${v.cibo.e}</span>
       <div style="flex:1;min-width:0">
-        <div class="nome">${esc(v.cibo.n)}</div><div class="sotto">${v.g} g</div>
+        <div class="nome">${esc(v.cibo.n)}</div><div class="sotto">${gr1(v.g)} g</div>
       </div>
-      <div style="font-weight:700;color:var(--cho)" class="num">${Math.round(v.cibo.cho*v.g/100)} g</div>
+      <div style="font-weight:700;color:var(--cho)" class="num">${gr1(v.cibo.cho*v.g/100)} g</div>
       <button style="padding:8px;color:#B9C2BB" data-a="togli:${i}">${ico('cestino',18)}</button>
     </div>`).join('');
 
@@ -642,10 +617,10 @@ function vistaPasto(){
 
   return `
     <div class="totale">
-      <div class="big num">${Math.round(t.cho)}</div>
+      <div class="big num">${gr1(t.cho)}</div>
       <div style="font-weight:600;margin-top:4px">grammi di carboidrati</div>
       <div style="font-size:14px;opacity:.85;margin-top:4px">
-        ${Math.round(t.f)} g grassi · ${Math.round(t.p)} g proteine · ${b.ugp.toFixed(1)} UGP</div>
+        ${gr1(t.f)} g grassi · ${gr1(t.p)} g proteine · ${b.ugp.toFixed(1)} UGP</div>
     </div>
     ${lista}
     <div class="box" style="background:var(--wave-soft);border:1px solid #F0DFC4;margin-top:16px">
@@ -675,10 +650,16 @@ function vistaSport(){
 
   return `
     <div class="card" style="padding:20px;margin-bottom:16px">
-      ${G('Che tipo di attività', [['aerobica','Aerobica'],['anaerobica','Forza'],['mista','Sport di squadra']], 'tipo')}
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--line)">
+        <span style="font-size:38px;line-height:1">🏊</span>
+        <div>
+          <div style="font-weight:800;font-size:21px;letter-spacing:-.3px">Nuoto</div>
+          <div style="font-size:13px;color:var(--ink2)">Attività aerobica</div>
+        </div>
+      </div>
       ${G('Intensità', [['leggera','Leggera'],['moderata','Moderata'],['intensa','Intensa']], 'intensita')}
       ${G('Durata', [[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']], 'durata')}
-      ${G('Insulina del pasto', [['attivo','Bolo fatto da poco'],['lontano','Lontano dai pasti'],['digiuno','A digiuno']], 'bolo')}
+      ${G('Fascia oraria', [['mattina','Mattina'],['pomeriggio','Pomeriggio'],['sera','Sera']], 'fascia')}
     </div>
     <div class="box" style="background:var(--sport);color:#fff">
       <div style="display:flex;align-items:baseline;gap:8px">
@@ -692,19 +673,6 @@ function vistaSport(){
         <span class="num" style="font-size:30px;font-weight:700">${r.durante} g</span>
         <span style="font-weight:600;margin-left:8px">durante</span>
         <div style="font-size:14px;opacity:.9;margin-top:4px">Distribuiti nel corso dell'attività.</div></div>` : ''}
-    </div>
-    <div class="card" style="padding:20px;margin-bottom:16px">
-      <div style="font-weight:700;margin-bottom:8px">Dopo l'attività</div>
-      <p style="font-size:14px;color:var(--ink2);margin:0">${r.dopo}</p>
-    </div>
-    ${r.note.length ? `<div class="box" style="background:var(--sport-soft)">
-      <div style="font-weight:700;color:var(--sport);margin-bottom:4px">Da tenere presente</div>
-      <ul>${r.note.map(n => `<li>${n}</li>`).join('')}</ul></div>` : ''}
-    <div class="card" style="padding:20px;margin-bottom:16px">
-      <div style="font-weight:700;margin-bottom:8px">Cosa mangiare</div>
-      <p style="font-size:14px;color:var(--ink2);margin:0">Prima e durante servono carboidrati rapidi
-        (succo, banana, tavolette di glucosio); per lo spuntino dopo meglio carboidrati lenti con una quota
-        di proteine (pane integrale, yogurt, frutta secca). Aggiungi i tuoi ai preferiti per averli a portata di mano.</p>
     </div>
     <div class="avvisoBox" style="background:var(--card);border:1px solid var(--line);color:var(--ink2)">
       <span>ℹ️</span><span>Queste quantità sono fasce di partenza, non prescrizioni. La risposta all'esercizio è molto
@@ -721,7 +689,7 @@ function vistaSport(){
 /* ---------- strati sopra: porzione e avviso ---------- */
 function stratoPorzione(){
   const f = cibo(S.aperto); if(!f) return '';
-  const cho = Math.round(f.cho * S.gr / 100);
+  const cho = gr1(f.cho * S.gr / 100);
   return `
   <div class="velo" data-a="chiudi">
     <div class="foglio" data-stop="1">
@@ -741,7 +709,7 @@ function stratoPorzione(){
       <div class="stepper">
         <button data-a="g:-">${ico('meno')}</button>
         <div style="flex:1;text-align:center">
-          <div class="num" style="font-size:28px;font-weight:700">${S.gr} g</div>
+          <div class="num" style="font-size:28px;font-weight:700">${gr1(S.gr)} g</div>
           <div style="font-size:12px;color:var(--ink2)">quantità</div>
         </div>
         <button data-a="g:+">${ico('piu')}</button>
@@ -816,6 +784,10 @@ function stratoNuovo(){
         <div style="width:84px"><div class="etich">Emoji</div>
           <input id="fi-e" class="campo" style="text-align:center" placeholder="🍽️" value="${esc(F.e)}"></div>
       </div>
+      <div class="chips-wrap" style="margin-bottom:12px;gap:6px">
+        ${EMOJI_CIBO.map(em => `<button class="chip ${F.e===em?'on':''}" data-a="fset:e:${em}"
+          style="font-size:19px;padding:6px 10px;line-height:1">${em}</button>`).join('')}
+      </div>
       <div class="etich">Valori per 100 g</div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         ${numero('fi-cho','Carboidrati', F.cho)}
@@ -832,7 +804,7 @@ function stratoNuovo(){
       <div class="chips-wrap" style="margin-bottom:12px">
         ${CATS.map(c => chip(c, F.cat===c, `fset:cat:${c}`)).join('')}</div>
       <div style="margin-bottom:16px;max-width:200px"><div class="etich">Porzione tipica in grammi (facoltativa)</div>
-        <input id="fi-porz" class="campo" inputmode="numeric" placeholder="es. 30" value="${esc(F.porz)}"></div>
+        <input id="fi-porz" class="campo" inputmode="decimal" placeholder="es. 62,5" value="${esc(F.porz)}"></div>
       <button class="primario" data-a="salvaAlimento">${S.editId ? 'Salva le modifiche' : 'Aggiungi ai miei alimenti'}</button>
     </div>
   </div>`;
@@ -892,7 +864,10 @@ document.addEventListener('click', e => {
   }
   else if(a==='apri'){ S.aperto = p1; S.gr = cibo(p1).porz[0][1]; }
   else if(a==='chiudi') S.aperto = null;
-  else if(a==='g'){ const passo = S.gr>=100?10:5; S.gr = p1==='+' ? S.gr+passo : Math.max(passo, S.gr-passo); }
+  else if(a==='g'){
+    const passo = S.gr>=100 ? 10 : S.gr>=25 ? 5 : S.gr>=5 ? 1 : 0.5;
+    S.gr = Math.round((p1==='+' ? S.gr+passo : Math.max(0.5, S.gr-passo))*10)/10;
+  }
   else if(a==='gset') S.gr = +p1;
   else if(a==='aggiungi'){ S.pasto.push({cibo: cibo(S.aperto), g: S.gr}); S.aperto = null; }
   else if(a==='togli') S.pasto.splice(+p1,1);
