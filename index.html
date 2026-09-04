@@ -253,6 +253,10 @@ function ico(n, s=22, pieno=false){
 }
 
 /* ---------- memoria sul telefono ---------- */
+/* Numero di versione dell'app: va aumentato a ogni pubblicazione.
+   Il controllo aggiornamenti confronta questo valore con quello online. */
+const VERSIONE = '2026-09-04.6';
+
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
 function scrivi(patch){ try{ localStorage.setItem(CHIAVE, JSON.stringify({...leggi(), ...patch})); }catch(e){} }
@@ -712,7 +716,8 @@ function vistaSport(){
         salvati su questo dispositivo, per conservarli o portarli su un altro telefono, e reimportali quando serve.</p>
       <button class="primario" style="background:var(--sport);margin-bottom:10px" data-a="esporta">Esporta alimenti (JSON)</button>
       <button class="primario" style="background:var(--card);color:var(--sport);border:1px solid var(--line)" data-a="importa">Importa alimenti da file</button>
-    </div>`;
+    </div>
+    <div style="text-align:center;font-size:12px;color:var(--ink2);padding:4px 0 8px">CHO · versione ${VERSIONE}</div>`;
 }
 
 /* ---------- strati sopra: porzione e avviso ---------- */
@@ -958,6 +963,37 @@ document.addEventListener('input', e => {
 });
 
 disegna();
+
+/* ---------- controllo aggiornamenti ----------
+   La shortcut in home spesso riapre la pagina rimasta in memoria senza
+   ricaricarla, e GitHub Pages tiene la pagina in cache ~10 minuti: qui
+   si controlla la versione online (all'avvio, quando l'app torna in
+   primo piano e ogni 15 minuti) e, se è diversa, compare un banner che
+   ricarica la pagina scavalcando la cache. */
+async function controllaAggiornamenti(){
+  if(!/^https?:$/.test(location.protocol)) return;
+  try{
+    const r = await fetch(location.pathname + '?agg=' + Date.now(), { cache:'no-store' });
+    if(!r.ok) return;
+    const t = await r.text();
+    const m = t.match(/VERSIONE = '([^']+)'/);
+    if(m && m[1] !== VERSIONE) mostraBannerAggiorna();
+  }catch(e){}
+}
+function mostraBannerAggiorna(){
+  if(document.getElementById('agg')) return;
+  const b = document.createElement('button');
+  b.id = 'agg';
+  b.textContent = '✨ Nuova versione disponibile — tocca per aggiornare';
+  b.style.cssText = 'position:fixed;top:calc(10px + env(safe-area-inset-top));left:14px;right:14px;z-index:60;' +
+    'padding:14px;border-radius:18px;background:var(--ink);color:#fff;font-weight:600;font-size:14px;' +
+    'box-shadow:0 10px 30px rgba(19,32,25,.35);animation:su .4s ease both';
+  b.onclick = () => location.replace(location.pathname + '?v=' + Date.now());
+  document.body.appendChild(b);
+}
+controllaAggiornamenti();
+document.addEventListener('visibilitychange', () => { if(!document.hidden) controllaAggiornamenti(); });
+setInterval(controllaAggiornamenti, 15 * 60 * 1000);
 </script>
 </body>
 </html>
