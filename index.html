@@ -341,7 +341,6 @@ const ATTIVITA = {
     opzioni:[[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']],
     base:{ 30:[8,0], 60:[14,0], 90:[16,10], 120:[20,15] } }
 };
-const MOMENTI = [['prima','Prima (g)'],['durante','Durante (g)']];
 
 function tabellaDefault(id){
   const att = ATTIVITA[id] || ATTIVITA.nuoto;
@@ -372,19 +371,33 @@ function salvaCella(id, sez, riga, col, val){
   scrivi({ tabelleSport: tutte });
 }
 
-/* Correzione del "prima" in base alla glicemia dichiarata: sotto 70
-   e tra 70 e 90 si aggiunge, tra 90 e 180 nulla, sopra si toglie. */
-function correzioneGlicemia(glic){
-  const g = parseFloat(String(glic ?? '').replace(',', '.'));
-  if(!isFinite(g) || g < 20 || g > 600) return 0;
-  return g < 70 ? 15 : g < 90 ? 10 : g <= 180 ? 0 : g <= 250 ? -5 : -10;
+/* Regole glicemiche, comuni a tutti gli sport e modificabili dai
+   parametri: grammi di correzione per fascia di glicemia prima, e —
+   sopra la soglia scelta dall'utente — niente carboidrati ma un bolo
+   correttivo: (glicemia − obiettivo) ÷ FSI, al mezzo di unità. L'FSI
+   non ha un valore di partenza: finché non lo imposta l'utente, per le
+   glicemie alte si segnala solo di impostarlo. */
+function glicParam(){
+  const p = leggi().glicemiaSport || {};
+  const n = (v, d) => (typeof v === 'number' && isFinite(v)) ? v : d;
+  return {
+    b70: n(p.b70, 15), b90: n(p.b90, 10), b180: n(p.b180, 0), bAlta: n(p.bAlta, -5),
+    soglia: Math.max(181, n(p.soglia, 250)),
+    fsi: (typeof p.fsi === 'number' && isFinite(p.fsi) && p.fsi > 0) ? p.fsi : null,
+    obiettivo: n(p.obiettivo, 150)
+  };
+}
+function salvaGlicParam(campo, val){
+  const p = leggi().glicemiaSport || {};
+  const n = parseFloat(String(val).replace(',', '.'));
+  if(isFinite(n)) p[campo] = n; else delete p[campo];
+  scrivi({ glicemiaSport: p });
 }
 
 function calcolaSport({ attivita, cond, glic }) {
   const att = ATTIVITA[attivita] || ATTIVITA.nuoto;
-  const v = tabellaSport(attivita).voci[cond] || { prima:0, durante:0 };
-  const correzione = correzioneGlicemia(glic);
-  const prima = Math.max(0, v.prima + correzione);
+  const g = parseFloat(String(glic ?? '').replace(',', '.'));
+  const glicOk = isFinite(g) && g >= 20 && g <= 600;
 
   // Profilo basale: riduzione più marcata per sessioni lunghe.
   const lungo = att.cond === 'Distanza' ? cond >= 15 : cond >= 90;
@@ -395,7 +408,37 @@ function calcolaSport({ attivita, cond, glic }) {
     anticipo: '60-90 minuti prima'
   };
 
-  return { prima, durante: v.durante, correzione, basale };
+  /* Nessuna proposta finché mancano la condizione o la glicemia. */
+  if(cond == null || !glicOk) return { pronto:false, rid, basale, prima:0, correzione:0 };
+
+  const P = glicParam();
+  if(g > P.soglia){
+    const unita = P.fsi ? Math.max(0, Math.round((g - P.obiettivo) / P.fsi * 2) / 2) : null;
+    return { pronto:true, bolo:{ unita }, rid, basale, prima:0, correzione:0 };
+  }
+  const correzione = g < 70 ? P.b70 : g < 90 ? P.b90 : g <= 180 ? P.b180 : P.bAlta;
+  const v = tabellaSport(attivita).voci[cond] || { prima:0 };
+  const prima = Math.max(0, Math.round(v.prima + correzione));
+  return { pronto:true, rid, basale, prima, correzione };
+}
+
+/* Il riquadro della proposta: grammi di CHO, oppure il bolo per le
+   glicemie alte, oppure il segnaposto finché mancano i dati. */
+function boxPrima(r, att){
+  const base = 'margin:0;padding:14px 16px;';
+  if(!r.pronto) return `<div class="box" id="r-box" style="${base}background:var(--card);border:1px dashed var(--line);box-shadow:none">
+    <div class="num" style="font-size:34px;font-weight:800;line-height:1;color:var(--ink2)">—</div>
+    <div style="font-size:12px;color:var(--ink2);margin-top:5px">scegli ${att.cond === 'Distanza' ? 'distanza' : 'durata'} e glicemia</div></div>`;
+  if(r.bolo) return `<div class="box" id="r-box" style="${base}background:var(--hypo);color:#fff;box-shadow:0 4px 14px rgba(176,36,24,.3)">
+    ${r.bolo.unita == null
+      ? `<div style="font-weight:800;font-size:17px;line-height:1.2">Glicemia alta</div>
+         <div style="font-size:12px;opacity:.9;margin-top:5px">imposta FSI e obiettivo nei parametri per avere il bolo</div>`
+      : `<div class="num" style="font-size:38px;font-weight:800;line-height:1">${String(r.bolo.unita).replace('.', ',')}<span style="font-size:17px;font-weight:700"> U</span></div>
+         <div style="font-size:12px;opacity:.9;margin-top:5px">bolo correttivo · niente CHO</div>`}</div>`;
+  return `<div class="box eroeViola" id="r-box" style="${base}">
+    <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.prima}<span style="font-size:17px;font-weight:700"> g</span></div>
+    <div style="font-size:12px;opacity:.9;margin-top:5px">${r.prima === 0 ? 'niente prima' : 'prima'}${
+      r.correzione ? ` · ${r.correzione > 0 ? '+' : ''}${r.correzione} g glicemia` : ''}</div></div>`;
 }
 
 /* ---------- autoallineamento sport ----------
@@ -413,7 +456,8 @@ function autoallinea(s, glicDopo){
   const esito = valutaEsito(glicDopo);
   const delta = esito === 'bassa' ? 5 : esito === 'alta' ? -5 : 0;
   const att = ATTIVITA[s.attivita];
-  const cella = att ? tabellaSport(s.attivita).voci[s.cond] : null;
+  /* Le sessioni "bolo" (glicemia alta, niente CHO) non tarano le celle. */
+  const cella = att && !s.bolo ? tabellaSport(s.attivita).voci[s.cond] : null;
   let nota;
   if(cella){
     const vecchia = cella.prima;
@@ -486,7 +530,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.10';
+const VERSIONE = '2026-09-05.11';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -693,6 +737,7 @@ function esportaDati(){
 let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', vedi:'tutto', aperto:null, gr:100,
+  scegliPasto:null, qp:'',
   sport:{ attivita:null, cond:60, glic:'' },
   paramSport:null, sessioneAperta:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
@@ -1044,7 +1089,7 @@ function totali(){
 function vistaPasto(){
   if(!S.pasto.length) return `
     <div class="hero" style="text-align:center">
-      <button class="fab fabHero" data-a="tab:atlante" aria-label="Aggiungi alimenti e piatti al pasto">${ico('piu',24)}</button>
+      <button class="fab fabHero" data-a="pastoPiu" aria-label="Aggiungi alimenti e piatti al pasto">${ico('piu',24)}</button>
       <div style="font-size:44px">🍽️</div>
       <div class="titolone" style="margin-top:6px">Il pasto è vuoto</div>
       <div class="datali" style="text-transform:none">Tocca + per scegliere alimenti e piatti dalla tua anagrafica:
@@ -1076,7 +1121,7 @@ function vistaPasto(){
 
   return `
     <div class="totale" style="position:relative">
-      <button class="fab fabHero" data-a="tab:atlante" aria-label="Aggiungi altri alimenti o piatti">${ico('piu',24)}</button>
+      <button class="fab fabHero" data-a="pastoPiu" aria-label="Aggiungi altri alimenti o piatti">${ico('piu',24)}</button>
       <div class="big num">${gr1(t.cho)}</div>
       <div style="font-weight:600;margin-top:4px">grammi di carboidrati</div>
       <div style="font-size:14px;opacity:.85;margin-top:4px">
@@ -1098,6 +1143,68 @@ function vistaPasto(){
 }
 
 /* ---------- schermata: piatti ---------- */
+/* ---------- strato: aggiunta al pasto (scelta e liste) ---------- */
+function stratoScegliPasto(){
+  const m = S.scegliPasto; if(!m) return '';
+  const testa = tit => `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-weight:700;font-size:19px">${tit}</div>
+      <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiScegli">${ico('chiudi',20)}</button>
+    </div>`;
+
+  if(m === 'menu') return `
+  <div class="velo" data-a="chiudiScegli">
+    <div class="foglio" data-stop="1">
+      ${testa('Cosa aggiungi al pasto?')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:8px"
+          data-a="pastoLista:alimenti">
+          <span style="font-size:34px;line-height:1">🥦</span>
+          <span style="font-weight:700">Alimento</span>
+        </button>
+        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:8px"
+          data-a="pastoLista:piatti">
+          <span style="font-size:34px;line-height:1">🍽️</span>
+          <span style="font-weight:700">Piatto</span>
+        </button>
+      </div>
+    </div>
+  </div>`;
+
+  const qn = S.qp.trim() ? norm(S.qp.trim()) : null;
+  const righe = m === 'alimenti'
+    ? FOODS.filter(f => !qn || norm(f.n).includes(qn)).map(f => `
+      <button class="card riga" style="width:100%;text-align:left" data-a="apri:${f.id}">
+        ${f.foto ? `<img class="emt" src="${f.foto}" alt="" style="object-fit:cover">` : `<span class="emt">${f.e}</span>`}
+        <span style="flex:1;min-width:0"><span class="nome" style="display:block">${esc(f.n)}</span>
+          <span class="sotto" style="display:block">${f.cho} g CHO per 100 g</span></span>
+        <span class="chopill num">${f.cho} g</span>
+      </button>`)
+    : PIATTI.filter(pl => !qn || norm(pl.n).includes(qn)).map(pl => {
+      const t = totaliPiatto(pl.ing);
+      return `
+      <button class="card riga" style="width:100%;text-align:left" data-a="apriPiatto:${pl.id}">
+        ${pl.foto ? `<img class="emt" src="${pl.foto}" alt="" style="object-fit:cover">` : `<span class="emt">${pl.e}</span>`}
+        <span style="flex:1;min-width:0"><span class="nome" style="display:block">${esc(pl.n)}</span>
+          <span class="sotto" style="display:block">${pl.ing.length} ingredient${pl.ing.length===1?'e':'i'}</span></span>
+        <span class="chopill num" style="background:linear-gradient(135deg,#C97B1F,#A85B0C)">${gr1(t.cho)} g</span>
+      </button>`;
+    });
+
+  return `
+  <div class="velo" data-a="chiudiScegli">
+    <div class="foglio" data-stop="1">
+      ${testa(m === 'alimenti' ? 'Scegli un alimento' : 'Scegli un piatto')}
+      <div class="cerca" style="margin-bottom:10px">${ico('cerca',20)}
+        <input id="qp" placeholder="Cerca" value="${esc(S.qp)}">
+      </div>
+      ${righe.length ? righe.join('')
+        : `<div style="text-align:center;padding:30px 0;color:var(--ink2)">${
+            m === 'alimenti' ? 'Nessun alimento trovato.' : 'Nessun piatto ancora: creane uno dalla Home col +.'}</div>`}
+    </div>
+  </div>`;
+}
+
 /* ---------- strato: uso di un piatto ---------- */
 function stratoPiattoUso(){
   if(!S.uso) return '';
@@ -1155,7 +1262,7 @@ function stratoPiattoUso(){
 }
 
 function stratiHTML(){
-  return (S.aperto ? stratoPorzione() : '') + stratoNuovo() + stratoPiattoUso() + stratoPiattoForm()
+  return stratoScegliPasto() + (S.aperto ? stratoPorzione() : '') + stratoNuovo() + stratoPiattoUso() + stratoPiattoForm()
     + (S.paramSport ? stratoParametri() : '') + (S.sessioneAperta ? stratoSessione() : '')
     + (leggi().avvisoVisto ? '' : stratoAvviso());
 }
@@ -1408,7 +1515,7 @@ function vistaSport(){
           <span style="font-size:20px;line-height:1">${a.icona||''}</span>
           <div style="flex:1;min-width:0">
             <div style="font-weight:600">${dq} · ${a.nome || ''} ${x.cond != null ? etichettaDi(a.opzioni || [], x.cond) : ''}</div>
-            <div style="font-size:12px;color:var(--ink2)">${gr1(x.presiPrima)} g prima${x.presiDurante ? ` + ${gr1(x.presiDurante)} g durante` : ''}${
+            <div style="font-size:12px;color:var(--ink2)">${x.bolo ? 'bolo correttivo' : `${gr1(x.presiPrima)} g prima`}${
               x.glicPrima ? ` · glic. ${x.glicPrima}` : ''}</div>
           </div>
           ${esitoTag}</div>`;
@@ -1449,24 +1556,16 @@ function vistaSport(){
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-      <div class="box eroeViola" style="margin:0;padding:14px 16px">
-        <div class="num" id="r-prima" style="font-size:38px;font-weight:800;line-height:1">${r.prima}<span style="font-size:17px;font-weight:700"> g</span></div>
-        <div id="r-primaSotto" style="font-size:12px;opacity:.9;margin-top:5px">${r.prima===0 ? 'niente prima di partire' : 'prima, senza bolo'}${
-          r.correzione ? ` · ${r.correzione>0?'+':''}${r.correzione} g glicemia` : ''}</div>
-      </div>
+      ${boxPrima(r, att)}
+      ${s.cond != null ? `
       <div class="box" style="margin:0;padding:14px 16px;background:var(--sport);color:#fff;box-shadow:0 4px 14px rgba(75,79,184,.3)">
-        <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.durante}<span style="font-size:17px;font-weight:700"> g</span></div>
-        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.durante===0 ? 'niente durante' : 'durante, distribuiti'}</div>
-      </div>
-    </div>
-    <div class="box" style="background:var(--sport-soft);padding:12px 16px;margin-bottom:6px;box-shadow:none">
-      <div style="font-weight:700;color:var(--sport);font-size:13px;margin-bottom:6px">💧 Profilo basale da applicare</div>
-      <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px">
-        <span style="color:var(--ink2);flex:none">Tipo di profilo</span>
-        <b style="text-align:right">${r.basale.profilo}</b></div>
-      <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:4px">
-        <span style="color:var(--ink2);flex:none">Quanto tempo prima</span>
-        <b style="text-align:right">${r.basale.anticipo}</b></div>
+        <div class="num" style="font-size:38px;font-weight:800;line-height:1">−${r.rid[0]}<span style="font-size:20px;font-weight:800">/${r.rid[1]}%</span></div>
+        <div style="font-size:12px;opacity:.9;margin-top:5px">basale temporanea · 60-90 min prima</div>
+      </div>` : `
+      <div class="box" style="margin:0;padding:14px 16px;background:var(--card);border:1px dashed var(--line);box-shadow:none">
+        <div class="num" style="font-size:34px;font-weight:800;line-height:1;color:var(--ink2)">—</div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:5px">basale temporanea</div>
+      </div>`}
     </div>`;
 }
 
@@ -1486,13 +1585,10 @@ function stratoSessione(){
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiSessione">${ico('chiudi',20)}</button>
       </div>
       <p style="font-size:13px;color:var(--ink2)">${a.nome}${s.cond != null ? ' · ' + etichettaDi(a.opzioni || [], s.cond) : ''}
-        — suggeriti ${s.suggPrima} g prima${s.suggDurante ? ` e ${s.suggDurante} g durante` : ''}.</p>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <div style="flex:1"><div class="etich">CHO presi prima (g)</div>
-          <input id="ss-prima" class="campo" inputmode="decimal" value="${esc(String(s.presiPrima))}"></div>
-        <div style="flex:1"><div class="etich">CHO presi durante (g)</div>
-          <input id="ss-durante" class="campo" inputmode="decimal" value="${esc(String(s.presiDurante))}"></div>
-      </div>
+        — ${s.bolo ? `glicemia alta: bolo correttivo${s.boloU != null ? ' da ' + String(s.boloU).replace('.', ',') + ' U' : ''}, niente CHO`
+                   : `suggeriti ${s.suggPrima} g prima`}.</p>
+      <div style="margin-bottom:12px;max-width:200px"><div class="etich">CHO presi prima (g)</div>
+        <input id="ss-prima" class="campo" inputmode="decimal" value="${esc(String(s.presiPrima))}"></div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <div style="flex:1"><div class="etich">Glicemia prima (mg/dl)</div>
           <input id="ss-glicprima" class="campo" inputmode="numeric" placeholder="Es. 120"
@@ -1512,8 +1608,8 @@ function stratoSessione(){
 function salvaSessione(){
   const s = S.sessioneAperta; if(!s) return;
   const dec = v => parseFloat(String(v).replace(',', '.'));
-  const prima = dec(s.presiPrima), durante = dec(s.presiDurante);
-  if(!(prima >= 0) || !(durante >= 0)){ alert('Indica i grammi di carboidrati presi (0 se niente).'); return; }
+  const prima = dec(s.presiPrima);
+  if(!(prima >= 0)){ alert('Indica i grammi di carboidrati presi (0 se niente).'); return; }
   const glic = String(s.glicDopo ?? '').trim() === '' ? null : dec(s.glicDopo);
   if(glic !== null && !(glic >= 20 && glic <= 600)){ alert('La glicemia dopo non sembra un valore in mg/dl.'); return; }
   const glicPrima = String(s.glicPrima ?? '').trim() === '' ? null : dec(s.glicPrima);
@@ -1522,8 +1618,9 @@ function salvaSessione(){
   let rec;
   if(s.nuova){
     rec = { id: nuovoId(), quando: Date.now(), attivita:s.attivita, cond:s.cond,
-      suggPrima:s.suggPrima, suggDurante:s.suggDurante, correzione:s.correzione || 0,
-      presiPrima:Math.round(prima*10)/10, presiDurante:Math.round(durante*10)/10,
+      suggPrima:s.suggPrima, correzione:s.correzione || 0,
+      ...(s.bolo ? { bolo:true, boloU:s.boloU } : {}),
+      presiPrima:Math.round(prima*10)/10, presiDurante:0,
       glicPrima: glicPrima !== null ? Math.round(glicPrima) : null,
       glicDopo:null, esito:null, nota:null };
     arr.push(rec);
@@ -1532,7 +1629,7 @@ function salvaSessione(){
     if(!rec){ S.sessioneAperta = null; disegna(); return; }
     if(rec.cond == null && s.cond != null) rec.cond = s.cond;
     if(glicPrima !== null) rec.glicPrima = Math.round(glicPrima);
-    rec.presiPrima = Math.round(prima*10)/10; rec.presiDurante = Math.round(durante*10)/10;
+    rec.presiPrima = Math.round(prima*10)/10;
   }
   let msg = null;
   if(glic !== null && rec.glicDopo == null){
@@ -1604,8 +1701,29 @@ function stratoParametri(){
       </div>
       <p style="font-size:13px;color:var(--ink2)">Grammi di carboidrati per ogni ${a.cond === 'Distanza' ? 'distanza' : 'durata'}:
         la schermata Sport richiama la riga scelta. Si salvano da soli su questo telefono e si tarano con gli esiti registrati.</p>
-      ${tab('voci', a.opzioni, MOMENTI, 'CHO per ' + a.cond.toLowerCase(),
-        'Grammi prima di partire (senza bolo) e totali durante la sessione.')}
+      ${tab('voci', a.opzioni, [['prima','CHO prima (g)']], 'CHO per ' + a.cond.toLowerCase(),
+        'Grammi da assumere prima di partire.')}
+      ${(() => { const P = glicParam();
+        const campoG = (id, lab, val, ph) => `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div style="flex:1;font-size:13px;color:var(--ink2);font-weight:600">${lab}</div>
+            <input id="pg-${id}" class="campo" inputmode="text" value="${val ?? ''}" placeholder="${ph || ''}"
+              style="width:96px;padding:9px 10px;text-align:center;font-weight:600"></div>`;
+        return `
+        <div style="font-weight:700;margin:18px 0 2px">Correzione per glicemia prima</div>
+        <div style="font-size:12px;color:var(--ink2);margin-bottom:8px">Comune a tutti gli sport: grammi aggiunti
+          (o tolti, col meno) ai CHO "prima" per fascia di glicemia.</div>
+        ${campoG('b70', 'Sotto 70 mg/dl (g)', P.b70)}
+        ${campoG('b90', '70–89 mg/dl (g)', P.b90)}
+        ${campoG('b180', '90–180 mg/dl (g)', P.b180)}
+        ${campoG('bAlta', 'Da 181 alla soglia (g)', P.bAlta)}
+        <div style="font-weight:700;margin:16px 0 2px">Bolo per glicemia alta</div>
+        <div style="font-size:12px;color:var(--ink2);margin-bottom:8px">Sopra la soglia niente carboidrati: propongo
+          un bolo correttivo = (glicemia − obiettivo) ÷ FSI, arrotondato al mezzo di unità. Concorda FSI e obiettivo
+          con il tuo diabetologo.</div>
+        ${campoG('soglia', 'Soglia bolo (mg/dl)', P.soglia)}
+        ${campoG('fsi', 'FSI (mg/dl per unità)', P.fsi, 'da impostare')}
+        ${campoG('obiettivo', 'Obiettivo (mg/dl)', P.obiettivo)}`; })()}
       <button class="primario" style="background:var(--sport);margin-top:18px" data-a="chiudiParam">Fatto</button>
     </div>
   </div>`;
@@ -1768,8 +1886,9 @@ function stratoAvviso(){
       <div style="font-size:28px">⚠️</div>
       <div style="font-size:20px;font-weight:700;margin:8px 0 10px">Uno strumento di conteggio, non di dosaggio</div>
       <p style="font-size:14px;color:var(--ink2)">Questa app calcola i grammi di carboidrati di un pasto e suggerisce
-      una forma di bolo. Non calcola unità di insulina: quelle restano al microinfusore, con i rapporti impostati dal
-      tuo diabetologo.</p>
+      una forma di bolo. Non calcola unità di insulina per i pasti: quelle restano al microinfusore, con i rapporti
+      impostati dal tuo diabetologo. L'unica eccezione è il bolo correttivo per lo sport, calcolato con soglia,
+      FSI e obiettivo che imposti tu nei parametri.</p>
       <p style="font-size:14px;color:var(--ink2);margin-bottom:20px">I valori degli alimenti sono indicativi e cambiano
       con marca, ricetta e cottura. Verifica sempre le etichette e concorda schemi e correzioni con il tuo team.</p>
       <button class="primario" style="background:var(--ink)" data-a="ok">Ho capito</button>
@@ -1815,7 +1934,7 @@ document.addEventListener('click', e => {
   if(a==='tab'){
     /* Rientrando in Sport si riparte sempre dal menu di scelta dell'attività. */
     if(p1 === 'sport' && S.tab !== 'sport'){ S.sport.attivita = null; S.sport.glic = ''; }
-    S.paramSport = null; S.sessioneAperta = null;
+    S.paramSport = null; S.sessioneAperta = null; S.scegliPasto = null;
     S.tab = p1;
   }
   else if(a==='cat') S.cat = p1;
@@ -1830,26 +1949,35 @@ document.addEventListener('click', e => {
     S.gr = Math.round((p1==='+' ? S.gr+passo : Math.max(0.5, S.gr-passo))*10)/10;
   }
   else if(a==='gset') S.gr = +p1;
-  else if(a==='aggiungi'){ S.pasto.push({cibo: cibo(S.aperto), g: S.gr}); S.aperto = null; }
+  else if(a==='aggiungi'){ S.pasto.push({cibo: cibo(S.aperto), g: S.gr}); S.aperto = null; S.scegliPasto = null; }
+  else if(a==='pastoPiu'){ S.scegliPasto = 'menu'; S.qp = ''; }
+  else if(a==='pastoLista'){ S.scegliPasto = p1; S.qp = ''; }
+  else if(a==='chiudiScegli'){ S.scegliPasto = null; S.qp = ''; }
   else if(a==='togli') S.pasto.splice(+p1,1);
   else if(a==='svuota') S.pasto = [];
   else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
   else if(a==='att'){
+    /* Si riparte senza condizione né glicemia: la proposta arriva solo
+       quando entrambe sono compilate. */
     S.sport.attivita = p1 || null;
-    /* La condizione (durata o distanza) riparte da un valore valido per lo sport scelto. */
-    const op = p1 && ATTIVITA[p1] ? ATTIVITA[p1].opzioni : null;
-    if(op && !op.some(o => String(o[0]) === String(S.sport.cond))) S.sport.cond = op[1] ? op[1][0] : op[0][0];
+    S.sport.cond = null; S.sport.glic = '';
   }
   else if(a==='param') S.paramSport = p1;
   else if(a==='chiudiParam') S.paramSport = null;
   else if(a==='regSport'){
     /* Si parte da quanto impostato nella pagina: condizione, glicemia
        dichiarata e quantità già corrette di conseguenza. */
+    const att = ATTIVITA[S.sport.attivita] || ATTIVITA.nuoto;
     const r = calcolaSport(S.sport);
+    if(!r.pronto){
+      alert(`Prima scegli ${att.cond === 'Distanza' ? 'la distanza' : 'la durata'} e inserisci la glicemia.`);
+      return;
+    }
     S.sessioneAperta = { nuova:true, attivita:S.sport.attivita, cond:S.sport.cond,
-      suggPrima:r.prima, suggDurante:r.durante, correzione:r.correzione,
+      suggPrima:r.prima, correzione:r.correzione,
+      bolo: r.bolo ? true : undefined, boloU: r.bolo ? r.bolo.unita : null,
       glicPrima:String(S.sport.glic || ''),
-      presiPrima:String(r.prima), presiDurante:String(r.durante), glicDopo:'' };
+      presiPrima:String(r.prima), glicDopo:'' };
   }
   else if(a==='esitoSport'){
     const x = sessioniSport().find(v => v.id === p1);
@@ -1918,7 +2046,7 @@ document.addEventListener('click', e => {
         const c = cibo(i.alimento), g = grIng(i);
         if(c && g > 0){ S.pasto.push({ cibo:{...c}, g: Math.round(g*10)/10 }); n++; }
       }
-      S.uso = null;
+      S.uso = null; S.scegliPasto = null;
       if(n) S.tab = 'pasto';
     }
   }
@@ -1985,23 +2113,26 @@ document.addEventListener('input', e => {
     const q = document.getElementById('q');
     q.focus(); q.setSelectionRange(q.value.length, q.value.length);
   }
+  else if(id === 'qp'){
+    S.qp = e.target.value;
+    document.getElementById('strati').innerHTML = stratiHTML();
+    const el = document.getElementById('qp');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }
   else if(id === 'fbarcode') S.codice = e.target.value;
   else if(id.startsWith('fi-') && S.form) S.form[id.slice(3)] = e.target.value;
   else if(id === 'ss-prima' && S.sessioneAperta) S.sessioneAperta.presiPrima = e.target.value;
-  else if(id === 'ss-durante' && S.sessioneAperta) S.sessioneAperta.presiDurante = e.target.value;
   else if(id === 'ss-glic' && S.sessioneAperta) S.sessioneAperta.glicDopo = e.target.value;
   else if(id === 'ss-glicprima' && S.sessioneAperta) S.sessioneAperta.glicPrima = e.target.value;
   else if(id === 'sp-glic'){
     /* La proposta si aggiorna dal vivo, senza ridisegnare la pagina
        (il campo perderebbe il focus mentre si scrive). */
     S.sport.glic = e.target.value;
-    const r = calcolaSport(S.sport);
-    const n = document.getElementById('r-prima');
-    if(n) n.innerHTML = `${r.prima}<span style="font-size:17px;font-weight:700"> g</span>`;
-    const c = document.getElementById('r-primaSotto');
-    if(c) c.textContent = (r.prima === 0 ? 'niente prima di partire' : 'prima, senza bolo')
-      + (r.correzione ? ` · ${r.correzione > 0 ? '+' : ''}${r.correzione} g glicemia` : '');
+    const box = document.getElementById('r-box');
+    const att = ATTIVITA[S.sport.attivita];
+    if(box && att) box.outerHTML = boxPrima(calcolaSport(S.sport), att);
   }
+  else if(id.startsWith('pg-')) salvaGlicParam(id.slice(3), e.target.value);
   else if(id.startsWith('pt-') && S.paramSport){
     /* Cella della tabella parametri: si salva subito, senza ridisegnare
        (il ridisegno farebbe perdere il focus mentre si scrive). */
