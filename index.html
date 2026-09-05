@@ -528,7 +528,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.16';
+const VERSIONE = '2026-09-05.17';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -645,20 +645,25 @@ function sanificaRicetta(o){
 }
 let RICETTE = (leggi().ricette || []).map(sanificaRicetta).filter(Boolean);
 
+/* Nelle quantità i grammi sono l'unità di default: un numero secco
+   ("270") viene mostrato come "270 g"; tutto il resto (q.b., "2 uova",
+   "1 cucchiaio") resta com'è scritto. */
+const qtaRicetta = q => /^\d+([.,]\d+)?$/.test(String(q).trim()) ? String(q).trim() + ' g' : q;
+
 /* Prima ricetta di esempio, inserita una sola volta a ricettario vuoto. */
 if(!RICETTE.length && !leggi().ricettaBase){
   RICETTE = [sanificaRicetta({
     n: 'Lasagne vegetariane',
     sezioni: [
       { titolo: 'Per le lasagne', voci: [
-        { n:"Lasagne all'uovo secche", q:'270 g' }, { n:'Scamorza (provola)', q:'250 g' },
-        { n:'Formaggio grattugiato', q:'120 g' } ] },
+        { n:"Lasagne all'uovo secche", q:'270' }, { n:'Scamorza (provola)', q:'250' },
+        { n:'Formaggio grattugiato', q:'120' } ] },
       { titolo: 'Per il sugo di verdure', voci: [
-        { n:'Passata di pomodoro', q:'400 g' }, { n:'Funghi champignon', q:'300 g' },
-        { n:'Zucchine', q:'220 g' }, { n:'Spinaci', q:'200 g' }, { n:'Cipolle rosse', q:'200 g' },
-        { n:'Carote', q:'180 g' }, { n:"Olio extravergine d'oliva", q:'q.b.' }, { n:'Sale fino', q:'q.b.' } ] },
+        { n:'Passata di pomodoro', q:'400' }, { n:'Funghi champignon', q:'300' },
+        { n:'Zucchine', q:'220' }, { n:'Spinaci', q:'200' }, { n:'Cipolle rosse', q:'200' },
+        { n:'Carote', q:'180' }, { n:"Olio extravergine d'oliva", q:'q.b.' }, { n:'Sale fino', q:'q.b.' } ] },
       { titolo: 'Per la besciamella', voci: [
-        { n:'Latte intero', q:'600 g' }, { n:'Farina 00', q:'50 g' }, { n:'Burro', q:'50 g' },
+        { n:'Latte intero', q:'600' }, { n:'Farina 00', q:'50' }, { n:'Burro', q:'50' },
         { n:'Sale fino', q:'q.b.' }, { n:'Noce moscata', q:'q.b.' } ] }
     ],
     passi: [
@@ -1198,7 +1203,7 @@ function stratoRicetta(){
           ${s.voci.map(v => `
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;
               padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px">
-              <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${esc(v.q)}</span>
+              <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${esc(qtaRicetta(v.q))}</span>
             </div>`).join('')}`).join('')}` : ''}
       ${r.passi.length ? `
         ${intest('Preparazione')}
@@ -1249,7 +1254,7 @@ function stratoRicettaForm(){
         <div style="display:flex;gap:6px;margin-bottom:6px">
           <input id="ri-${s}-${k}-n" class="campo" placeholder="Ingrediente" value="${esc(v.n)}"
             style="flex:1;min-width:0;padding:10px 12px">
-          <input id="ri-${s}-${k}-q" class="campo" placeholder="Qtà" value="${esc(v.q)}"
+          <input id="ri-${s}-${k}-q" class="campo" placeholder="g" value="${esc(v.q)}"
             style="width:82px;padding:10px 8px;text-align:center">
           <button class="card" style="padding:0 10px;color:var(--ink2)" data-a="rIngDel:${s}:${k}">${ico('chiudi',14)}</button>
         </div>`).join('')}
