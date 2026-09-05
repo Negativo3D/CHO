@@ -528,7 +528,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.15';
+const VERSIONE = '2026-09-05.16';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -613,21 +613,65 @@ function sanificaPiatto(o){
 let PIATTI = (leggi().piatti || []).map(sanificaPiatto).filter(Boolean);
 
 /* ---------- ricettario ----------
-   Ricette personali: nome, foto, ingredienti (una riga ciascuno) e
-   procedimento in testo libero. Per ora sono indipendenti dal
-   conteggio dei carboidrati. */
+   Ricette personali strutturate come un vero ricettario: sezioni di
+   ingredienti con titolo (es. "Per la besciamella") e voci
+   nome + quantità, più il procedimento a passaggi numerati. Campi
+   aggiungibili, modificabili ed eliminabili dal modulo. Indipendenti
+   dal conteggio dei carboidrati. */
 function sanificaRicetta(o){
   if(!o || typeof o !== 'object' || Array.isArray(o)) return null;
   if(typeof o.n !== 'string' || !o.n.trim()) return null;
+  let sezioni = Array.isArray(o.sezioni) ? o.sezioni.map(s => ({
+    titolo: s && typeof s.titolo === 'string' ? s.titolo.trim() : '',
+    voci: s && Array.isArray(s.voci) ? s.voci.map(v => ({
+      n: v && typeof v.n === 'string' ? v.n.trim() : '',
+      q: v && typeof v.q === 'string' ? v.q.trim() : ''
+    })).filter(v => v.n) : []
+  })).filter(s => s.voci.length || s.titolo) : null;
+  let passi = Array.isArray(o.passi)
+    ? o.passi.map(x => typeof x === 'string' ? x.trim() : '').filter(Boolean) : null;
+  /* Migrazione dal vecchio formato a testo libero. */
+  if(!sezioni && typeof o.ing === 'string' && o.ing.trim())
+    sezioni = [{ titolo:'', voci: o.ing.split('\n').map(x => x.trim()).filter(Boolean).map(n => ({ n, q:'' })) }];
+  if(!passi && typeof o.proc === 'string' && o.proc.trim())
+    passi = o.proc.split('\n').map(x => x.trim()).filter(Boolean);
   return {
     id: typeof o.id === 'string' && o.id ? o.id : nuovoId(),
     n: o.n.trim(),
     foto: typeof o.foto === 'string' && (o.foto.startsWith('data:image') || o.foto.startsWith('https://')) ? o.foto : null,
-    ing: typeof o.ing === 'string' ? o.ing : '',
-    proc: typeof o.proc === 'string' ? o.proc : ''
+    sezioni: sezioni || [],
+    passi: passi || []
   };
 }
 let RICETTE = (leggi().ricette || []).map(sanificaRicetta).filter(Boolean);
+
+/* Prima ricetta di esempio, inserita una sola volta a ricettario vuoto. */
+if(!RICETTE.length && !leggi().ricettaBase){
+  RICETTE = [sanificaRicetta({
+    n: 'Lasagne vegetariane',
+    sezioni: [
+      { titolo: 'Per le lasagne', voci: [
+        { n:"Lasagne all'uovo secche", q:'270 g' }, { n:'Scamorza (provola)', q:'250 g' },
+        { n:'Formaggio grattugiato', q:'120 g' } ] },
+      { titolo: 'Per il sugo di verdure', voci: [
+        { n:'Passata di pomodoro', q:'400 g' }, { n:'Funghi champignon', q:'300 g' },
+        { n:'Zucchine', q:'220 g' }, { n:'Spinaci', q:'200 g' }, { n:'Cipolle rosse', q:'200 g' },
+        { n:'Carote', q:'180 g' }, { n:"Olio extravergine d'oliva", q:'q.b.' }, { n:'Sale fino', q:'q.b.' } ] },
+      { titolo: 'Per la besciamella', voci: [
+        { n:'Latte intero', q:'600 g' }, { n:'Farina 00', q:'50 g' }, { n:'Burro', q:'50 g' },
+        { n:'Sale fino', q:'q.b.' }, { n:'Noce moscata', q:'q.b.' } ] }
+    ],
+    passi: [
+      'Prepara la besciamella: scalda il latte con sale e noce moscata. In un tegame sciogli il burro, unisci la farina e mescola con la frusta; versa il latte caldo poco alla volta e cuoci finché si addensa.',
+      'Pulisci e taglia le verdure: cipolle, carote e zucchine a dadini, i funghi a fettine.',
+      "In padella con un filo d'olio rosola la cipolla, poi aggiungi carote, zucchine e funghi; unisci la passata, sala e cuoci una decina di minuti. Aggiungi gli spinaci a fine cottura.",
+      'Componi le lasagne: sul fondo della pirofila un velo di besciamella, poi sfoglia, sugo di verdure, besciamella, scamorza a dadini e formaggio grattugiato.',
+      'Prosegui a strati fino a esaurire gli ingredienti, terminando con besciamella e abbondante formaggio.',
+      'Cuoci in forno statico a 180° per circa 30 minuti, fino a gratinatura. Lascia riposare qualche minuto prima di servire.'
+    ]
+  })].filter(Boolean);
+  scrivi({ ricette: RICETTE, ricettaBase: true });
+}
 
 /* ---------- registro del peso ---------- */
 function sanificaPeso(o){
@@ -1108,7 +1152,7 @@ function vistaRicette(){
     </div>`;
 
   const celle = lista.map((r,i) => {
-    const nIng = r.ing.split('\n').filter(x => x.trim()).length;
+    const nIng = r.sezioni.reduce((t,s) => t + s.voci.length, 0);
     return `
     <div class="cella" style="animation-delay:${Math.min(i,8)*45}ms">
       <button class="apri" data-a="ricApri:${r.id}">
@@ -1130,26 +1174,42 @@ function vistaRicette(){
       : `<div style="text-align:center;padding:48px 0;color:var(--ink2)">Nessuna ricetta con questo nome.</div>`}`;
 }
 
-/* ---------- strato: lettura di una ricetta ---------- */
+/* ---------- strato: lettura di una ricetta (stile ricettario) ---------- */
 function stratoRicetta(){
   const r = RICETTE.find(x => x.id === S.ricettaAperta); if(!r) return '';
-  const ings = r.ing.split('\n').map(x => x.trim()).filter(Boolean);
+  const titSez = t => `
+    <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--wave);text-transform:uppercase;
+      margin:14px 0 2px;padding-bottom:5px;border-bottom:1px solid var(--line)">${esc(t)}</div>`;
+  const intest = t => `
+    <div style="font-weight:800;font-size:19px;letter-spacing:-.2px;margin:18px 0 2px">${t}
+      <div style="width:34px;height:3px;background:var(--wave);border-radius:2px;margin-top:5px"></div></div>`;
   return `
   <div class="velo" data-a="ricChiudi">
     <div class="foglio" data-stop="1">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px">
-        <div style="font-weight:800;font-size:21px;line-height:1.2">${esc(r.n)}</div>
+        <div style="font-weight:800;font-size:22px;line-height:1.2">${esc(r.n)}</div>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2);flex:none" data-a="ricChiudi">${ico('chiudi',20)}</button>
       </div>
-      ${r.foto ? `<img src="${r.foto}" alt="" style="width:100%;height:170px;object-fit:cover;border-radius:18px;display:block;margin-bottom:14px">` : ''}
-      ${ings.length ? `
-        <div style="font-weight:700;margin-bottom:6px">Ingredienti</div>
-        <ul style="margin:0 0 14px;padding-left:18px">${ings.map(i => `<li style="margin-bottom:4px">${esc(i)}</li>`).join('')}</ul>` : ''}
-      ${r.proc.trim() ? `
-        <div style="font-weight:700;margin-bottom:6px">Procedimento</div>
-        <p style="font-size:14px;white-space:pre-line;margin:0 0 16px">${esc(r.proc.trim())}</p>` : ''}
-      ${!ings.length && !r.proc.trim() ? `<p style="color:var(--ink2);font-size:14px">Ricetta ancora da completare: tocca Modifica.</p>` : ''}
-      <div style="display:flex;gap:8px;margin-top:6px">
+      ${r.foto ? `<img src="${r.foto}" alt="" style="width:100%;height:180px;object-fit:cover;border-radius:18px;display:block">` : ''}
+      ${r.sezioni.length ? `
+        ${intest('Ingredienti')}
+        ${r.sezioni.map(s => `
+          ${s.titolo ? titSez(s.titolo) : ''}
+          ${s.voci.map(v => `
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+              padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px">
+              <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${esc(v.q)}</span>
+            </div>`).join('')}`).join('')}` : ''}
+      ${r.passi.length ? `
+        ${intest('Preparazione')}
+        ${r.passi.map((t,k) => `
+          <div style="display:flex;gap:11px;margin-top:12px">
+            <span style="width:26px;height:26px;border-radius:8px;background:var(--wave);color:#fff;font-weight:700;
+              font-size:13px;display:flex;align-items:center;justify-content:center;flex:none">${k+1}</span>
+            <p style="flex:1;font-size:14px;margin:2px 0 0">${esc(t)}</p>
+          </div>`).join('')}` : ''}
+      ${!r.sezioni.length && !r.passi.length ? `<p style="color:var(--ink2);font-size:14px">Ricetta ancora da completare: tocca Modifica.</p>` : ''}
+      <div style="display:flex;gap:8px;margin-top:20px">
         <button class="primario" style="flex:1;background:var(--wave)" data-a="ricModifica:${r.id}">Modifica</button>
         <button class="card" style="padding:14px 18px;font-weight:600;color:var(--hypo)" data-a="ricElimina:${r.id}">Elimina</button>
       </div>
@@ -1157,7 +1217,7 @@ function stratoRicetta(){
   </div>`;
 }
 
-/* ---------- strato: modulo ricetta ---------- */
+/* ---------- strato: modulo ricetta a campi ---------- */
 function stratoRicettaForm(){
   const F = S.rform; if(!F) return '';
   return `
@@ -1168,18 +1228,45 @@ function stratoRicettaForm(){
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="ricAnnulla">${ico('chiudi',20)}</button>
       </div>
       <div style="margin-bottom:12px"><div class="etich">Nome</div>
-        <input id="rf-n" class="campo" placeholder="Es. Torta di mele della nonna" value="${esc(F.n)}"></div>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+        <input id="rf-n" class="campo" placeholder="Es. Lasagne vegetariane" value="${esc(F.n)}"></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
         ${F.foto ? `<img src="${esc(F.foto)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:16px;flex:none">` : ''}
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2);display:flex;
           align-items:center;justify-content:center;gap:8px" data-a="ricFoto">
           ${ico('camera',18)} ${F.foto ? 'Cambia la foto' : 'Aggiungi una foto'}</button>
         ${F.foto ? `<button class="card" style="padding:12px;font-weight:600;color:var(--hypo)" data-a="ricFotoX">Togli</button>` : ''}
       </div>
-      <div style="margin-bottom:12px"><div class="etich">Ingredienti — uno per riga</div>
-        <textarea id="rf-ing" class="campo" rows="5" placeholder="300 g di farina&#10;2 uova&#10;…">${esc(F.ing)}</textarea></div>
-      <div style="margin-bottom:16px"><div class="etich">Procedimento</div>
-        <textarea id="rf-proc" class="campo" rows="7" placeholder="Descrivi i passaggi…">${esc(F.proc)}</textarea></div>
+
+      <div class="etich" style="font-size:14px;margin-bottom:8px">Ingredienti</div>
+      ${F.sezioni.map((sez,s) => `
+      <div class="card" style="padding:12px;margin-bottom:10px">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="rsez-${s}" class="campo" placeholder="Titolo sezione (es. Per la besciamella)"
+            value="${esc(sez.titolo)}" style="flex:1;padding:10px 12px;font-weight:600">
+          ${F.sezioni.length > 1 ? `<button class="card" style="padding:0 12px;color:var(--hypo)" data-a="rSezDel:${s}">${ico('cestino',16)}</button>` : ''}
+        </div>
+        ${sez.voci.map((v,k) => `
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <input id="ri-${s}-${k}-n" class="campo" placeholder="Ingrediente" value="${esc(v.n)}"
+            style="flex:1;min-width:0;padding:10px 12px">
+          <input id="ri-${s}-${k}-q" class="campo" placeholder="Qtà" value="${esc(v.q)}"
+            style="width:82px;padding:10px 8px;text-align:center">
+          <button class="card" style="padding:0 10px;color:var(--ink2)" data-a="rIngDel:${s}:${k}">${ico('chiudi',14)}</button>
+        </div>`).join('')}
+        <button class="chip" data-a="rIngAdd:${s}" style="--c:var(--wave);margin-top:2px">+ ingrediente</button>
+      </div>`).join('')}
+      <button class="chip" data-a="rSezAdd" style="--c:var(--wave);margin-bottom:16px">+ sezione ingredienti</button>
+
+      <div class="etich" style="font-size:14px;margin-bottom:8px">Preparazione</div>
+      ${F.passi.map((pp,k) => `
+      <div style="display:flex;gap:6px;margin-bottom:8px;align-items:flex-start">
+        <span style="width:26px;height:26px;border-radius:8px;background:var(--wave);color:#fff;font-weight:700;
+          font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:9px">${k+1}</span>
+        <textarea id="rp-${k}" class="campo" rows="3" placeholder="Descrivi il passaggio…" style="flex:1;min-width:0">${esc(pp)}</textarea>
+        <button class="card" style="padding:8px 10px;color:var(--ink2);margin-top:6px" data-a="rPassoDel:${k}">${ico('chiudi',14)}</button>
+      </div>`).join('')}
+      <button class="chip" data-a="rPassoAdd" style="--c:var(--wave);margin-bottom:18px">+ passaggio</button>
+
       <button class="primario" style="background:var(--wave)" data-a="ricSalva">${S.editRicettaId ? 'Salva le modifiche' : 'Salva la ricetta'}</button>
     </div>
   </div>`;
@@ -1188,7 +1275,7 @@ function stratoRicettaForm(){
 function salvaRicetta(){
   const F = S.rform; if(!F) return;
   if(!F.n.trim()){ alert('Dai un nome alla ricetta.'); return; }
-  const dati = sanificaRicetta({ id: S.editRicettaId || undefined, n:F.n, foto:F.foto, ing:F.ing, proc:F.proc });
+  const dati = sanificaRicetta({ id: S.editRicettaId || undefined, n:F.n, foto:F.foto, sezioni:F.sezioni, passi:F.passi });
   if(S.editRicettaId){
     const i = RICETTE.findIndex(x => x.id === S.editRicettaId);
     if(i >= 0) RICETTE[i] = dati; else RICETTE.push(dati);
@@ -1960,13 +2047,34 @@ document.addEventListener('click', e => {
     S.gr = Math.round((p1==='+' ? S.gr+passo : Math.max(0.5, S.gr-passo))*10)/10;
   }
   else if(a==='gset') S.gr = +p1;
-  else if(a==='ricNuova'){ S.rform = { n:'', foto:null, ing:'', proc:'' }; S.editRicettaId = null; }
+  else if(a==='ricNuova'){
+    S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'' }] }], passi:[''] };
+    S.editRicettaId = null;
+  }
+  else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'' }] }); }
+  else if(a==='rSezDel'){ if(S.rform) S.rform.sezioni.splice(+p1, 1); }
+  else if(a==='rIngAdd'){ if(S.rform && S.rform.sezioni[+p1]) S.rform.sezioni[+p1].voci.push({ n:'', q:'' }); }
+  else if(a==='rIngDel'){
+    if(S.rform && S.rform.sezioni[+p1]){
+      S.rform.sezioni[+p1].voci.splice(+p2, 1);
+      if(!S.rform.sezioni[+p1].voci.length) S.rform.sezioni[+p1].voci.push({ n:'', q:'' });
+    }
+  }
+  else if(a==='rPassoAdd'){ if(S.rform) S.rform.passi.push(''); }
+  else if(a==='rPassoDel'){ if(S.rform){ S.rform.passi.splice(+p1, 1); if(!S.rform.passi.length) S.rform.passi.push(''); } }
   else if(a==='ricApri') S.ricettaAperta = p1;
   else if(a==='ricChiudi') S.ricettaAperta = null;
   else if(a==='ricAnnulla'){ S.rform = null; S.editRicettaId = null; }
   else if(a==='ricModifica'){
     const r = RICETTE.find(x => x.id === p1);
-    if(r){ S.rform = { n:r.n, foto:r.foto, ing:r.ing, proc:r.proc }; S.editRicettaId = p1; S.ricettaAperta = null; }
+    if(r){
+      S.rform = { n:r.n, foto:r.foto,
+        sezioni: r.sezioni.length
+          ? r.sezioni.map(sz => ({ titolo:sz.titolo, voci: sz.voci.length ? sz.voci.map(v => ({...v})) : [{ n:'', q:'' }] }))
+          : [{ titolo:'', voci:[{ n:'', q:'' }] }],
+        passi: r.passi.length ? [...r.passi] : [''] };
+      S.editRicettaId = p1; S.ricettaAperta = null;
+    }
   }
   else if(a==='ricElimina'){
     const r = RICETTE.find(x => x.id === p1);
@@ -2135,8 +2243,19 @@ document.addEventListener('input', e => {
     if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   }
   else if(id === 'rf-n' && S.rform) S.rform.n = e.target.value;
-  else if(id === 'rf-ing' && S.rform) S.rform.ing = e.target.value;
-  else if(id === 'rf-proc' && S.rform) S.rform.proc = e.target.value;
+  else if(id.startsWith('rsez-') && S.rform){
+    const sz = S.rform.sezioni[+id.slice(5)];
+    if(sz) sz.titolo = e.target.value;
+  }
+  else if(id.startsWith('ri-') && S.rform){
+    const [, s, k, campo] = id.split('-');
+    const v = S.rform.sezioni[+s] && S.rform.sezioni[+s].voci[+k];
+    if(v && (campo === 'n' || campo === 'q')) v[campo] = e.target.value;
+  }
+  else if(id.startsWith('rp-') && S.rform){
+    const k = +id.slice(3);
+    if(S.rform.passi[k] != null) S.rform.passi[k] = e.target.value;
+  }
   else if(id === 'fbarcode') S.codice = e.target.value;
   else if(id.startsWith('fi-') && S.form) S.form[id.slice(3)] = e.target.value;
   else if(id === 'ss-prima' && S.sessioneAperta) S.sessioneAperta.presiPrima = e.target.value;
