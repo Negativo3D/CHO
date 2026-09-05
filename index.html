@@ -326,54 +326,40 @@ function calcolaBolo(cho, grassi, proteine, igPrevalente) {
    basale (riduzione percentuale e anticipo, mai unità) per attività
    aerobiche, in base a intensità, durata e fascia oraria.
    --------------------------------------------------------------- */
+/* Ogni sport ha UNA sola condizione da scegliere: la durata (nuoto,
+   trekking) o la distanza in km (corsa). Per ogni valore c'è una riga
+   di parametri compilabile (CHO prima e durante); i valori di partenza
+   sotto ("base": [prima, durante]) sono indicativi. */
 const ATTIVITA = {
-  nuoto:    { nome:'Nuoto',    icona:'🏊', sotto:'Aerobica in acqua',        oraria:15, fattorePrima:1 },
-  corsa:    { nome:'Corsa',    icona:'🏃', sotto:'Aerobica ad alto consumo', oraria:18, fattorePrima:1.2 },
-  trekking: { nome:'Trekking', icona:'🥾', sotto:'Camminata lunga',          oraria:10, fattorePrima:0.8 }
+  nuoto:    { nome:'Nuoto',    icona:'🏊', sotto:'Aerobica in acqua',        cond:'Durata',
+    opzioni:[[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']],
+    base:{ 30:[10,0], 60:[18,0], 90:[20,15], 120:[25,23] } },
+  corsa:    { nome:'Corsa',    icona:'🏃', sotto:'Aerobica ad alto consumo', cond:'Distanza',
+    opzioni:[[5,'5 km'],[10,'10 km'],[15,'15 km'],[21,'21 km']],
+    base:{ 5:[15,0], 10:[22,10], 15:[26,20], 21:[30,30] } },
+  trekking: { nome:'Trekking', icona:'🥾', sotto:'Camminata lunga',          cond:'Durata',
+    opzioni:[[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']],
+    base:{ 30:[8,0], 60:[14,0], 90:[16,10], 120:[20,15] } }
 };
+const MOMENTI = [['prima','Prima (g)'],['durante','Durante (g)']];
 
-const INTENSITA = [['leggera','Leggera'],['moderata','Moderata'],['intensa','Intensa']];
-const FASCE = [['mattina','Mattina'],['pomeriggio','Pomeriggio'],['sera','Sera']];
-const DURATE = [[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']];
-const GLICEMIE = [['bassa','Bassa'],['range','In range'],['alta','Alta']];
-const MOMENTI_GLIC = [['unora','1 h prima'],['subito','Subito prima']];
-
-/* Ogni sport ha una tabella di grammi di CHO compilabile dall'utente
-   (pulsante "parametri"): "prima" per intensità × fascia oraria,
-   "durante" per intensità × durata, più le correzioni per la glicemia
-   misurata un'ora prima e subito prima di partire (grammi da sommare
-   al "prima": possono essere negativi). La schermata Sport non calcola
-   nulla: richiama le celle corrispondenti alle condizioni scelte.
-   I valori di partenza riproducono le vecchie fasce orientative. */
 function tabellaDefault(id){
   const att = ATTIVITA[id] || ATTIVITA.nuoto;
-  const t = { prima:{}, durante:{}, glicemia:{
-    bassa:{ unora:10, subito:15 }, range:{ unora:0, subito:0 }, alta:{ unora:-5, subito:-10 }
-  } };
-  for(const [iv] of INTENSITA){
-    const fInt = iv === 'leggera' ? 0.5 : iv === 'moderata' ? 1 : 1.4;
-    t.prima[iv] = {}; t.durante[iv] = {};
-    for(const [fv] of FASCE){
-      const base = fv === 'mattina' ? 8 : fv === 'sera' ? 22 : 18;
-      t.prima[iv][fv] = Math.round(base * fInt * att.fattorePrima);
-    }
-    for(const [dv] of DURATE){
-      const ore = dv / 60;
-      t.durante[iv][dv] = ore > 1 ? Math.round(att.oraria * fInt * (ore - 0.5)) : 0;
-    }
+  const t = { voci:{} };
+  for(const [v] of att.opzioni){
+    const b = att.base[v] || [0,0];
+    t.voci[v] = { prima:b[0], durante:b[1] };
   }
   return t;
 }
 function tabellaSport(id){
   const salvata = (leggi().tabelleSport || {})[id] || {};
   const t = tabellaDefault(id);
-  for(const sez of ['prima','durante','glicemia'])
-    for(const riga in t[sez])
-      for(const col in t[sez][riga]){
-        const v = salvata[sez] && salvata[sez][riga] ? salvata[sez][riga][col] : undefined;
-        /* Le correzioni glicemia possono essere negative, le altre celle no. */
-        if(typeof v === 'number' && isFinite(v) && (sez === 'glicemia' || v >= 0)) t[sez][riga][col] = v;
-      }
+  for(const riga in t.voci)
+    for(const col in t.voci[riga]){
+      const v = salvata.voci && salvata.voci[riga] ? salvata.voci[riga][col] : undefined;
+      if(typeof v === 'number' && isFinite(v) && v >= 0) t.voci[riga][col] = v;
+    }
   return t;
 }
 function salvaCella(id, sez, riga, col, val){
@@ -382,30 +368,24 @@ function salvaCella(id, sez, riga, col, val){
   const s = t[sez] || (t[sez] = {});
   const r = s[riga] || (s[riga] = {});
   const n = parseFloat(String(val).replace(',', '.'));
-  if(isFinite(n) && (sez === 'glicemia' || n >= 0)) r[col] = Math.round(n); else delete r[col];
+  if(isFinite(n) && n >= 0) r[col] = Math.round(n); else delete r[col];
   scrivi({ tabelleSport: tutte });
 }
 
-function calcolaSport({ attivita, intensita, durata, fascia, glic1h, glic0 }) {
-  const t = tabellaSport(attivita);
-  const correzione = t.glicemia[glic1h].unora + t.glicemia[glic0].subito;
-  const prima = Math.max(0, t.prima[intensita][fascia] + correzione);
-  const durante = t.durante[intensita][durata];
+function calcolaSport({ attivita, cond }) {
+  const att = ATTIVITA[attivita] || ATTIVITA.nuoto;
+  const v = tabellaSport(attivita).voci[cond] || { prima:0, durante:0 };
 
-  // Profilo basale: forma della riduzione temporanea e anticipo.
-  let rid = intensita === "leggera" ? (durata <= 30 ? null : [10, 30])
-    : intensita === "moderata" ? [30, 50] : [50, 70];
-  if (rid && durata >= 90) rid = [Math.min(rid[0] + 10, 80), Math.min(rid[1] + 10, 80)];
-  const basale = rid ? {
+  // Profilo basale: riduzione più marcata per sessioni lunghe.
+  const lungo = att.cond === 'Distanza' ? cond >= 15 : cond >= 90;
+  const medio = att.cond === 'Distanza' ? cond >= 10 : cond >= 60;
+  const rid = lungo ? [40, 60] : medio ? [30, 50] : [10, 30];
+  const basale = {
     profilo: `Basale temporanea ridotta del ${rid[0]}-${rid[1]}%`,
-    anticipo: intensita === "leggera" ? "30-60 minuti prima"
-      : intensita === "moderata" ? "60-90 minuti prima" : "Circa 90 minuti prima"
-  } : {
-    profilo: "Profilo abituale, nessuna riduzione",
-    anticipo: "Nessun anticipo necessario"
+    anticipo: '60-90 minuti prima'
   };
 
-  return { prima, durante, correzione, basale };
+  return { prima: v.prima, durante: v.durante, basale };
 }
 
 /* ---------- autoallineamento sport ----------
@@ -422,18 +402,43 @@ function valutaEsito(g){ return g < 70 ? 'bassa' : g > 180 ? 'alta' : 'range'; }
 function autoallinea(s, glicDopo){
   const esito = valutaEsito(glicDopo);
   const delta = esito === 'bassa' ? 5 : esito === 'alta' ? -5 : 0;
-  const vecchia = tabellaSport(s.attivita).prima[s.intensita][s.fascia];
-  const target = Math.max(0, Math.round(s.presiPrima + delta - (s.correzione || 0)));
-  const nuova = Math.max(0, Math.round((vecchia + target) / 2));
-  if(nuova !== vecchia) salvaCella(s.attivita, 'prima', s.intensita, s.fascia, nuova);
-  const dove = `${(ATTIVITA[s.attivita]||{}).nome || s.attivita} · ${etichettaDi(INTENSITA,s.intensita).toLowerCase()} · ${etichettaDi(FASCE,s.fascia).toLowerCase()}`;
-  const nota = esito === 'range'
-    ? (nuova !== vecchia ? `in range: CHO "prima" (${dove}) allineati da ${vecchia} a ${nuova} g.`
-                         : `in range: parametri confermati (${dove}).`)
-    : esito === 'bassa'
-      ? `bassa: i carboidrati erano pochi. CHO "prima" (${dove}): ${vecchia} → ${nuova} g.`
-      : `alta: i carboidrati erano troppi. CHO "prima" (${dove}): ${vecchia} → ${nuova} g.`;
+  const att = ATTIVITA[s.attivita];
+  const cella = att ? tabellaSport(s.attivita).voci[s.cond] : null;
+  let nota;
+  if(cella){
+    const vecchia = cella.prima;
+    const target = Math.max(0, Math.round(s.presiPrima + delta));
+    const nuova = Math.max(0, Math.round((vecchia + target) / 2));
+    if(nuova !== vecchia) salvaCella(s.attivita, 'voci', s.cond, 'prima', nuova);
+    const dove = `${att.nome} · ${etichettaDi(att.opzioni, s.cond)}`;
+    nota = esito === 'range'
+      ? (nuova !== vecchia ? `in range: CHO "prima" (${dove}) allineati da ${vecchia} a ${nuova} g.`
+                           : `in range: parametri confermati (${dove}).`)
+      : esito === 'bassa'
+        ? `bassa: i carboidrati erano pochi. CHO "prima" (${dove}): ${vecchia} → ${nuova} g.`
+        : `alta: i carboidrati erano troppi. CHO "prima" (${dove}): ${vecchia} → ${nuova} g.`;
+  } else {
+    /* Sessione registrata con una versione precedente: solo l'esito. */
+    nota = esito === 'range' ? 'in range.' : esito === 'bassa'
+      ? 'bassa: i carboidrati erano pochi.' : 'alta: i carboidrati erano troppi.';
+  }
   return { esito, nota };
+}
+
+/* Promemoria: la sessione più recente senza esito, registrata da
+   almeno un'ora, viene riproposta in Home e in Sport per inserire la
+   glicemia dopo l'attività. */
+function promemoriaEsito(){
+  const p = sessioniSport().filter(x => x.glicDopo == null && Date.now() - x.quando > 60*60*1000).pop();
+  if(!p) return '';
+  const a = ATTIVITA[p.attivita] || {};
+  return `<button class="card" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;
+    margin-bottom:12px;border:1px solid var(--sport);background:var(--sport-soft);text-align:left"
+    data-a="esitoSport:${p.id}">
+    <span style="font-size:22px;line-height:1">${a.icona||'🏃'}</span>
+    <span style="flex:1;font-size:13px;line-height:1.35"><b>Com'è andata${a.nome ? ' con ' + a.nome.toLowerCase() : ''}?</b><br>
+      <span style="color:var(--ink2)">Inserisci la glicemia dopo l'attività: serve a tarare i parametri.</span></span>
+    <span style="color:var(--sport);font-weight:700;font-size:18px">›</span></button>`;
 }
 
 
@@ -462,7 +467,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.3';
+const VERSIONE = '2026-09-05.4';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -669,7 +674,7 @@ function esportaDati(){
 let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', aperto:null, gr:100,
-  sport:{ attivita:null, intensita:'moderata', durata:60, fascia:'pomeriggio', glic1h:'range', glic0:'range' },
+  sport:{ attivita:null, cond:60 },
   paramSport:null, sessioneAperta:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
   uso:null, pform:null, editPiattoId:null, pingQ:'',
@@ -909,6 +914,7 @@ function vistaAtlante(){
   const t = totali();
   const hero = `
     <div style="text-align:center;font-size:11px;color:var(--ink2);padding:10px 0 0">CHO · versione ${VERSIONE}</div>
+    ${promemoriaEsito()}
     <div class="hero">
       <div class="occhiello">CHO · Conta carboidrati</div>
       <div class="titolone">${saluto}<br>Cosa mangi oggi?</div>
@@ -1368,6 +1374,7 @@ function vistaSport(){
   if(!s.attivita){
     const sess = sessioniSport().slice().reverse().slice(0,4);
     return `
+    ${promemoriaEsito()}
     <div class="hero viola">
       <div class="occhiello">Attività fisica</div>
       <div class="titolone">Che attività<br>fai oggi?</div>
@@ -1393,7 +1400,7 @@ function vistaSport(){
         return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px">
           <span style="font-size:20px;line-height:1">${a.icona||''}</span>
           <div style="flex:1;min-width:0">
-            <div style="font-weight:600">${dq} · ${etichettaDi(DURATE,x.durata)} ${etichettaDi(INTENSITA,x.intensita).toLowerCase()}</div>
+            <div style="font-weight:600">${dq} · ${a.nome || ''} ${x.cond != null ? etichettaDi(a.opzioni || [], x.cond) : ''}</div>
             <div style="font-size:12px;color:var(--ink2)">${gr1(x.presiPrima)} g prima${x.presiDurante ? ` + ${gr1(x.presiDurante)} g durante` : ''}</div>
           </div>
           ${esitoTag}</div>`;
@@ -1420,29 +1427,24 @@ function vistaSport(){
           <div style="font-weight:800;font-size:18px;letter-spacing:-.3px">${att.nome}</div>
           <div style="font-size:12px;color:var(--ink2)">${att.sotto}</div>
         </div>
+        <button class="chip" data-a="att:" style="--c:var(--sport)">‹</button>
         <button class="chip" data-a="param:${s.attivita}" aria-label="Parametri ${att.nome}"
           style="--c:var(--sport);display:flex;align-items:center;gap:5px">${ico('regola',15)}</button>
-        <button class="chip" data-a="att:" style="--c:var(--sport)">‹</button>
+        <button class="chip on" data-a="regSport" aria-label="Registra questa attività"
+          style="--c:var(--sport);display:flex;align-items:center">${ico('piu',16)}</button>
       </div>
-      ${G('Intensità', INTENSITA, 'intensita')}
-      ${G('Durata', DURATE, 'durata')}
-      ${G('Fascia oraria', FASCE, 'fascia')}
-      ${G("Glicemia 1 h prima", GLICEMIE, 'glic1h')}
-      ${G('Glicemia subito prima', GLICEMIE, 'glic0')}
+      ${G(att.cond, att.opzioni, 'cond')}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="box eroeViola" style="margin:0;padding:14px 16px">
         <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.prima}<span style="font-size:17px;font-weight:700"> g</span></div>
-        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.prima===0 ? 'niente prima di partire' : 'prima, senza bolo'}${
-          r.correzione ? ` · ${r.correzione>0?'+':''}${r.correzione} g glicemia` : ''}</div>
+        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.prima===0 ? 'niente prima di partire' : 'prima, senza bolo'}</div>
       </div>
       <div class="box" style="margin:0;padding:14px 16px;background:var(--sport);color:#fff;box-shadow:0 4px 14px rgba(75,79,184,.3)">
         <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.durante}<span style="font-size:17px;font-weight:700"> g</span></div>
         <div style="font-size:12px;opacity:.9;margin-top:5px">${r.durante===0 ? 'niente durante' : 'durante, distribuiti'}</div>
       </div>
     </div>
-    <button class="primario" style="padding:11px;background:var(--sport);margin-bottom:10px;display:flex;
-      align-items:center;justify-content:center;gap:8px" data-a="regSport">${ico('spunta',18)} Registra questa attività</button>
     <div class="box" style="background:var(--sport-soft);padding:12px 16px;margin-bottom:6px;box-shadow:none">
       <div style="font-weight:700;color:var(--sport);font-size:13px;margin-bottom:6px">💧 Profilo basale da applicare</div>
       <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px">
@@ -1469,9 +1471,8 @@ function stratoSessione(){
         </div>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiSessione">${ico('chiudi',20)}</button>
       </div>
-      <p style="font-size:13px;color:var(--ink2)">${a.nome} · ${etichettaDi(INTENSITA,s.intensita)} ·
-        ${etichettaDi(DURATE,s.durata)} · ${etichettaDi(FASCE,s.fascia)} — suggeriti ${s.suggPrima} g prima${
-        s.suggDurante ? ` e ${s.suggDurante} g durante` : ''}.</p>
+      <p style="font-size:13px;color:var(--ink2)">${a.nome}${s.cond != null ? ' · ' + etichettaDi(a.opzioni || [], s.cond) : ''}
+        — suggeriti ${s.suggPrima} g prima${s.suggDurante ? ` e ${s.suggDurante} g durante` : ''}.</p>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <div style="flex:1"><div class="etich">CHO presi prima (g)</div>
           <input id="ss-prima" class="campo" inputmode="decimal" value="${esc(String(s.presiPrima))}"></div>
@@ -1499,14 +1500,15 @@ function salvaSessione(){
   const arr = sessioniSport();
   let rec;
   if(s.nuova){
-    rec = { id: nuovoId(), quando: Date.now(), attivita:s.attivita, intensita:s.intensita, durata:s.durata,
-      fascia:s.fascia, glic1h:s.glic1h, glic0:s.glic0, suggPrima:s.suggPrima, suggDurante:s.suggDurante,
-      correzione:s.correzione || 0, presiPrima:Math.round(prima*10)/10, presiDurante:Math.round(durante*10)/10,
+    rec = { id: nuovoId(), quando: Date.now(), attivita:s.attivita, cond:s.cond,
+      suggPrima:s.suggPrima, suggDurante:s.suggDurante,
+      presiPrima:Math.round(prima*10)/10, presiDurante:Math.round(durante*10)/10,
       glicDopo:null, esito:null, nota:null };
     arr.push(rec);
   } else {
     rec = arr.find(v => v.id === s.id);
     if(!rec){ S.sessioneAperta = null; disegna(); return; }
+    if(rec.cond == null && s.cond != null) rec.cond = s.cond;
     rec.presiPrima = Math.round(prima*10)/10; rec.presiDurante = Math.round(durante*10)/10;
   }
   let msg = null;
@@ -1545,12 +1547,10 @@ function stratoParametri(){
         </div>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiParam">${ico('chiudi',20)}</button>
       </div>
-      <p style="font-size:13px;color:var(--ink2)">Grammi di carboidrati per ogni condizione: la schermata Sport
-        richiama la cella che corrisponde a intensità, durata e fascia scelte. Si salvano da soli su questo telefono.</p>
-      ${tab('prima', INTENSITA, FASCE, 'CHO prima di partire', 'Grammi per intensità (righe) e fascia oraria (colonne).')}
-      ${tab('durante', INTENSITA, DURATE, "CHO durante l'attività", 'Grammi totali della sessione, per intensità e durata.')}
-      ${tab('glicemia', GLICEMIE, MOMENTI_GLIC, 'Correzione per glicemia',
-        'Grammi da sommare al "prima" secondo la glicemia misurata 1 ora prima e subito prima di partire. Valori negativi = meno carboidrati.', true)}
+      <p style="font-size:13px;color:var(--ink2)">Grammi di carboidrati per ogni ${a.cond === 'Distanza' ? 'distanza' : 'durata'}:
+        la schermata Sport richiama la riga scelta. Si salvano da soli su questo telefono e si tarano con gli esiti registrati.</p>
+      ${tab('voci', a.opzioni, MOMENTI, 'CHO per ' + a.cond.toLowerCase(),
+        'Grammi prima di partire (senza bolo) e totali durante la sessione.')}
       <button class="primario" style="background:var(--sport);margin-top:18px" data-a="chiudiParam">Fatto</button>
     </div>
   </div>`;
@@ -1758,19 +1758,23 @@ document.addEventListener('click', e => {
   else if(a==='togli') S.pasto.splice(+p1,1);
   else if(a==='svuota') S.pasto = [];
   else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
-  else if(a==='att') S.sport.attivita = p1 || null;
+  else if(a==='att'){
+    S.sport.attivita = p1 || null;
+    /* La condizione (durata o distanza) riparte da un valore valido per lo sport scelto. */
+    const op = p1 && ATTIVITA[p1] ? ATTIVITA[p1].opzioni : null;
+    if(op && !op.some(o => String(o[0]) === String(S.sport.cond))) S.sport.cond = op[1] ? op[1][0] : op[0][0];
+  }
   else if(a==='param') S.paramSport = p1;
   else if(a==='chiudiParam') S.paramSport = null;
   else if(a==='regSport'){
     const r = calcolaSport(S.sport);
-    S.sessioneAperta = { nuova:true, attivita:S.sport.attivita, intensita:S.sport.intensita,
-      durata:S.sport.durata, fascia:S.sport.fascia, glic1h:S.sport.glic1h, glic0:S.sport.glic0,
-      suggPrima:r.prima, suggDurante:r.durante, correzione:r.correzione,
+    S.sessioneAperta = { nuova:true, attivita:S.sport.attivita, cond:S.sport.cond,
+      suggPrima:r.prima, suggDurante:r.durante,
       presiPrima:String(r.prima), presiDurante:String(r.durante), glicDopo:'' };
   }
   else if(a==='esitoSport'){
     const x = sessioniSport().find(v => v.id === p1);
-    if(x) S.sessioneAperta = { ...x, nuova:false,
+    if(x) S.sessioneAperta = { ...x, nuova:false, cond: x.cond ?? x.durata ?? null,
       presiPrima:String(x.presiPrima), presiDurante:String(x.presiDurante), glicDopo:'' };
   }
   else if(a==='chiudiSessione') S.sessioneAperta = null;
