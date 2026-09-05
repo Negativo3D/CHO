@@ -515,6 +515,8 @@ const IC = {
   spunta:'<path d="M4 12l5 5L20 7"/>',
   su:'<path d="M6 14l6-6 6 6"/>', giu:'<path d="M6 10l6 6 6-6"/>',
   grip:'<path d="M5 9h14M5 15h14"/>',
+  cucchiaio:'<ellipse cx="12" cy="7" rx="4.2" ry="5"/><path d="M12 12v9"/>',
+  cucchiaino:'<ellipse cx="12" cy="8.5" rx="3" ry="3.6"/><path d="M12 12.2V20"/>',
   libro:'<path d="M12 6a3 3 0 0 0-3-3H3v15h6a3 3 0 0 1 3 3"/><path d="M12 6a3 3 0 0 1 3-3h6v15h-6a3 3 0 0 0-3 3"/><path d="M12 6v15"/>',
   cloche:'<path d="M3 18h18"/><path d="M5 18a7 7 0 0 1 14 0"/><path d="M12 11V9"/><circle cx="12" cy="7.5" r="1.5"/>',
   pentola:'<path d="M5 11h14v4a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5z"/><path d="M3 11h18"/><path d="M9 4c0 2 1.5 2 1.5 4M14 4c0 2 1.5 2 1.5 4"/>',
@@ -530,7 +532,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.24';
+const VERSIONE = '2026-09-05.25';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -660,16 +662,21 @@ let RICETTE = (leggi().ricette || []).map(sanificaRicetta).filter(Boolean);
 /* Nelle quantità i grammi sono l'unità di default: un numero secco
    ("270") viene mostrato come "270 g"; tutto il resto (q.b., "2 uova",
    "1 cucchiaio") resta com'è scritto. */
-const UNITA_RICETTA = [['g','g'],['qb','q.b.'],['cm','cucchiaio da minestra'],['cc','cucchiaino da caffè'],['n','n°']];
-function qtaVoce(v){
-  const q = String(v.q || '').trim();
+const UNITA_RICETTA = ['g','qb','cm','cc','n'];
+/* Etichetta compatta dell'unità: testo per g/q.b./n°, iconcina a
+   cucchiaio (da minestra) o cucchiaino (da caffè) per le altre. */
+function etichettaUnita(u){
+  if(u === 'cm') return `<span style="display:inline-flex;vertical-align:-4px" title="cucchiaio da minestra">${ico('cucchiaio',17)}</span>`;
+  if(u === 'cc') return `<span style="display:inline-flex;vertical-align:-3px" title="cucchiaino da caffè">${ico('cucchiaino',14)}</span>`;
+  return u === 'qb' ? 'q.b.' : u === 'n' ? 'n°' : 'g';
+}
+function qtaVoceHTML(v){
+  const q = esc(String(v.q || '').trim());
   const u = v.u || 'g';
   if(u === 'qb') return 'q.b.';
   if(!q) return '';
   if(u === 'g') return /^\d+([.,]\d+)?$/.test(q) ? q + ' g' : q;
-  const uno = parseFloat(q.replace(',', '.')) === 1;
-  if(u === 'cm') return q + (uno ? ' cucchiaio da minestra' : ' cucchiai da minestra');
-  if(u === 'cc') return q + (uno ? ' cucchiaino da caffè' : ' cucchiaini da caffè');
+  if(u === 'cm' || u === 'cc') return `${q} ${etichettaUnita(u)}`;
   if(u === 'n') return 'n° ' + q;
   return q;
 }
@@ -871,7 +878,7 @@ function esportaDati(){
 let S = {
   tab:'atlante', preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', vedi:'tutto', aperto:null, gr:100,
-  qr:'', ricettaAperta:null, rform:null, editRicettaId:null,
+  qr:'', ricettaAperta:null, rform:null, editRicettaId:null, rformUnita:null,
   sport:{ attivita:null, cond:60, glic:'' },
   paramSport:null, sessioneAperta:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
@@ -1275,7 +1282,7 @@ function stratoRicetta(){
           ${s.voci.map((v,i) => `
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;
               padding:3px 0;font-size:13.5px${i ? ';border-top:1px dashed var(--line)' : ''}">
-              <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${esc(qtaVoce(v))}</span>
+              <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${qtaVoceHTML(v)}</span>
             </div>`).join('')}`).join('')}` : ''}
       ${r.passi.length ? `
         ${intest('Preparazione')}
@@ -1332,11 +1339,17 @@ function stratoRicettaForm(){
           ${v.u === 'qb' ? '' : `
           <input id="ri-${s}-${k}-q" class="campo" placeholder="…" value="${esc(v.q)}"
             style="width:46px;padding:10px 4px;text-align:center">`}
-          <select id="ri-${s}-${k}-u" class="campo" style="width:${v.u === 'qb' ? '112' : '58'}px;padding:10px 4px;font-size:13px">
-            ${UNITA_RICETTA.map(([uv,ul]) => `<option value="${uv}" ${v.u === uv ? 'selected' : ''}>${ul}</option>`).join('')}
-          </select>
+          <button class="card" data-a="rUnitaApri:${s}:${k}" aria-label="Unità di misura"
+            style="width:${v.u === 'qb' ? '58' : '46'}px;flex:none;display:flex;align-items:center;justify-content:center;
+            font-weight:600;font-size:13px;color:var(--wave)">${etichettaUnita(v.u)}</button>
           <button class="card" style="padding:0 10px;color:var(--ink2)" data-a="rIngDel:${s}:${k}">${ico('chiudi',14)}</button>
-        </div>`).join('')}
+        </div>
+        ${S.rformUnita === s + ':' + k ? `
+        <div style="display:flex;gap:6px;margin:-2px 0 10px 40px;align-items:center">
+          ${UNITA_RICETTA.map(u => `<button class="chip ${v.u === u ? 'on' : ''}"
+            style="--c:var(--wave);padding:8px 12px;display:flex;align-items:center"
+            data-a="rUnitaSet:${s}:${k}:${u}">${etichettaUnita(u)}</button>`).join('')}
+        </div>` : ''}`).join('')}
         <button class="chip" data-a="rIngAdd:${s}" style="--c:var(--wave);margin-top:2px">+ ingrediente</button>
       </div>`).join('')}
       <button class="chip" data-a="rSezAdd" style="--c:var(--wave);margin-bottom:16px">+ sezione ingredienti</button>
@@ -2164,7 +2177,7 @@ document.addEventListener('pointercancel', () => fineDragIng(true));
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-a]'); if(!b) return;
   if(b.classList.contains('velo') && e.target !== b) return;
-  const [a, p1, p2] = b.dataset.a.split(':');
+  const [a, p1, p2, p3] = b.dataset.a.split(':');
 
   if(a==='tab'){
     /* Rientrando in Sport si riparte sempre dal menu di scelta dell'attività. */
@@ -2197,6 +2210,15 @@ document.addEventListener('click', e => {
       S.rform.sezioni[+p1].voci.splice(+p2, 1);
       if(!S.rform.sezioni[+p1].voci.length) S.rform.sezioni[+p1].voci.push({ n:'', q:'', u:'g' });
     }
+  }
+  else if(a==='rUnitaApri') S.rformUnita = S.rformUnita === p1 + ':' + p2 ? null : p1 + ':' + p2;
+  else if(a==='rUnitaSet'){
+    const v = S.rform && S.rform.sezioni[+p1] && S.rform.sezioni[+p1].voci[+p2];
+    if(v && UNITA_RICETTA.includes(p3)){
+      v.u = p3;
+      if(v.u === 'qb') v.q = '';
+    }
+    S.rformUnita = null;
   }
   else if(a==='rPassoAdd'){ if(S.rform) S.rform.passi.push({ t:'', foto:null }); }
   else if(a==='rPassoDel'){ if(S.rform){ S.rform.passi.splice(+p1, 1); if(!S.rform.passi.length) S.rform.passi.push({ t:'', foto:null }); } }
@@ -2395,12 +2417,6 @@ document.addEventListener('input', e => {
     const [, s, k, campo] = id.split('-');
     const v = S.rform.sezioni[+s] && S.rform.sezioni[+s].voci[+k];
     if(v && (campo === 'n' || campo === 'q')) v[campo] = e.target.value;
-    else if(v && campo === 'u'){
-      /* Cambiando unità la riga può mostrare o nascondere la quantità. */
-      v.u = e.target.value;
-      if(v.u === 'qb') v.q = '';
-      disegna();
-    }
   }
   else if(id.startsWith('rp-') && S.rform){
     const k = +id.slice(3);
