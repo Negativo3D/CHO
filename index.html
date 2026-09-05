@@ -135,6 +135,7 @@
   body[data-tab="sport"] main{padding-bottom:104px}
   button{font-family:inherit;border:0;background:none;cursor:pointer;color:inherit}
   input{font-family:inherit}
+  textarea.campo{font-family:inherit;resize:none;line-height:1.5;display:block}
   .card{background:var(--card);border:1px solid var(--line);border-radius:20px}
   .riga{display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px}
   .riga .em{font-size:30px;line-height:1}
@@ -520,6 +521,7 @@ const IC = {
   regola:'<path d="M4 8h8M18 8h2M4 16h2M12 16h8"/><circle cx="15" cy="8" r="2.5"/><circle cx="9" cy="16" r="2.5"/>',
   casa:'<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-6h4v6"/>',
   spunta:'<path d="M4 12l5 5L20 7"/>',
+  libro:'<path d="M12 6a3 3 0 0 0-3-3H3v15h6a3 3 0 0 1 3 3"/><path d="M12 6a3 3 0 0 1 3-3h6v15h-6a3 3 0 0 0-3 3"/><path d="M12 6v15"/>',
   camera:'<path d="M3 8a1 1 0 0 1 1-1h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="12" cy="13" r="3.5"/>'
 };
 function ico(n, s=22, pieno=false){
@@ -530,7 +532,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.11';
+const VERSIONE = '2026-09-05.12';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -613,6 +615,23 @@ function sanificaPiatto(o){
 }
 
 let PIATTI = (leggi().piatti || []).map(sanificaPiatto).filter(Boolean);
+
+/* ---------- ricettario ----------
+   Ricette personali: nome, foto, ingredienti (una riga ciascuno) e
+   procedimento in testo libero. Per ora sono indipendenti dal
+   conteggio dei carboidrati. */
+function sanificaRicetta(o){
+  if(!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  if(typeof o.n !== 'string' || !o.n.trim()) return null;
+  return {
+    id: typeof o.id === 'string' && o.id ? o.id : nuovoId(),
+    n: o.n.trim(),
+    foto: typeof o.foto === 'string' && (o.foto.startsWith('data:image') || o.foto.startsWith('https://')) ? o.foto : null,
+    ing: typeof o.ing === 'string' ? o.ing : '',
+    proc: typeof o.proc === 'string' ? o.proc : ''
+  };
+}
+let RICETTE = (leggi().ricette || []).map(sanificaRicetta).filter(Boolean);
 
 /* ---------- registro del peso ---------- */
 function sanificaPeso(o){
@@ -738,6 +757,7 @@ let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', vedi:'tutto', aperto:null, gr:100,
   scegliPasto:null, qp:'',
+  qr:'', ricettaAperta:null, rform:null, editRicettaId:null,
   sport:{ attivita:null, cond:60, glic:'' },
   paramSport:null, sessioneAperta:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
@@ -1074,6 +1094,127 @@ function vistaAtlante(){
 `;
 }
 
+/* ---------- schermata: ricettario ---------- */
+function vistaRicette(){
+  const qn = S.qr.trim() ? norm(S.qr.trim()) : null;
+  const lista = RICETTE.filter(r => !qn || norm(r.n).includes(qn));
+
+  const hero = `
+    <div class="hero" style="background:linear-gradient(140deg,#E09A3E 0%,#C97B1F 45%,#8A4A08 100%);
+      box-shadow:0 14px 34px rgba(168,91,12,.35)">
+      <button class="fab fabHero" data-a="ricNuova" aria-label="Nuova ricetta"
+        style="background:linear-gradient(135deg,#E8A94F,#8A4A08);box-shadow:0 8px 20px rgba(90,47,5,.4), 0 0 0 5px rgba(255,255,255,.14)">${ico('piu',24)}</button>
+      <div style="padding-right:60px">
+        <div class="occhiello">Ricettario</div>
+        <div class="titolone">Le tue ricette</div>
+        <div class="datali" style="text-transform:none">${RICETTE.length
+          ? `${RICETTE.length} ricett${RICETTE.length === 1 ? 'a' : 'e'}`
+          : 'Scrivile una volta, le ritrovi sempre qui.'}</div>
+      </div>
+    </div>`;
+
+  if(!RICETTE.length) return `
+    ${hero}
+    <div class="card" style="padding:28px 24px;text-align:center">
+      <div style="font-size:36px">🍲</div>
+      <div style="font-weight:700;font-size:18px;margin-top:8px">Nessuna ricetta ancora</div>
+      <p style="color:var(--ink2);font-size:14px;margin:8px 0 0">Col + qui sopra crei la prima: nome, foto,
+        ingredienti e procedimento. Le compilerai e perfezionerai un po' alla volta.</p>
+    </div>`;
+
+  const celle = lista.map((r,i) => {
+    const nIng = r.ing.split('\n').filter(x => x.trim()).length;
+    return `
+    <div class="cella" style="animation-delay:${Math.min(i,8)*45}ms">
+      <button class="apri" data-a="ricApri:${r.id}">
+        ${r.foto
+          ? `<img src="${r.foto}" alt="" style="width:100%;height:92px;object-fit:cover;border-radius:16px;display:block">`
+          : `<span class="emg" style="background:var(--wave-soft)">🍲</span>`}
+        <span class="nome2">${esc(r.n)}</span>
+        <span style="font-size:11px;color:var(--ink2)">${nIng ? `${nIng} ingredient${nIng === 1 ? 'e' : 'i'}` : 'da completare'}</span>
+      </button>
+    </div>`;
+  }).join('');
+
+  return `
+    ${hero}
+    <div class="cerca">${ico('cerca',20)}
+      <input id="qr" placeholder="Cerca una ricetta" value="${esc(S.qr)}">
+    </div>
+    ${celle ? `<div class="griglia">${celle}</div>`
+      : `<div style="text-align:center;padding:48px 0;color:var(--ink2)">Nessuna ricetta con questo nome.</div>`}`;
+}
+
+/* ---------- strato: lettura di una ricetta ---------- */
+function stratoRicetta(){
+  const r = RICETTE.find(x => x.id === S.ricettaAperta); if(!r) return '';
+  const ings = r.ing.split('\n').map(x => x.trim()).filter(Boolean);
+  return `
+  <div class="velo" data-a="ricChiudi">
+    <div class="foglio" data-stop="1">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px">
+        <div style="font-weight:800;font-size:21px;line-height:1.2">${esc(r.n)}</div>
+        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2);flex:none" data-a="ricChiudi">${ico('chiudi',20)}</button>
+      </div>
+      ${r.foto ? `<img src="${r.foto}" alt="" style="width:100%;height:170px;object-fit:cover;border-radius:18px;display:block;margin-bottom:14px">` : ''}
+      ${ings.length ? `
+        <div style="font-weight:700;margin-bottom:6px">Ingredienti</div>
+        <ul style="margin:0 0 14px;padding-left:18px">${ings.map(i => `<li style="margin-bottom:4px">${esc(i)}</li>`).join('')}</ul>` : ''}
+      ${r.proc.trim() ? `
+        <div style="font-weight:700;margin-bottom:6px">Procedimento</div>
+        <p style="font-size:14px;white-space:pre-line;margin:0 0 16px">${esc(r.proc.trim())}</p>` : ''}
+      ${!ings.length && !r.proc.trim() ? `<p style="color:var(--ink2);font-size:14px">Ricetta ancora da completare: tocca Modifica.</p>` : ''}
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="primario" style="flex:1;background:var(--wave)" data-a="ricModifica:${r.id}">Modifica</button>
+        <button class="card" style="padding:14px 18px;font-weight:600;color:var(--hypo)" data-a="ricElimina:${r.id}">Elimina</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- strato: modulo ricetta ---------- */
+function stratoRicettaForm(){
+  const F = S.rform; if(!F) return '';
+  return `
+  <div class="velo" data-a="ricAnnulla">
+    <div class="foglio" data-stop="1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-weight:700;font-size:19px">${S.editRicettaId ? 'Modifica ricetta' : 'Nuova ricetta'}</div>
+        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="ricAnnulla">${ico('chiudi',20)}</button>
+      </div>
+      <div style="margin-bottom:12px"><div class="etich">Nome</div>
+        <input id="rf-n" class="campo" placeholder="Es. Torta di mele della nonna" value="${esc(F.n)}"></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+        ${F.foto ? `<img src="${esc(F.foto)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:16px;flex:none">` : ''}
+        <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2);display:flex;
+          align-items:center;justify-content:center;gap:8px" data-a="ricFoto">
+          ${ico('camera',18)} ${F.foto ? 'Cambia la foto' : 'Aggiungi una foto'}</button>
+        ${F.foto ? `<button class="card" style="padding:12px;font-weight:600;color:var(--hypo)" data-a="ricFotoX">Togli</button>` : ''}
+      </div>
+      <div style="margin-bottom:12px"><div class="etich">Ingredienti — uno per riga</div>
+        <textarea id="rf-ing" class="campo" rows="5" placeholder="300 g di farina&#10;2 uova&#10;…">${esc(F.ing)}</textarea></div>
+      <div style="margin-bottom:16px"><div class="etich">Procedimento</div>
+        <textarea id="rf-proc" class="campo" rows="7" placeholder="Descrivi i passaggi…">${esc(F.proc)}</textarea></div>
+      <button class="primario" style="background:var(--wave)" data-a="ricSalva">${S.editRicettaId ? 'Salva le modifiche' : 'Salva la ricetta'}</button>
+    </div>
+  </div>`;
+}
+
+function salvaRicetta(){
+  const F = S.rform; if(!F) return;
+  if(!F.n.trim()){ alert('Dai un nome alla ricetta.'); return; }
+  const dati = sanificaRicetta({ id: S.editRicettaId || undefined, n:F.n, foto:F.foto, ing:F.ing, proc:F.proc });
+  if(S.editRicettaId){
+    const i = RICETTE.findIndex(x => x.id === S.editRicettaId);
+    if(i >= 0) RICETTE[i] = dati; else RICETTE.push(dati);
+  } else RICETTE.push(dati);
+  if(!scrivi({ ricette: RICETTE }))
+    alert('Spazio sul telefono esaurito: prova a togliere la foto o a usarne una più piccola.');
+  S.rform = null; S.editRicettaId = null;
+  disegna();
+}
+function fotoRicetta(){ scegliFoto(d => { if(S.rform){ S.rform.foto = d; disegna(); } }); }
+
 /* ---------- schermata: pasto ---------- */
 function totali(){
   let cho=0,f=0,p=0,max=0,ig='medio',alcol=false;
@@ -1263,6 +1404,7 @@ function stratoPiattoUso(){
 
 function stratiHTML(){
   return stratoScegliPasto() + (S.aperto ? stratoPorzione() : '') + stratoNuovo() + stratoPiattoUso() + stratoPiattoForm()
+    + (S.ricettaAperta ? stratoRicetta() : '') + stratoRicettaForm()
     + (S.paramSport ? stratoParametri() : '') + (S.sessioneAperta ? stratoSessione() : '')
     + (leggi().avvisoVisto ? '' : stratoAvviso());
 }
@@ -1897,8 +2039,8 @@ function stratoAvviso(){
 }
 
 /* ---------- disegno ---------- */
-const TABS = [['atlante','Home','casa'],['pasto','Pasto','piatto'],['sport','Sport','sport'],['peso','Peso','peso']];
-const TITOLI = {atlante:'CHO', pasto:'Il tuo pasto', sport:'Attività fisica', peso:'Il tuo peso'};
+const TABS = [['atlante','Home','casa'],['pasto','Pasto','piatto'],['ricette','Ricette','libro'],['sport','Sport','sport'],['peso','Peso','peso']];
+const TITOLI = {atlante:'CHO', pasto:'Il tuo pasto', ricette:'Ricettario', sport:'Attività fisica', peso:'Il tuo peso'};
 
 function disegna(){
   document.body.dataset.tab = S.tab;
@@ -1909,8 +2051,8 @@ function disegna(){
   /* Le animazioni d'ingresso partono solo cambiando schermata, non a ogni tocco. */
   v.classList.toggle('anim', S.tab !== disegna.ultimoTab);
   disegna.ultimoTab = S.tab;
-  v.innerHTML = S.tab==='atlante' ? vistaAtlante()
-    : S.tab==='pasto' ? vistaPasto() : S.tab==='peso' ? vistaPeso() : vistaSport();
+  v.innerHTML = S.tab==='atlante' ? vistaAtlante() : S.tab==='pasto' ? vistaPasto()
+    : S.tab==='ricette' ? vistaRicette() : S.tab==='peso' ? vistaPeso() : vistaSport();
   document.getElementById('nav').innerHTML = TABS.map(([id,l,i]) => `
     <button class="${S.tab===id?'on':''}" data-a="tab:${id}">
       <span class="ic">${ico(i)}</span><span class="lab">${l}</span>
@@ -1935,6 +2077,7 @@ document.addEventListener('click', e => {
     /* Rientrando in Sport si riparte sempre dal menu di scelta dell'attività. */
     if(p1 === 'sport' && S.tab !== 'sport'){ S.sport.attivita = null; S.sport.glic = ''; }
     S.paramSport = null; S.sessioneAperta = null; S.scegliPasto = null;
+    S.ricettaAperta = null; S.rform = null; S.editRicettaId = null;
     S.tab = p1;
   }
   else if(a==='cat') S.cat = p1;
@@ -1951,6 +2094,25 @@ document.addEventListener('click', e => {
   else if(a==='gset') S.gr = +p1;
   else if(a==='aggiungi'){ S.pasto.push({cibo: cibo(S.aperto), g: S.gr}); S.aperto = null; S.scegliPasto = null; }
   else if(a==='pastoPiu'){ S.scegliPasto = 'menu'; S.qp = ''; }
+  else if(a==='ricNuova'){ S.rform = { n:'', foto:null, ing:'', proc:'' }; S.editRicettaId = null; }
+  else if(a==='ricApri') S.ricettaAperta = p1;
+  else if(a==='ricChiudi') S.ricettaAperta = null;
+  else if(a==='ricAnnulla'){ S.rform = null; S.editRicettaId = null; }
+  else if(a==='ricModifica'){
+    const r = RICETTE.find(x => x.id === p1);
+    if(r){ S.rform = { n:r.n, foto:r.foto, ing:r.ing, proc:r.proc }; S.editRicettaId = p1; S.ricettaAperta = null; }
+  }
+  else if(a==='ricElimina'){
+    const r = RICETTE.find(x => x.id === p1);
+    if(r && confirm(`Eliminare la ricetta "${r.n}"?`)){
+      RICETTE = RICETTE.filter(x => x.id !== p1);
+      scrivi({ ricette: RICETTE });
+      S.ricettaAperta = null;
+    }
+  }
+  else if(a==='ricSalva'){ salvaRicetta(); return; }
+  else if(a==='ricFoto'){ fotoRicetta(); return; }
+  else if(a==='ricFotoX'){ if(S.rform) S.rform.foto = null; }
   else if(a==='pastoLista'){ S.scegliPasto = p1; S.qp = ''; }
   else if(a==='chiudiScegli'){ S.scegliPasto = null; S.qp = ''; }
   else if(a==='togli') S.pasto.splice(+p1,1);
@@ -2119,6 +2281,16 @@ document.addEventListener('input', e => {
     const el = document.getElementById('qp');
     if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   }
+  else if(id === 'qr'){
+    S.qr = e.target.value;
+    const v = document.getElementById('vista');
+    v.innerHTML = vistaRicette();
+    const el = document.getElementById('qr');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }
+  else if(id === 'rf-n' && S.rform) S.rform.n = e.target.value;
+  else if(id === 'rf-ing' && S.rform) S.rform.ing = e.target.value;
+  else if(id === 'rf-proc' && S.rform) S.rform.proc = e.target.value;
   else if(id === 'fbarcode') S.codice = e.target.value;
   else if(id.startsWith('fi-') && S.form) S.form[id.slice(3)] = e.target.value;
   else if(id === 'ss-prima' && S.sessioneAperta) S.sessioneAperta.presiPrima = e.target.value;
