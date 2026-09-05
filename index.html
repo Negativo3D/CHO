@@ -188,6 +188,9 @@
 
   .velo{position:fixed;inset:0;background:rgba(19,32,25,.5);z-index:40;display:flex;align-items:flex-end}
   .foglio{width:100%;background:var(--bg);border-radius:26px 26px 0 0;padding:20px 20px 34px;max-height:88vh;overflow-y:auto}
+  /* Foglio a schermo pieno (es. lettura ricetta): sale tutto, non a metà. */
+  .foglio.pieno{height:100vh;height:100dvh;max-height:none;border-radius:0;
+    padding-top:calc(16px + env(safe-area-inset-top))}
   .stepper{display:flex;align-items:center;gap:12px;margin-bottom:16px}
   .stepper button{width:56px;height:56px;border-radius:18px;background:var(--card);border:1px solid var(--line);
     display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:600}
@@ -532,7 +535,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.26';
+const VERSIONE = '2026-09-05.27';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1330,7 +1333,7 @@ function stratoRicetta(){
 
   return `
   <div class="velo" data-a="ricChiudi">
-    <div class="foglio" data-stop="1">
+    <div class="foglio pieno" data-stop="1">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px">
         <div style="font-weight:800;font-size:22px;line-height:1.2;flex:1;min-width:0">${esc(r.n)}</div>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--wave);flex:none"
@@ -1343,8 +1346,6 @@ function stratoRicetta(){
       ${r.cottura.length ? parte('cott', 'Cottura', passiHTML(r.cottura)) : ''}
       ${!r.sezioni.length && !r.passi.length && !r.cottura.length
         ? `<p style="color:var(--ink2);font-size:14px">Ricetta ancora da completare: tocca la matita.</p>` : ''}
-      <button class="card" style="width:100%;padding:13px;font-weight:600;color:var(--hypo);margin-top:20px"
-        data-a="ricElimina:${r.id}">Elimina la ricetta</button>
     </div>
   </div>`;
 }
@@ -1355,9 +1356,11 @@ function stratoRicettaForm(){
   return `
   <div class="velo" data-a="ricAnnulla">
     <div class="foglio" data-stop="1">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <div style="font-weight:700;font-size:19px">${S.editRicettaId ? 'Modifica ricetta' : 'Nuova ricetta'}</div>
-        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="ricAnnulla">${ico('chiudi',20)}</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <div style="font-weight:700;font-size:19px;flex:1;min-width:0">${S.editRicettaId ? 'Modifica ricetta' : 'Nuova ricetta'}</div>
+        ${S.editRicettaId ? `<button class="card" style="padding:8px;border-radius:999px;color:var(--hypo);flex:none"
+          data-a="ricElimina:${S.editRicettaId}" aria-label="Elimina la ricetta">${ico('cestino',18)}</button>` : ''}
+        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2);flex:none" data-a="ricAnnulla">${ico('chiudi',20)}</button>
       </div>
       <div style="margin-bottom:12px"><div class="etich">Nome</div>
         <input id="rf-n" class="campo" placeholder="Es. Lasagne vegetariane" value="${esc(F.n)}"></div>
@@ -2306,7 +2309,7 @@ document.addEventListener('click', e => {
     if(r && confirm(`Eliminare la ricetta "${r.n}"?`)){
       RICETTE = RICETTE.filter(x => x.id !== p1);
       scrivi({ ricette: RICETTE });
-      S.ricettaAperta = null;
+      S.ricettaAperta = null; S.rform = null; S.editRicettaId = null;
     }
   }
   else if(a==='ricSalva'){ salvaRicetta(); return; }
