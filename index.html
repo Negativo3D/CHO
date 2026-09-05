@@ -529,7 +529,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.21';
+const VERSIONE = '2026-09-05.22';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -624,10 +624,14 @@ function sanificaRicetta(o){
   if(typeof o.n !== 'string' || !o.n.trim()) return null;
   let sezioni = Array.isArray(o.sezioni) ? o.sezioni.map(s => ({
     titolo: s && typeof s.titolo === 'string' ? s.titolo.trim() : '',
-    voci: s && Array.isArray(s.voci) ? s.voci.map(v => ({
-      n: v && typeof v.n === 'string' ? v.n.trim() : '',
-      q: v && typeof v.q === 'string' ? v.q.trim() : ''
-    })).filter(v => v.n) : []
+    voci: s && Array.isArray(s.voci) ? s.voci.map(v => {
+      if(!v) return null;
+      let q = typeof v.q === 'string' ? v.q.trim() : '';
+      let u = ['g','qb','cm','cc','n'].includes(v.u) ? v.u : null;
+      /* Migrazione: 'q.b.' scritto nella quantità diventa l'unità q.b. */
+      if(!u){ if(/^q\.? ?b\.?$/i.test(q)){ u = 'qb'; q = ''; } else u = 'g'; }
+      return { n: typeof v.n === 'string' ? v.n.trim() : '', q, u };
+    }).filter(v => v && v.n) : []
   })).filter(s => s.voci.length || s.titolo) : null;
   /* Ogni passaggio può avere una foto; i vecchi passi a stringa migrano. */
   const fotoOk = f => typeof f === 'string' && (f.startsWith('data:image') || f.startsWith('https://')) ? f : null;
@@ -655,7 +659,19 @@ let RICETTE = (leggi().ricette || []).map(sanificaRicetta).filter(Boolean);
 /* Nelle quantità i grammi sono l'unità di default: un numero secco
    ("270") viene mostrato come "270 g"; tutto il resto (q.b., "2 uova",
    "1 cucchiaio") resta com'è scritto. */
-const qtaRicetta = q => /^\d+([.,]\d+)?$/.test(String(q).trim()) ? String(q).trim() + ' g' : q;
+const UNITA_RICETTA = [['g','g'],['qb','q.b.'],['cm','cucchiaio da minestra'],['cc','cucchiaino da caffè'],['n','n°']];
+function qtaVoce(v){
+  const q = String(v.q || '').trim();
+  const u = v.u || 'g';
+  if(u === 'qb') return 'q.b.';
+  if(!q) return '';
+  if(u === 'g') return /^\d+([.,]\d+)?$/.test(q) ? q + ' g' : q;
+  const uno = parseFloat(q.replace(',', '.')) === 1;
+  if(u === 'cm') return q + (uno ? ' cucchiaio da minestra' : ' cucchiai da minestra');
+  if(u === 'cc') return q + (uno ? ' cucchiaino da caffè' : ' cucchiaini da caffè');
+  if(u === 'n') return 'n° ' + q;
+  return q;
+}
 
 /* Testo e foto del taglio delle verdure per la ricetta di partenza. */
 const TESTO_TAGLIO_VERDURE = 'Spuntate carote, zucchine e melanzane e tagliatele per il lungo a fettine dello spessore di qualche millimetro; dividete poi le fettine in 2-3 parti per ottenere dei bastoncini piatti di 2-3 cm.';
@@ -1240,7 +1256,7 @@ function stratoRicetta(){
           ${s.voci.map((v,i) => `
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;
               padding:3px 0;font-size:13.5px${i ? ';border-top:1px dashed var(--line)' : ''}">
-              <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${esc(qtaRicetta(v.q))}</span>
+              <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${esc(qtaVoce(v))}</span>
             </div>`).join('')}`).join('')}` : ''}
       ${r.passi.length ? `
         ${intest('Preparazione')}
@@ -1294,8 +1310,12 @@ function stratoRicettaForm(){
         <div style="display:flex;gap:6px;margin-bottom:6px;align-items:stretch">
           <input id="ri-${s}-${k}-n" class="campo" placeholder="Ingrediente" value="${esc(v.n)}"
             style="flex:1;min-width:0;padding:10px 12px">
-          <input id="ri-${s}-${k}-q" class="campo" placeholder="g" value="${esc(v.q)}"
-            style="width:66px;padding:10px 6px;text-align:center">
+          ${v.u === 'qb' ? '' : `
+          <input id="ri-${s}-${k}-q" class="campo" placeholder="…" value="${esc(v.q)}"
+            style="width:46px;padding:10px 4px;text-align:center">`}
+          <select id="ri-${s}-${k}-u" class="campo" style="width:${v.u === 'qb' ? '112' : '60'}px;padding:10px 4px;font-size:13px">
+            ${UNITA_RICETTA.map(([uv,ul]) => `<option value="${uv}" ${v.u === uv ? 'selected' : ''}>${ul}</option>`).join('')}
+          </select>
           <div style="display:flex;flex-direction:column;gap:2px;flex:none">
             <button class="card" style="flex:1;padding:0 7px;color:${k ? 'var(--ink2)' : 'var(--line)'};border-radius:9px"
               data-a="rIngSu:${s}:${k}">${ico('su',13)}</button>
@@ -2104,16 +2124,16 @@ document.addEventListener('click', e => {
   }
   else if(a==='gset') S.gr = +p1;
   else if(a==='ricNuova'){
-    S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'' }] }], passi:[{ t:'', foto:null }] };
+    S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }], passi:[{ t:'', foto:null }] };
     S.editRicettaId = null;
   }
-  else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'' }] }); }
+  else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'', u:'g' }] }); }
   else if(a==='rSezDel'){ if(S.rform) S.rform.sezioni.splice(+p1, 1); }
-  else if(a==='rIngAdd'){ if(S.rform && S.rform.sezioni[+p1]) S.rform.sezioni[+p1].voci.push({ n:'', q:'' }); }
+  else if(a==='rIngAdd'){ if(S.rform && S.rform.sezioni[+p1]) S.rform.sezioni[+p1].voci.push({ n:'', q:'', u:'g' }); }
   else if(a==='rIngDel'){
     if(S.rform && S.rform.sezioni[+p1]){
       S.rform.sezioni[+p1].voci.splice(+p2, 1);
-      if(!S.rform.sezioni[+p1].voci.length) S.rform.sezioni[+p1].voci.push({ n:'', q:'' });
+      if(!S.rform.sezioni[+p1].voci.length) S.rform.sezioni[+p1].voci.push({ n:'', q:'', u:'g' });
     }
   }
   else if(a==='rIngSu' || a==='rIngGiu'){
@@ -2139,7 +2159,7 @@ document.addEventListener('click', e => {
       S.rform = { n:r.n, foto:r.foto,
         sezioni: r.sezioni.length
           ? r.sezioni.map(sz => ({ titolo:sz.titolo, voci: sz.voci.length ? sz.voci.map(v => ({...v})) : [{ n:'', q:'' }] }))
-          : [{ titolo:'', voci:[{ n:'', q:'' }] }],
+          : [{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
         passi: r.passi.length ? r.passi.map(x => ({...x})) : [{ t:'', foto:null }] };
       S.editRicettaId = p1; S.ricettaAperta = null;
     }
@@ -2319,6 +2339,12 @@ document.addEventListener('input', e => {
     const [, s, k, campo] = id.split('-');
     const v = S.rform.sezioni[+s] && S.rform.sezioni[+s].voci[+k];
     if(v && (campo === 'n' || campo === 'q')) v[campo] = e.target.value;
+    else if(v && campo === 'u'){
+      /* Cambiando unità la riga può mostrare o nascondere la quantità. */
+      v.u = e.target.value;
+      if(v.u === 'qb') v.q = '';
+      disegna();
+    }
   }
   else if(id.startsWith('rp-') && S.rform){
     const k = +id.slice(3);
