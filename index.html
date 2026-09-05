@@ -535,7 +535,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.28';
+const VERSIONE = '2026-09-05.29';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -613,8 +613,40 @@ function sanificaPiatto(o){
     n: o.n.trim(),
     e: typeof o.e === 'string' && o.e.trim() ? Array.from(o.e.trim()).slice(0,3).join('') : '🍽️',
     foto: typeof o.foto === 'string' && o.foto.startsWith('data:image') ? o.foto : null,
-    ing
+    ing,
+    ...(typeof o.daRicetta === 'string' && o.daRicetta ? { daRicetta: o.daRicetta } : {}),
+    ...(Number.isInteger(o.mancanti) && o.mancanti > 0 ? { mancanti: o.mancanti } : {})
   };
+}
+
+/* ---------- ricette che diventano piatti ----------
+   Ogni ricetta genera (e tiene aggiornato) un piatto in anagrafica:
+   le voci in grammi vengono abbinate per nome agli alimenti, così i
+   carboidrati arrivano dal database; le voci non abbinabili vengono
+   contate come "mancanti" e segnalate nel piatto. */
+function sincronizzaPiattoRicetta(r){
+  const ing = [];
+  let mancanti = 0;
+  for(const sez of r.sezioni) for(const v of sez.voci){
+    const u = v.u || 'g';
+    if(u === 'qb') continue;             /* q.b.: irrilevante per i CHO */
+    const g = parseFloat(String(v.q).replace(',', '.'));
+    if(u !== 'g' || !(g > 0)){ mancanti++; continue; }
+    const c = FOODS.find(f => norm(f.n) === norm(v.n))
+      || FOODS.find(f => norm(v.n).includes(norm(f.n)) || norm(f.n).includes(norm(v.n)));
+    if(c) ing.push({ alimento: c.id, modo:'g', g: Math.round(g*10)/10 });
+    else mancanti++;
+  }
+  const i = PIATTI.findIndex(pl => pl.daRicetta === r.id);
+  if(!ing.length){
+    if(i >= 0){ PIATTI.splice(i, 1); scrivi({ piatti: PIATTI }); }
+    return;
+  }
+  const dati = sanificaPiatto({ id: i >= 0 ? PIATTI[i].id : undefined,
+    n: r.n, foto: r.foto, ing, daRicetta: r.id, mancanti });
+  if(!dati) return;
+  if(i >= 0) PIATTI[i] = dati; else PIATTI.push(dati);
+  scrivi({ piatti: PIATTI });
 }
 
 let PIATTI = (leggi().piatti || []).map(sanificaPiatto).filter(Boolean);
@@ -1441,6 +1473,7 @@ function salvaRicetta(){
   } else RICETTE.push(dati);
   if(!scrivi({ ricette: RICETTE }))
     alert('Spazio sul telefono esaurito: prova a togliere la foto o a usarne una più piccola.');
+  sincronizzaPiattoRicetta(dati);
   S.rform = null; S.editRicettaId = null;
   disegna();
 }
@@ -1490,8 +1523,12 @@ function stratoPiattoUso(){
         <div class="num" style="font-size:50px;font-weight:800;color:var(--cho);line-height:1">${gr1(t.cho)}</div>
         <div style="font-size:14px;font-weight:600;color:var(--cho);margin-top:4px">grammi di carboidrati</div>
         <div style="font-size:12px;color:var(--ink2);margin-top:4px">${gr1(t.f)} g grassi · ${gr1(t.p)} g proteine
+          · ${Math.round(t.cho*4 + t.p*4 + t.f*9)} kcal
           · ${b.tipo}${b.split ? ` ${b.split[0]}/${b.split[1]}%` : ''}${b.durata ? ` su ${b.durata}` : ''}</div>
       </div>
+      ${pl.mancanti ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
+        <span>⚠️</span><span>Piatto creato dalla ricetta: ${pl.mancanti} ingredient${pl.mancanti === 1 ? 'e non è' : 'i non sono'}
+        nell'anagrafica alimenti, quindi i suoi carboidrati non sono contati.</span></div>` : ''}
       ${righe}
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2)" data-a="modificaPiatto:${pl.id}">Modifica</button>
@@ -1511,7 +1548,8 @@ function stratiHTML(){
 function salvaPiatto(){
   const F = S.pform; if(!F) return;
   if(!F.n.trim()){ alert('Dai un nome al piatto.'); return; }
-  const dati = sanificaPiatto({ id: S.editPiattoId || undefined, n:F.n, e:F.e, foto:F.foto, ing:F.ing });
+  const dati = sanificaPiatto({ id: S.editPiattoId || undefined, n:F.n, e:F.e, foto:F.foto, ing:F.ing,
+    daRicetta: F.daRicetta, mancanti: F.mancanti });
   if(!dati){ alert('Aggiungi almeno un ingrediente con una quantità valida.'); return; }
   const nuovi = [...PIATTI];
   if(S.editPiattoId){
@@ -2002,6 +2040,8 @@ function stratoPorzione(){
         <div class="num" style="font-size:54px;font-weight:800;color:var(--cho);line-height:1">${cho}</div>
         <div style="font-size:14px;font-weight:600;color:var(--cho);margin-top:4px">grammi di carboidrati</div>
         <div style="font-size:12px;color:var(--ink2);margin-top:4px">da inserire nel microinfusore</div>
+        <div class="num" style="font-size:13px;font-weight:600;color:var(--ink2);margin-top:10px;padding-top:10px;border-top:1px solid rgba(19,32,25,.08)">
+          ${gr1(f.f*S.gr/100)} g grassi · ${gr1(f.p*S.gr/100)} g proteine · ${Math.round((f.cho*4 + f.p*4 + f.f*9)*S.gr/100)} kcal</div>
       </div>
       <div class="stepper">
         <button data-a="g:-">${ico('meno')}</button>
@@ -2304,7 +2344,8 @@ document.addEventListener('click', e => {
     const r = RICETTE.find(x => x.id === p1);
     if(r && confirm(`Eliminare la ricetta "${r.n}"?`)){
       RICETTE = RICETTE.filter(x => x.id !== p1);
-      scrivi({ ricette: RICETTE });
+      PIATTI = PIATTI.filter(pl => pl.daRicetta !== p1);
+      scrivi({ ricette: RICETTE, piatti: PIATTI });
       S.ricettaAperta = null; S.rform = null; S.editRicettaId = null;
     }
   }
@@ -2398,7 +2439,8 @@ document.addEventListener('click', e => {
   }
   else if(a==='modificaPiatto'){
     const pl = PIATTI.find(x => x.id === p1);
-    if(pl){ S.pform = { n:pl.n, e:pl.e, foto:pl.foto, ing: pl.ing.map(i => ({...i})) }; S.editPiattoId = p1; S.uso = null; S.pingQ = ''; }
+    if(pl){ S.pform = { n:pl.n, e:pl.e, foto:pl.foto, ing: pl.ing.map(i => ({...i})),
+      daRicetta: pl.daRicetta, mancanti: pl.mancanti }; S.editPiattoId = p1; S.uso = null; S.pingQ = ''; }
   }
   else if(a==='eliminaPiatto'){
     const pl = PIATTI.find(x => x.id === p1);
@@ -2523,6 +2565,13 @@ document.addEventListener('input', e => {
     }
   }
 });
+
+/* Allineamento iniziale: ogni ricetta esistente genera il suo piatto
+   (una sola volta; poi ci pensa il salvataggio della ricetta). */
+if(!leggi().ricettePiatti1){
+  RICETTE.forEach(sincronizzaPiattoRicetta);
+  scrivi({ ricettePiatti1: true });
+}
 
 disegna();
 
