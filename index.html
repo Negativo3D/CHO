@@ -264,8 +264,9 @@
 <div id="strati"></div>
 
 <script>
-/* Nessun alimento predefinito: l'elenco è costruito dall'utente
-   (a mano, con il codice a barre o da una fotografia) e vive in localStorage. */
+/* L'elenco alimenti vive in localStorage: parte da una piccola base di
+   partenza (vedi ALIMENTI_BASE) e cresce con gli inserimenti dell'utente
+   (a mano, con il codice a barre o da una fotografia). */
 const CATS = ["Pane e cereali","Primi e patate","Frutta","Verdura e legumi","Latte e derivati","Dolci e snack","Fuori casa","Bevande","Zuccheri rapidi","Altro"];
 function calcolaBolo(cho, grassi, proteine, igPrevalente) {
   const kcalGP = grassi * 9 + proteine * 4;
@@ -429,7 +430,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.1';
+const VERSIONE = '2026-09-05.2';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -456,12 +457,33 @@ function sanificaAlimento(o){
     cat: CATS.includes(o.cat) ? o.cat : 'Altro',
     cho, f: num(o.f) ?? 0, p: num(o.p) ?? 0,
     ig: ['basso','medio','alto'].includes(o.ig) ? o.ig : 'medio',
+    foto: typeof o.foto === 'string' && (o.foto.startsWith('data:image') || o.foto.startsWith('https://')) ? o.foto : null,
     ...(o.alcol === true ? {alcol:true} : {}),
     porz
   };
 }
 
 let FOODS = (leggi().alimenti || []).map(sanificaAlimento).filter(Boolean);
+
+/* Elenco di partenza: inserito una sola volta, se l'elenco è ancora
+   vuoto, per poter usare subito l'app. Valori indicativi per 100 g,
+   da verificare sulle etichette; si possono modificare o eliminare. */
+const ALIMENTI_BASE = [
+  { n:'Pasta di semola',     e:'🍝', cat:'Primi e patate',   cho:71, f:1.5, p:13,  ig:'medio', porz:[['1 porzione',90],['100 g',100]] },
+  { n:'Pane comune',         e:'🍞', cat:'Pane e cereali',   cho:57, f:1,   p:9,   ig:'alto',  porz:[['1 fetta',50],['100 g',100]] },
+  { n:'Pizza margherita',    e:'🍕', cat:'Fuori casa',       cho:28, f:8,   p:11,  ig:'medio', porz:[['1 pizza',300],['100 g',100]] },
+  { n:'Cornetto alla crema', e:'🥐', cat:'Dolci e snack',    cho:45, f:18,  p:7,   ig:'alto',  porz:[['1 cornetto',90],['100 g',100]] },
+  { n:'Riso',                e:'🍚', cat:'Primi e patate',   cho:78, f:0.6, p:7,   ig:'alto',  porz:[['1 porzione',80],['100 g',100]] },
+  { n:'Patate',              e:'🥔', cat:'Verdura e legumi', cho:18, f:0.1, p:2,   ig:'alto',  porz:[['1 porzione',200],['100 g',100]] },
+  { n:'Mela',                e:'🍎', cat:'Frutta',           cho:14, f:0.2, p:0.3, ig:'basso', porz:[['1 mela',150],['100 g',100]] },
+  { n:'Banana',              e:'🍌', cat:'Frutta',           cho:23, f:0.3, p:1.1, ig:'medio', porz:[['1 banana',120],['100 g',100]] },
+  { n:'Latte intero',        e:'🥛', cat:'Latte e derivati', cho:5,  f:3.6, p:3.3, ig:'basso', porz:[['1 bicchiere',250],['100 g',100]] },
+  { n:'Biscotti frollini',   e:'🍪', cat:'Dolci e snack',    cho:72, f:20,  p:7,   ig:'alto',  porz:[['4 biscotti',32],['100 g',100]] }
+];
+if(!FOODS.length && !leggi().baseInserita){
+  FOODS = ALIMENTI_BASE.map(sanificaAlimento).filter(Boolean);
+  scrivi({ alimenti: FOODS, baseInserita: true });
+}
 
 /* ---------- anagrafica piatti ----------
    Un piatto è una combinazione già porzionata di alimenti
@@ -514,22 +536,26 @@ function totaliPiatto(ing){
   return { cho, f, p };
 }
 
-function fotoPiatto(){
+async function ridimensionaFoto(sorgente){
+  const img = await createImageBitmap(sorgente);
+  const sc = Math.min(1, 480 / Math.max(img.width, img.height));
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
+  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+  return cv.toDataURL('image/jpeg', .72);
+}
+function scegliFoto(usa){
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*';
   inp.onchange = async () => {
     const file = inp.files[0]; if(!file) return;
-    try{
-      const img = await createImageBitmap(file);
-      const sc = Math.min(1, 480 / Math.max(img.width, img.height));
-      const cv = document.createElement('canvas');
-      cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
-      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-      if(S.pform){ S.pform.foto = cv.toDataURL('image/jpeg', .72); disegna(); }
-    }catch(e){ alert('Non riesco a leggere questa immagine.'); }
+    try{ usa(await ridimensionaFoto(file)); }
+    catch(e){ alert('Non riesco a leggere questa immagine.'); }
   };
   inp.click();
 }
+function fotoPiatto(){ scegliFoto(d => { if(S.pform){ S.pform.foto = d; disegna(); } }); }
+function fotoAlimento(){ scegliFoto(d => { if(S.form){ S.form.foto = d; disegna(); } }); }
 
 /* ---------- esportazione in PDF ----------
    PDF generato a mano (nessuna libreria): font base Helvetica con
@@ -626,7 +652,7 @@ const FORMATI_BARCODE = ['ean_13','ean_8','upc_a','upc_e','code_128'];
 let flussoCamera = null, cicloScan = null, rilevatore = null, zxReader = null, zxPromise = null;
 
 function formVuoto(){
-  return { n:'', e:'', cho:'', f:'', p:'', ig:'medio', alcol:'no', cat:'Altro', porz:'' };
+  return { n:'', e:'', cho:'', f:'', p:'', ig:'medio', alcol:'no', cat:'Altro', porz:'', foto:null };
 }
 
 const EMOJI_CIBO = ['🍞','🥐','🥖','🍝','🍚','🥔','🍕','🥪','🍔','🍎','🍌','🍊','🍇','🍓','🍑','🥝','🥦','🥕','🍅','🫘','🥛','🧀','🥣','🥚','🍖','🐟','🍪','🍫','🍰','🍨','🍯','🍬','🥤','🧃','🍺','🍷'];
@@ -759,7 +785,7 @@ async function cercaCodice(codice){
   if(!/^\d{6,14}$/.test(codice)){ alert("Inserisci un codice a barre valido (solo cifre)."); return; }
   S.nuovo = 'barcode'; S.caricamento = true; disegna();
   try{
-    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${codice}.json?fields=product_name,product_name_it,nutriments`);
+    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${codice}.json?fields=product_name,product_name_it,nutriments,image_front_small_url,image_front_url`);
     const j = await r.json();
     S.caricamento = false;
     if(!j.product || !j.status){
@@ -776,11 +802,28 @@ async function cercaCodice(codice){
     };
     S.editId = null; S.nuovo = 'form';
     disegna();
+    const urlFoto = j.product.image_front_small_url || j.product.image_front_url;
+    if(urlFoto) caricaFotoProdotto(urlFoto);
     if(!S.form.cho) alert("Il prodotto è stato trovato ma i carboidrati per 100 g non sono indicati: completali tu dall'etichetta.");
   }catch(e){
     S.caricamento = false;
     alert("Ricerca non riuscita: controlla la connessione a internet e riprova, oppure inserisci l'alimento a mano.");
     disegna();
+  }
+}
+
+/* La vera foto del prodotto, da Open Food Facts: scaricata e salvata
+   rimpicciolita nel modulo aperto, così resta anche senza internet.
+   Se il download non riesce si tiene l'indirizzo remoto dell'immagine. */
+async function caricaFotoProdotto(url){
+  let d = url;
+  try{ d = await ridimensionaFoto(await (await fetch(url)).blob()); }catch(e){}
+  if(S.form && S.nuovo === 'form' && !S.form.foto){
+    S.form.foto = d;
+    /* Niente ridisegno mentre si scrive in un campo: la foto comparirà
+       al prossimo tocco. */
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    if(tag !== 'INPUT' && tag !== 'TEXTAREA') disegna();
   }
 }
 
@@ -795,7 +838,7 @@ function salvaAlimento(){
   const porzG = Math.round(dec(F.porz)*10)/10;
   const dati = sanificaAlimento({
     id: S.editId || undefined,
-    n: nome, e: F.e, cat: F.cat,
+    n: nome, e: F.e, cat: F.cat, foto: F.foto,
     cho: Math.round(cho*10)/10, f: num(F.f), p: num(F.p),
     ig: F.ig, alcol: F.alcol === 'si',
     porz: porzG > 0 ? [["1 porzione", porzG], ["100 g", 100]] : [["100 g", 100]]
@@ -806,7 +849,8 @@ function salvaAlimento(){
   } else {
     FOODS.push(dati);
   }
-  scrivi({ alimenti: FOODS });
+  if(!scrivi({ alimenti: FOODS }))
+    alert('Spazio sul telefono esaurito: prova a togliere la foto o a usarne una più piccola.');
   S.nuovo = null; S.form = null; S.editId = null;
   disegna();
 }
@@ -868,7 +912,7 @@ function vistaAtlante(){
   const celle = l.map((f,i) => `
     <div class="cella" style="animation-delay:${Math.min(i,8)*45}ms">
       <button class="apri" data-a="apri:${f.id}">
-        <span class="emg">${f.e}</span>
+        ${f.foto ? `<img class="emg" src="${f.foto}" alt="" style="object-fit:cover">` : `<span class="emg">${f.e}</span>`}
         <span class="nome2">${esc(f.n)}</span>
         <span class="chopill num">${f.cho} g</span>
         <span style="font-size:11px;color:var(--ink2)"> per 100 g</span>
@@ -926,7 +970,7 @@ function vistaPasto(){
 
   const lista = S.pasto.map((v,i) => `
     <div class="card riga" style="border-radius:22px;box-shadow:0 3px 10px rgba(19,32,25,.05)">
-      <span class="emt">${v.cibo.e}</span>
+      ${v.cibo.foto ? `<img class="emt" src="${v.cibo.foto}" alt="" style="object-fit:cover">` : `<span class="emt">${v.cibo.e}</span>`}
       <div style="flex:1;min-width:0">
         <div class="nome">${esc(v.cibo.n)}</div><div class="sotto">${gr1(v.g)} g</div>
       </div>
@@ -1023,7 +1067,8 @@ function stratoPiattoUso(){
     const g = grIng(i);
     return `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <span class="emt" style="width:40px;height:40px;font-size:20px">${c.e}</span>
+      ${c.foto ? `<img class="emt" src="${c.foto}" alt="" style="width:40px;height:40px;object-fit:cover">`
+        : `<span class="emt" style="width:40px;height:40px;font-size:20px">${c.e}</span>`}
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.n)}</div>
         <div style="font-size:12px;color:var(--ink2)">${i.modo==='pezzi'
@@ -1103,7 +1148,8 @@ function stratoPiattoForm(){
     return `
     <div class="card" style="padding:12px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <span class="emt" style="width:38px;height:38px;font-size:19px">${c.e}</span>
+        ${c.foto ? `<img class="emt" src="${c.foto}" alt="" style="width:38px;height:38px;object-fit:cover">`
+          : `<span class="emt" style="width:38px;height:38px;font-size:19px">${c.e}</span>`}
         <div style="flex:1;font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.n)}</div>
         <button style="padding:6px;color:#B9C2BB" data-a="pingTogli:${k}">${ico('cestino',16)}</button>
       </div>
@@ -1148,7 +1194,8 @@ function stratoPiattoForm(){
       <input id="pf-cerca" class="campo" style="margin:4px 0 8px" placeholder="Cerca un alimento da aggiungere…" value="${esc(S.pingQ)}">
       ${risultati.map(f => `
         <button class="card riga" style="width:100%;text-align:left;padding:10px 12px" data-a="pingAdd:${f.id}">
-          <span class="emt" style="width:36px;height:36px;font-size:18px">${f.e}</span>
+          ${f.foto ? `<img class="emt" src="${f.foto}" alt="" style="width:36px;height:36px;object-fit:cover">`
+            : `<span class="emt" style="width:36px;height:36px;font-size:18px">${f.e}</span>`}
           <span style="flex:1;min-width:0"><span class="nome" style="display:block;font-size:14px">${esc(f.n)}</span>
           <span class="sotto">${f.cho} g CHO per 100 g</span></span>
           <span style="color:var(--cho);font-weight:700">＋</span>
@@ -1393,7 +1440,8 @@ function stratoPorzione(){
     <div class="foglio" data-stop="1">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
         <div style="display:flex;gap:12px;align-items:center">
-          <span style="font-size:40px">${f.e}</span>
+          ${f.foto ? `<img src="${f.foto}" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:16px;flex:none">`
+            : `<span style="font-size:40px">${f.e}</span>`}
           <div><div style="font-weight:700;font-size:19px">${esc(f.n)}</div>
           <div style="font-size:12px;color:var(--ink2)">${f.cho} g CHO · ${f.f} g grassi · ${f.p} g proteine per 100 g</div></div>
         </div>
@@ -1485,6 +1533,13 @@ function stratoNuovo(){
       <div class="chips-wrap" style="margin-bottom:12px;gap:6px">
         ${EMOJI_CIBO.map(em => `<button class="chip ${F.e===em?'on':''}" data-a="fset:e:${em}"
           style="font-size:19px;padding:6px 10px;line-height:1">${em}</button>`).join('')}
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+        ${F.foto ? `<img src="${esc(F.foto)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:16px;flex:none">` : ''}
+        <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2);display:flex;
+          align-items:center;justify-content:center;gap:8px" data-a="ffoto">
+          ${ico('camera',18)} ${F.foto ? 'Cambia la foto' : "Aggiungi una foto dell'alimento"}</button>
+        ${F.foto ? `<button class="card" style="padding:12px;font-weight:600;color:var(--hypo)" data-a="ffotoX">Togli</button>` : ''}
       </div>
       <div class="etich">Valori per 100 g</div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -1585,6 +1640,8 @@ document.addEventListener('click', e => {
   else if(a==='nuovoForm'){ S.form = formVuoto(); S.editId = null; S.nuovo = 'form'; }
   else if(a==='nuovoBarcode'){ S.nuovo = 'barcode'; S.codice = ''; S.caricamento = false; avviaScanner(); }
   else if(a==='nuovoFoto'){ fotoBarcode(); return; }
+  else if(a==='ffoto'){ fotoAlimento(); return; }
+  else if(a==='ffotoX'){ if(S.form) S.form.foto = null; }
   else if(a==='cercaCodice'){ fermaScanner(); cercaCodice(S.codice); return; }
   else if(a==='salvaAlimento'){ salvaAlimento(); return; }
   else if(a==='fset'){ if(S.form) S.form[p1] = p2; }
@@ -1592,7 +1649,7 @@ document.addEventListener('click', e => {
     const f = cibo(p1);
     if(f){
       S.form = { n:f.n, e:f.e, cho:String(f.cho), f:String(f.f), p:String(f.p),
-        ig:f.ig, alcol:f.alcol ? 'si' : 'no', cat:f.cat || 'Altro',
+        ig:f.ig, alcol:f.alcol ? 'si' : 'no', cat:f.cat || 'Altro', foto: f.foto || null,
         porz: f.porz[0][1] !== 100 ? String(f.porz[0][1]) : '' };
       S.editId = p1; S.nuovo = 'form'; S.aperto = null;
     }
