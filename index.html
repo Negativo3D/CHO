@@ -517,6 +517,10 @@ const IC = {
   casa:'<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-6h4v6"/>',
   spunta:'<path d="M4 12l5 5L20 7"/>',
   libro:'<path d="M12 6a3 3 0 0 0-3-3H3v15h6a3 3 0 0 1 3 3"/><path d="M12 6a3 3 0 0 1 3-3h6v15h-6a3 3 0 0 0-3 3"/><path d="M12 6v15"/>',
+  cloche:'<path d="M3 18h18"/><path d="M5 18a7 7 0 0 1 14 0"/><path d="M12 11V9"/><circle cx="12" cy="7.5" r="1.5"/>',
+  pentola:'<path d="M5 11h14v4a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5z"/><path d="M3 11h18"/><path d="M9 4c0 2 1.5 2 1.5 4M14 4c0 2 1.5 2 1.5 4"/>',
+  mela:'<path d="M12 8c-1.6-1.6-4.2-1.9-5.9-.3-1.9 1.8-2.2 4.6-1.1 7.3 1 2.4 2.7 4.6 4.6 5 .9.2 1.5-.4 2.4-.4s1.5.6 2.4.4c1.9-.4 3.6-2.6 4.6-5 1.1-2.7.8-5.5-1.1-7.3C16.2 6.1 13.6 6.4 12 8z"/><path d="M12 8c0-2.2 1.2-3.6 3-4.5"/>',
+  matita:'<path d="M4 20l1.2-4.5L16 4.7a2 2 0 0 1 2.8 0l.5.5a2 2 0 0 1 0 2.8L8.5 18.8z"/><path d="M14.5 6.2l3.3 3.3"/>',
   camera:'<path d="M3 8a1 1 0 0 1 1-1h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="12" cy="13" r="3.5"/>'
 };
 function ico(n, s=22, pieno=false){
@@ -527,7 +531,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.13';
+const VERSIONE = '2026-09-05.14';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1028,7 +1032,7 @@ function vistaAtlante(){
       <button class="apri" data-a="apriPiatto:${pl.id}">
         ${pl.foto
           ? `<img src="${pl.foto}" alt="" style="width:100%;height:92px;object-fit:cover;border-radius:16px;display:block">`
-          : `<span class="emg">${pl.e}</span>`}
+          : `<span class="emg" style="background:var(--wave-soft);color:var(--wave)">${ico('cloche',27)}</span>`}
         <span class="nome2">${esc(pl.n)}</span>
         <span class="chopill num" style="background:linear-gradient(135deg,#C97B1F,#A85B0C)">${gr1(t.cho)} g</span>
         <span style="font-size:11px;color:var(--ink2)"> CHO</span>
@@ -1100,8 +1104,8 @@ function vistaRicette(){
   if(!RICETTE.length) return `
     ${hero}
     <div class="card" style="padding:28px 24px;text-align:center">
-      <div style="font-size:36px">🍲</div>
-      <div style="font-weight:700;font-size:18px;margin-top:8px">Nessuna ricetta ancora</div>
+      <span class="emg" style="margin:0 auto;background:var(--wave-soft);color:var(--wave)">${ico('pentola',27)}</span>
+      <div style="font-weight:700;font-size:18px;margin-top:10px">Nessuna ricetta ancora</div>
       <p style="color:var(--ink2);font-size:14px;margin:8px 0 0">Col + qui sopra crei la prima: nome, foto,
         ingredienti e procedimento. Le compilerai e perfezionerai un po' alla volta.</p>
     </div>`;
@@ -1113,7 +1117,7 @@ function vistaRicette(){
       <button class="apri" data-a="ricApri:${r.id}">
         ${r.foto
           ? `<img src="${r.foto}" alt="" style="width:100%;height:92px;object-fit:cover;border-radius:16px;display:block">`
-          : `<span class="emg" style="background:var(--wave-soft)">🍲</span>`}
+          : `<span class="emg" style="background:var(--wave-soft);color:var(--wave)">${ico('pentola',27)}</span>`}
         <span class="nome2">${esc(r.n)}</span>
         <span style="font-size:11px;color:var(--ink2)">${nIng ? `${nIng} ingredient${nIng === 1 ? 'e' : 'i'}` : 'da completare'}</span>
       </button>
@@ -1233,7 +1237,7 @@ function stratoPiattoUso(){
         <div style="display:flex;gap:12px;align-items:center;min-width:0">
           ${pl.foto
             ? `<img src="${pl.foto}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:16px">`
-            : `<span style="font-size:40px">${pl.e}</span>`}
+            : `<span class="emg" style="width:56px;height:56px;background:var(--wave-soft);color:var(--wave)">${ico('cloche',28)}</span>`}
           <div style="min-width:0"><div style="font-weight:700;font-size:19px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(pl.n)}</div>
           <div style="font-size:12px;color:var(--ink2)">${ing.length} ingredient${ing.length===1?'e':'i'}</div></div>
         </div>
@@ -1324,16 +1328,13 @@ function stratoPiattoForm(){
         <div style="font-weight:700;font-size:19px">${S.editPiattoId ? 'Modifica piatto' : 'Nuovo piatto'}</div>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiPiatto">${ico('chiudi',20)}</button>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <div style="flex:1"><div class="etich">Nome del piatto</div>
-          <input id="pf-n" class="campo" placeholder="Es. Pasta al pomodoro" value="${esc(F.n)}"></div>
-        <div style="width:84px"><div class="etich">Emoji</div>
-          <input id="pf-e" class="campo" style="text-align:center" placeholder="🍝" value="${esc(F.e)}"></div>
-      </div>
+      <div style="margin-bottom:12px"><div class="etich">Nome del piatto</div>
+        <input id="pf-n" class="campo" placeholder="Es. Pasta al pomodoro" value="${esc(F.n)}"></div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
         ${F.foto ? `<img src="${F.foto}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:16px">` : ''}
-        <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2)" data-a="pfoto">
-          📷 ${F.foto ? 'Cambia la foto' : 'Aggiungi una foto del piatto'}</button>
+        <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2);display:flex;
+          align-items:center;justify-content:center;gap:8px" data-a="pfoto">
+          ${ico('camera',18)} ${F.foto ? 'Cambia la foto' : 'Aggiungi una foto del piatto'}</button>
         ${F.foto ? `<button class="card" style="padding:12px;font-weight:600;color:var(--hypo)" data-a="pfotoX">Togli</button>` : ''}
       </div>
       <div class="etich">Ingredienti (dalla tua anagrafica alimenti)</div>
@@ -1782,9 +1783,9 @@ function stratoNuovo(){
       <div style="font-weight:700;font-size:19px">${tit}</div>
       <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiNuovo">${ico('chiudi',20)}</button>
     </div>`;
-  const voce = (em, tit, sotto, az) => `
+  const voce = (icona, tit, sotto, az) => `
     <button class="card riga" style="width:100%;text-align:left" data-a="${az}">
-      <span class="em">${em}</span>
+      <span class="emt" style="background:var(--cho-soft);color:var(--cho)">${ico(icona,22)}</span>
       <span style="flex:1;min-width:0">
         <span class="nome" style="display:block">${tit}</span>
         <span class="sotto" style="display:block;white-space:normal">${sotto}</span>
@@ -1795,15 +1796,15 @@ function stratoNuovo(){
     <div class="foglio" data-stop="1">
       ${testa('Cosa vuoi aggiungere?')}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:8px"
+        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:9px"
           data-a="nuovoAlimento">
-          <span style="font-size:34px;line-height:1">🥦</span>
+          <span class="emg" style="width:50px;height:50px;color:var(--cho)">${ico('mela',26)}</span>
           <span style="font-weight:700">Alimento</span>
           <span style="font-size:12px;color:var(--ink2);text-align:center;line-height:1.35">Un singolo cibo,<br>valori per 100 g</span>
         </button>
-        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:8px"
+        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:9px"
           data-a="nuovoPiatto">
-          <span style="font-size:34px;line-height:1">🍽️</span>
+          <span class="emg" style="width:50px;height:50px;background:var(--wave-soft);color:var(--wave)">${ico('cloche',26)}</span>
           <span style="font-weight:700">Piatto</span>
           <span style="font-size:12px;color:var(--ink2);text-align:center;line-height:1.35">Più alimenti<br>già porzionati</span>
         </button>
@@ -1815,9 +1816,9 @@ function stratoNuovo(){
   <div class="velo" data-a="chiudiNuovo">
     <div class="foglio" data-stop="1">
       ${testa('Aggiungi un alimento')}
-      ${voce('📷','Leggi il codice a barre','Inquadra la confezione: la composizione per 100 g arriva da Open Food Facts','nuovoBarcode')}
-      ${voce('🖼️','Da una fotografia','Scegli o scatta una foto del codice a barre e la leggo da lì','nuovoFoto')}
-      ${voce('✍️','Compila a mano','Scrivi tu nome e valori per 100 g leggendo l’etichetta','nuovoForm')}
+      ${voce('barcode','Leggi il codice a barre','Inquadra la confezione: la composizione per 100 g arriva da Open Food Facts','nuovoBarcode')}
+      ${voce('camera','Da una fotografia','Scegli o scatta una foto del codice a barre e la leggo da lì','nuovoFoto')}
+      ${voce('matita','Compila a mano','Scrivi tu nome e valori per 100 g leggendo l’etichetta','nuovoForm')}
     </div>
   </div>`;
 
@@ -2153,7 +2154,6 @@ document.addEventListener('input', e => {
   else if(id === 'peso-ora') S.pesoOra = e.target.value;
   else if(id === 'peso-kg') S.pesoKg = e.target.value;
   else if(id === 'pf-n' && S.pform) S.pform.n = e.target.value;
-  else if(id === 'pf-e' && S.pform) S.pform.e = e.target.value;
   else if(id === 'pf-cerca' && S.pform){
     S.pingQ = e.target.value;
     document.getElementById('strati').innerHTML = stratiHTML();
