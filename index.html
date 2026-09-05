@@ -133,6 +133,9 @@
     box-shadow:0 10px 26px rgba(14,122,87,.45), 0 0 0 6px rgba(14,122,87,.08)
   }
   main{padding:0 16px 150px}
+  /* In Sport non c'è il pulsante flottante: meno aria in fondo, così
+     il dettaglio attività sta in una videata senza scorrere. */
+  body[data-tab="sport"] main{padding-bottom:104px}
   button{font-family:inherit;border:0;background:none;cursor:pointer;color:inherit}
   input{font-family:inherit}
   .card{background:var(--card);border:1px solid var(--line);border-radius:20px}
@@ -405,6 +408,34 @@ function calcolaSport({ attivita, intensita, durata, fascia, glic1h, glic0 }) {
   return { prima, durante, correzione, basale };
 }
 
+/* ---------- autoallineamento sport ----------
+   Ogni attività può essere registrata: condizioni, CHO davvero presi e,
+   quando la si misura, la glicemia dopo l'attività. Dall'esito i
+   parametri si aggiustano da soli, a piccoli passi: sotto 70 mg/dl i
+   carboidrati erano pochi, tra 70 e 180 la quantità presa era giusta,
+   sopra 180 erano troppi. La cella "prima" delle condizioni usate si
+   sposta a metà strada verso la quantità che avrebbe funzionato. */
+function sessioniSport(){ const v = leggi().sessioniSport; return Array.isArray(v) ? v : []; }
+function salvaSessioni(arr){ scrivi({ sessioniSport: arr.slice(-50) }); }
+const etichettaDi = (lista, v) => (lista.find(x => String(x[0]) === String(v)) || ['', String(v)])[1];
+function valutaEsito(g){ return g < 70 ? 'bassa' : g > 180 ? 'alta' : 'range'; }
+function autoallinea(s, glicDopo){
+  const esito = valutaEsito(glicDopo);
+  const delta = esito === 'bassa' ? 5 : esito === 'alta' ? -5 : 0;
+  const vecchia = tabellaSport(s.attivita).prima[s.intensita][s.fascia];
+  const target = Math.max(0, Math.round(s.presiPrima + delta - (s.correzione || 0)));
+  const nuova = Math.max(0, Math.round((vecchia + target) / 2));
+  if(nuova !== vecchia) salvaCella(s.attivita, 'prima', s.intensita, s.fascia, nuova);
+  const dove = `${(ATTIVITA[s.attivita]||{}).nome || s.attivita} · ${etichettaDi(INTENSITA,s.intensita).toLowerCase()} · ${etichettaDi(FASCE,s.fascia).toLowerCase()}`;
+  const nota = esito === 'range'
+    ? (nuova !== vecchia ? `in range: CHO "prima" (${dove}) allineati da ${vecchia} a ${nuova} g.`
+                         : `in range: parametri confermati (${dove}).`)
+    : esito === 'bassa'
+      ? `bassa: i carboidrati erano pochi. CHO "prima" (${dove}): ${vecchia} → ${nuova} g.`
+      : `alta: i carboidrati erano troppi. CHO "prima" (${dove}): ${vecchia} → ${nuova} g.`;
+  return { esito, nota };
+}
+
 
 
 /* ---------- icone ---------- */
@@ -420,6 +451,7 @@ const IC = {
   barcode:'<path d="M4 6v12M8 6v12M11 6v9M14 6v12M17 6v9M20 6v12"/>',
   regola:'<path d="M4 8h8M18 8h2M4 16h2M12 16h8"/><circle cx="15" cy="8" r="2.5"/><circle cx="9" cy="16" r="2.5"/>',
   casa:'<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-6h4v6"/>',
+  spunta:'<path d="M4 12l5 5L20 7"/>',
   camera:'<path d="M3 8a1 1 0 0 1 1-1h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="12" cy="13" r="3.5"/>'
 };
 function ico(n, s=22, pieno=false){
@@ -430,7 +462,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.2';
+const VERSIONE = '2026-09-05.3';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -638,7 +670,7 @@ let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', aperto:null, gr:100,
   sport:{ attivita:null, intensita:'moderata', durata:60, fascia:'pomeriggio', glic1h:'range', glic0:'range' },
-  paramSport:null,
+  paramSport:null, sessioneAperta:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
   uso:null, pform:null, editPiattoId:null, pingQ:'',
   pesoData:'', pesoOra:'', pesoKg:'', pesoRange:'6m', pesoTip:null
@@ -1111,7 +1143,8 @@ function stratoPiattoUso(){
 
 function stratiHTML(){
   return (S.aperto ? stratoPorzione() : '') + stratoNuovo() + stratoPiattoUso() + stratoPiattoForm()
-    + (S.paramSport ? stratoParametri() : '') + (leggi().avvisoVisto ? '' : stratoAvviso());
+    + (S.paramSport ? stratoParametri() : '') + (S.sessioneAperta ? stratoSessione() : '')
+    + (leggi().avvisoVisto ? '' : stratoAvviso());
 }
 
 function salvaPiatto(){
@@ -1332,7 +1365,9 @@ function vistaPeso(){
 function vistaSport(){
   const s = S.sport;
 
-  if(!s.attivita) return `
+  if(!s.attivita){
+    const sess = sessioniSport().slice().reverse().slice(0,4);
+    return `
     <div class="hero viola">
       <div class="occhiello">Attività fisica</div>
       <div class="titolone">Che attività<br>fai oggi?</div>
@@ -1343,7 +1378,28 @@ function vistaSport(){
         <button class="tile" style="animation-delay:${i*60}ms" data-a="att:${id}">
           <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
         </button>`).join('')}
-    </div>`;
+    </div>
+    ${sess.length ? `
+    <div class="card" style="padding:12px 14px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px">Ultime attività</div>
+      ${sess.map(x => {
+        const a = ATTIVITA[x.attivita] || {};
+        const dq = new Date(x.quando).toLocaleDateString('it-IT',{weekday:'short', day:'numeric', month:'short'});
+        const esitoTag = x.glicDopo == null
+          ? `<button class="chip on" style="--c:var(--sport);padding:6px 12px;font-size:12px" data-a="esitoSport:${x.id}">Esito?</button>`
+          : x.esito === 'range' ? `<b class="num" style="color:var(--cho)">${x.glicDopo} ✓</b>`
+          : x.esito === 'bassa' ? `<b class="num" style="color:var(--hypo)">${x.glicDopo} ↓</b>`
+          : `<b class="num" style="color:var(--wave)">${x.glicDopo} ↑</b>`;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px">
+          <span style="font-size:20px;line-height:1">${a.icona||''}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600">${dq} · ${etichettaDi(DURATE,x.durata)} ${etichettaDi(INTENSITA,x.intensita).toLowerCase()}</div>
+            <div style="font-size:12px;color:var(--ink2)">${gr1(x.presiPrima)} g prima${x.presiDurante ? ` + ${gr1(x.presiDurante)} g durante` : ''}</div>
+          </div>
+          ${esitoTag}</div>`;
+      }).join('')}
+    </div>` : ''}`;
+  }
 
   const att = ATTIVITA[s.attivita];
   const r = calcolaSport(s);
@@ -1385,6 +1441,8 @@ function vistaSport(){
         <div style="font-size:12px;opacity:.9;margin-top:5px">${r.durante===0 ? 'niente durante' : 'durante, distribuiti'}</div>
       </div>
     </div>
+    <button class="primario" style="padding:11px;background:var(--sport);margin-bottom:10px;display:flex;
+      align-items:center;justify-content:center;gap:8px" data-a="regSport">${ico('spunta',18)} Registra questa attività</button>
     <div class="box" style="background:var(--sport-soft);padding:12px 16px;margin-bottom:6px;box-shadow:none">
       <div style="font-weight:700;color:var(--sport);font-size:13px;margin-bottom:6px">💧 Profilo basale da applicare</div>
       <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px">
@@ -1397,6 +1455,73 @@ function vistaSport(){
 }
 
 /* ---------- strato: parametri dello sport ---------- */
+/* ---------- strato: registrazione attività ed esito ---------- */
+function stratoSessione(){
+  const s = S.sessioneAperta; if(!s) return '';
+  const a = ATTIVITA[s.attivita] || {};
+  return `
+  <div class="velo" data-a="chiudiSessione">
+    <div class="foglio" data-stop="1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <span style="font-size:30px;line-height:1">${a.icona||''}</span>
+          <div style="font-weight:800;font-size:19px">${s.nuova ? 'Registra attività' : 'Esito attività'}</div>
+        </div>
+        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiSessione">${ico('chiudi',20)}</button>
+      </div>
+      <p style="font-size:13px;color:var(--ink2)">${a.nome} · ${etichettaDi(INTENSITA,s.intensita)} ·
+        ${etichettaDi(DURATE,s.durata)} · ${etichettaDi(FASCE,s.fascia)} — suggeriti ${s.suggPrima} g prima${
+        s.suggDurante ? ` e ${s.suggDurante} g durante` : ''}.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <div style="flex:1"><div class="etich">CHO presi prima (g)</div>
+          <input id="ss-prima" class="campo" inputmode="decimal" value="${esc(String(s.presiPrima))}"></div>
+        <div style="flex:1"><div class="etich">CHO presi durante (g)</div>
+          <input id="ss-durante" class="campo" inputmode="decimal" value="${esc(String(s.presiDurante))}"></div>
+      </div>
+      <div style="margin-bottom:12px"><div class="etich">Glicemia dopo l'attività (mg/dl)</div>
+        <input id="ss-glic" class="campo" inputmode="numeric" placeholder="Compila quando l'hai misurata"
+          value="${esc(String(s.glicDopo ?? ''))}"></div>
+      <p style="font-size:12px;color:var(--ink2)">Con l'esito i parametri di queste condizioni si aggiustano da soli:
+        sotto 70 aumento i CHO, tra 70 e 180 confermo quanto hai preso, sopra 180 li riduco. Puoi salvare adesso
+        e inserire la glicemia più tardi da "Ultime attività".</p>
+      <button class="primario" style="background:var(--sport)" data-a="salvaSessione">Salva</button>
+    </div>
+  </div>`;
+}
+
+function salvaSessione(){
+  const s = S.sessioneAperta; if(!s) return;
+  const dec = v => parseFloat(String(v).replace(',', '.'));
+  const prima = dec(s.presiPrima), durante = dec(s.presiDurante);
+  if(!(prima >= 0) || !(durante >= 0)){ alert('Indica i grammi di carboidrati presi (0 se niente).'); return; }
+  const glic = String(s.glicDopo ?? '').trim() === '' ? null : dec(s.glicDopo);
+  if(glic !== null && !(glic >= 20 && glic <= 600)){ alert('La glicemia dopo non sembra un valore in mg/dl.'); return; }
+  const arr = sessioniSport();
+  let rec;
+  if(s.nuova){
+    rec = { id: nuovoId(), quando: Date.now(), attivita:s.attivita, intensita:s.intensita, durata:s.durata,
+      fascia:s.fascia, glic1h:s.glic1h, glic0:s.glic0, suggPrima:s.suggPrima, suggDurante:s.suggDurante,
+      correzione:s.correzione || 0, presiPrima:Math.round(prima*10)/10, presiDurante:Math.round(durante*10)/10,
+      glicDopo:null, esito:null, nota:null };
+    arr.push(rec);
+  } else {
+    rec = arr.find(v => v.id === s.id);
+    if(!rec){ S.sessioneAperta = null; disegna(); return; }
+    rec.presiPrima = Math.round(prima*10)/10; rec.presiDurante = Math.round(durante*10)/10;
+  }
+  let msg = null;
+  if(glic !== null && rec.glicDopo == null){
+    rec.glicDopo = Math.round(glic);
+    const r = autoallinea(rec, rec.glicDopo);
+    rec.esito = r.esito; rec.nota = r.nota;
+    msg = `Glicemia ${rec.glicDopo} mg/dl, ${r.nota}`;
+  }
+  salvaSessioni(arr);
+  S.sessioneAperta = null;
+  disegna();
+  if(msg) alert(msg);
+}
+
 function stratoParametri(){
   const id = S.paramSport; if(!id || !ATTIVITA[id]) return '';
   const a = ATTIVITA[id];
@@ -1581,6 +1706,7 @@ const TABS = [['atlante','Home','casa'],['piatti','Piatti','piatti'],['pasto','P
 const TITOLI = {atlante:'CHO', piatti:'I miei piatti', pasto:'Il tuo pasto', sport:'Attività fisica', peso:'Il tuo peso'};
 
 function disegna(){
+  document.body.dataset.tab = S.tab;
   const h = document.getElementById('titolo');
   h.textContent = TITOLI[S.tab];
   h.style.display = S.tab === 'atlante' ? 'none' : '';
@@ -1613,7 +1739,7 @@ document.addEventListener('click', e => {
   if(a==='tab'){
     /* Rientrando in Sport si riparte sempre dal menu di scelta dell'attività. */
     if(p1 === 'sport' && S.tab !== 'sport') S.sport.attivita = null;
-    S.paramSport = null;
+    S.paramSport = null; S.sessioneAperta = null;
     S.tab = p1;
   }
   else if(a==='cat') S.cat = p1;
@@ -1635,6 +1761,20 @@ document.addEventListener('click', e => {
   else if(a==='att') S.sport.attivita = p1 || null;
   else if(a==='param') S.paramSport = p1;
   else if(a==='chiudiParam') S.paramSport = null;
+  else if(a==='regSport'){
+    const r = calcolaSport(S.sport);
+    S.sessioneAperta = { nuova:true, attivita:S.sport.attivita, intensita:S.sport.intensita,
+      durata:S.sport.durata, fascia:S.sport.fascia, glic1h:S.sport.glic1h, glic0:S.sport.glic0,
+      suggPrima:r.prima, suggDurante:r.durante, correzione:r.correzione,
+      presiPrima:String(r.prima), presiDurante:String(r.durante), glicDopo:'' };
+  }
+  else if(a==='esitoSport'){
+    const x = sessioniSport().find(v => v.id === p1);
+    if(x) S.sessioneAperta = { ...x, nuova:false,
+      presiPrima:String(x.presiPrima), presiDurante:String(x.presiDurante), glicDopo:'' };
+  }
+  else if(a==='chiudiSessione') S.sessioneAperta = null;
+  else if(a==='salvaSessione'){ salvaSessione(); return; }
   else if(a==='nuovo') S.nuovo = 'menu';
   else if(a==='chiudiNuovo'){ fermaScanner(); S.nuovo = null; S.form = null; S.editId = null; S.caricamento = false; }
   else if(a==='nuovoForm'){ S.form = formVuoto(); S.editId = null; S.nuovo = 'form'; }
@@ -1761,6 +1901,9 @@ document.addEventListener('input', e => {
   }
   else if(id === 'fbarcode') S.codice = e.target.value;
   else if(id.startsWith('fi-') && S.form) S.form[id.slice(3)] = e.target.value;
+  else if(id === 'ss-prima' && S.sessioneAperta) S.sessioneAperta.presiPrima = e.target.value;
+  else if(id === 'ss-durante' && S.sessioneAperta) S.sessioneAperta.presiDurante = e.target.value;
+  else if(id === 'ss-glic' && S.sessioneAperta) S.sessioneAperta.glicDopo = e.target.value;
   else if(id.startsWith('pt-') && S.paramSport){
     /* Cella della tabella parametri: si salva subito, senza ridisegnare
        (il ridisegno farebbe perdere il focus mentre si scrive). */
