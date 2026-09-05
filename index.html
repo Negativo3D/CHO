@@ -431,8 +431,16 @@ function autoallinea(s, glicDopo){
 /* Promemoria: la sessione più recente senza esito, registrata da
    almeno un'ora, viene riproposta in Home e in Sport per inserire la
    glicemia dopo l'attività. */
+/* Il promemoria scade alla durata dell'attività più mezz'ora dalla
+   registrazione. Per la corsa la durata si stima dalla distanza
+   (~6 minuti al chilometro). */
+function scadenzaEsito(x){
+  const a = ATTIVITA[x.attivita];
+  const minuti = a && a.cond === 'Distanza' ? (x.cond || 10) * 6 : (x.cond || 60);
+  return x.quando + (minuti + 30) * 60000;
+}
 function promemoriaEsito(){
-  const p = sessioniSport().filter(x => x.glicDopo == null && Date.now() - x.quando > 60*60*1000).pop();
+  const p = sessioniSport().filter(x => x.glicDopo == null && Date.now() >= scadenzaEsito(x)).pop();
   if(!p) return '';
   const a = ATTIVITA[p.attivita] || {};
   return `<button class="card" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;
@@ -470,7 +478,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.5';
+const VERSIONE = '2026-09-05.6';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1394,7 +1402,8 @@ function vistaSport(){
           <span style="font-size:20px;line-height:1">${a.icona||''}</span>
           <div style="flex:1;min-width:0">
             <div style="font-weight:600">${dq} · ${a.nome || ''} ${x.cond != null ? etichettaDi(a.opzioni || [], x.cond) : ''}</div>
-            <div style="font-size:12px;color:var(--ink2)">${gr1(x.presiPrima)} g prima${x.presiDurante ? ` + ${gr1(x.presiDurante)} g durante` : ''}</div>
+            <div style="font-size:12px;color:var(--ink2)">${gr1(x.presiPrima)} g prima${x.presiDurante ? ` + ${gr1(x.presiDurante)} g durante` : ''}${
+              x.glicPrima ? ` · glic. ${x.glicPrima}` : ''}</div>
           </div>
           ${esitoTag}</div>`;
       }).join('')}
@@ -1472,12 +1481,17 @@ function stratoSessione(){
         <div style="flex:1"><div class="etich">CHO presi durante (g)</div>
           <input id="ss-durante" class="campo" inputmode="decimal" value="${esc(String(s.presiDurante))}"></div>
       </div>
-      <div style="margin-bottom:12px"><div class="etich">Glicemia dopo l'attività (mg/dl)</div>
-        <input id="ss-glic" class="campo" inputmode="numeric" placeholder="Compila quando l'hai misurata"
-          value="${esc(String(s.glicDopo ?? ''))}"></div>
-      <p style="font-size:12px;color:var(--ink2)">Con l'esito i parametri di queste condizioni si aggiustano da soli:
-        sotto 70 aumento i CHO, tra 70 e 180 confermo quanto hai preso, sopra 180 li riduco. Puoi salvare adesso
-        e inserire la glicemia più tardi da "Ultime attività".</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <div style="flex:1"><div class="etich">Glicemia prima (mg/dl)</div>
+          <input id="ss-glicprima" class="campo" inputmode="numeric" placeholder="Es. 120"
+            value="${esc(String(s.glicPrima ?? ''))}"></div>
+        <div style="flex:1"><div class="etich">Glicemia dopo (mg/dl)</div>
+          <input id="ss-glic" class="campo" inputmode="numeric" placeholder="Te la ricordo io"
+            value="${esc(String(s.glicDopo ?? ''))}"></div>
+      </div>
+      <p style="font-size:12px;color:var(--ink2)">Salva pure senza la glicemia dopo: te la ricordo io allo scadere
+        dell'attività più mezz'ora. Con l'esito i parametri si aggiustano da soli: sotto 70 aumento i CHO,
+        tra 70 e 180 confermo quanto hai preso, sopra 180 li riduco.</p>
       <button class="primario" style="background:var(--sport)" data-a="salvaSessione">Salva</button>
     </div>
   </div>`;
@@ -1490,18 +1504,22 @@ function salvaSessione(){
   if(!(prima >= 0) || !(durante >= 0)){ alert('Indica i grammi di carboidrati presi (0 se niente).'); return; }
   const glic = String(s.glicDopo ?? '').trim() === '' ? null : dec(s.glicDopo);
   if(glic !== null && !(glic >= 20 && glic <= 600)){ alert('La glicemia dopo non sembra un valore in mg/dl.'); return; }
+  const glicPrima = String(s.glicPrima ?? '').trim() === '' ? null : dec(s.glicPrima);
+  if(glicPrima !== null && !(glicPrima >= 20 && glicPrima <= 600)){ alert('La glicemia prima non sembra un valore in mg/dl.'); return; }
   const arr = sessioniSport();
   let rec;
   if(s.nuova){
     rec = { id: nuovoId(), quando: Date.now(), attivita:s.attivita, cond:s.cond,
       suggPrima:s.suggPrima, suggDurante:s.suggDurante,
       presiPrima:Math.round(prima*10)/10, presiDurante:Math.round(durante*10)/10,
+      glicPrima: glicPrima !== null ? Math.round(glicPrima) : null,
       glicDopo:null, esito:null, nota:null };
     arr.push(rec);
   } else {
     rec = arr.find(v => v.id === s.id);
     if(!rec){ S.sessioneAperta = null; disegna(); return; }
     if(rec.cond == null && s.cond != null) rec.cond = s.cond;
+    if(glicPrima !== null) rec.glicPrima = Math.round(glicPrima);
     rec.presiPrima = Math.round(prima*10)/10; rec.presiDurante = Math.round(durante*10)/10;
   }
   let msg = null;
@@ -1513,9 +1531,41 @@ function salvaSessione(){
   }
   salvaSessioni(arr);
   S.sessioneAperta = null;
+  /* Se resta un esito da inserire, chiedo (una volta) il permesso per
+     le notifiche: servirà a ricordare la glicemia a fine attività. */
+  if(rec.glicDopo == null && 'Notification' in window && Notification.permission === 'default')
+    Notification.requestPermission().catch(() => {});
   disegna();
   if(msg) alert(msg);
 }
+
+/* ---------- promemoria attivo ----------
+   Ogni minuto (e al ritorno in primo piano) si controlla se una
+   sessione ha superato la scadenza: compare il banner e, col permesso,
+   parte una notifica di sistema tramite il service worker. */
+let swReg = null;
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol))
+  navigator.serviceWorker.register('./sw.js').then(r => { swReg = r; }).catch(() => {});
+
+function controllaPromemoria(){
+  const arr = sessioniSport();
+  const daAvvisare = arr.filter(x => x.glicDopo == null && !x.avvisata && Date.now() >= scadenzaEsito(x));
+  if(!daAvvisare.length) return;
+  daAvvisare.forEach(x => { x.avvisata = true; });
+  salvaSessioni(arr);
+  const a = ATTIVITA[daAvvisare[daAvvisare.length-1].attivita] || {};
+  if('Notification' in window && Notification.permission === 'granted' && swReg){
+    swReg.showNotification("Com'è andata l'attività?", {
+      body: `Inserisci la glicemia dopo ${a.nome ? a.nome.toLowerCase() : "l'attività"}: serve a tarare i parametri.`,
+      icon: 'icona-192.png', badge: 'icona-192.png', tag: 'cho-esito'
+    }).catch(() => {});
+  }
+  /* Il banner compare col ridisegno, ma non mentre si sta scrivendo. */
+  const tag = document.activeElement ? document.activeElement.tagName : '';
+  if(!S.nuovo && !S.pform && !S.sessioneAperta && !S.paramSport && tag !== 'INPUT' && tag !== 'TEXTAREA') disegna();
+}
+setInterval(controllaPromemoria, 60 * 1000);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) controllaPromemoria(); });
 
 function stratoParametri(){
   const id = S.paramSport; if(!id || !ATTIVITA[id]) return '';
@@ -1925,6 +1975,7 @@ document.addEventListener('input', e => {
   else if(id === 'ss-prima' && S.sessioneAperta) S.sessioneAperta.presiPrima = e.target.value;
   else if(id === 'ss-durante' && S.sessioneAperta) S.sessioneAperta.presiDurante = e.target.value;
   else if(id === 'ss-glic' && S.sessioneAperta) S.sessioneAperta.glicDopo = e.target.value;
+  else if(id === 'ss-glicprima' && S.sessioneAperta) S.sessioneAperta.glicPrima = e.target.value;
   else if(id.startsWith('pt-') && S.paramSport){
     /* Cella della tabella parametri: si salva subito, senza ridisegnare
        (il ridisegno farebbe perdere il focus mentre si scrive). */
