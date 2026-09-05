@@ -91,11 +91,6 @@
 
   .emt{width:46px;height:46px;border-radius:15px;background:var(--cho-soft);flex:none;
     display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1}
-  .pastoPill{
-    display:flex;align-items:center;gap:8px;width:100%;margin-top:14px;text-align:left;
-    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
-    border-radius:16px;padding:10px 14px;color:#fff;font-size:14px;font-weight:600
-  }
   .griglia{display:grid;grid-template-columns:1fr 1fr;gap:11px}
   .cella{
     position:relative;background:var(--card);border:1px solid var(--line);border-radius:24px;
@@ -177,19 +172,19 @@
   .avvisoBox{display:flex;gap:8px;font-size:14px;border-radius:18px;padding:14px;margin-bottom:16px;line-height:1.5}
 
   nav{
-    position:fixed;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));
-    display:flex;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-    border:1px solid var(--line);border-radius:28px;z-index:20;
-    box-shadow:0 12px 32px rgba(19,32,25,.16)
+    position:fixed;left:12px;right:12px;bottom:calc(6px + env(safe-area-inset-bottom));
+    display:flex;gap:3px;padding:6px;background:rgba(17,28,22,.94);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-radius:999px;z-index:20;
+    box-shadow:0 16px 36px rgba(19,32,25,.4)
   }
-  nav button{flex:1;padding:8px 0 8px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--ink2);position:relative}
-  nav button.on{color:var(--cho)}
-  nav .ic{display:flex;align-items:center;justify-content:center;padding:4px 18px;border-radius:999px}
-  nav button.on .ic{background:var(--cho-soft)}
-  nav .lab{font-size:11px;font-weight:500}
+  nav button{flex:1;padding:8px 0 7px;display:flex;flex-direction:column;align-items:center;gap:2px;
+    color:#8EA396;position:relative;border-radius:999px;transition:background .18s ease,color .18s ease}
+  nav button.on{color:#fff;background:linear-gradient(135deg,#16B47E,#0A5C41);
+    box-shadow:0 6px 16px rgba(14,122,87,.45)}
+  nav .ic{display:flex;align-items:center;justify-content:center}
+  nav .lab{font-size:10px;font-weight:600;letter-spacing:.2px}
   nav button.on .lab{font-weight:700}
-  .badge{position:absolute;top:4px;left:50%;margin-left:6px;background:var(--cho);color:#fff;font-size:10px;
-    font-weight:700;width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center}
 
   .velo{position:fixed;inset:0;background:rgba(19,32,25,.5);z-index:40;display:flex;align-items:flex-end}
   .foglio{width:100%;background:var(--bg);border-radius:26px 26px 0 0;padding:20px 20px 34px;max-height:88vh;overflow-y:auto}
@@ -532,7 +527,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.12';
+const VERSIONE = '2026-09-05.13';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -754,9 +749,8 @@ function esportaDati(){
 }
 
 let S = {
-  tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
+  tab:'atlante', preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', vedi:'tutto', aperto:null, gr:100,
-  scegliPasto:null, qp:'',
   qr:'', ricettaAperta:null, rform:null, editRicettaId:null,
   sport:{ attivita:null, cond:60, glic:'' },
   paramSport:null, sessioneAperta:null,
@@ -992,26 +986,16 @@ const CAT_EMOJI = {
 };
 
 function vistaAtlante(){
-  const ora = new Date().getHours();
-  const saluto = ora < 6 ? 'Notte fonda 🌙' : ora < 13 ? 'Buongiorno 🌅' : ora < 18 ? 'Buon pomeriggio ☀️' : 'Buonasera 🌙';
-  const dataOggi = new Date().toLocaleDateString('it-IT', { weekday:'long', day:'numeric', month:'long' });
-  const t = totali();
+  const dataOggi = new Date().toLocaleDateString('it-IT', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const hero = `
-    <div style="text-align:center;font-size:11px;color:var(--ink2);padding:10px 0 0">CHO · versione ${VERSIONE}</div>
     ${promemoriaEsito()}
-    <div class="hero">
+    <div class="hero" style="margin-top:12px">
       <button class="fab fabHero" data-a="nuovo" aria-label="Aggiungi alimento o piatto">${ico('piu',24)}</button>
       <div style="padding-right:60px">
         <div class="occhiello">CHO · Conta carboidrati</div>
-        <div class="titolone">${saluto}<br>Cosa mangi oggi?</div>
-        <div class="datali">${dataOggi}</div>
+        <div class="titolone" style="text-transform:capitalize">${dataOggi}</div>
+        <div style="font-size:11px;font-weight:600;opacity:.65;margin-top:8px">Versione ${VERSIONE}</div>
       </div>
-      ${S.pasto.length ? `
-        <button class="pastoPill" data-a="tab:pasto">
-          <span style="font-size:18px">🍽️</span>
-          <span style="flex:1">Nel pasto: <b class="num">${gr1(t.cho)} g</b> di carboidrati · ${S.pasto.length} aliment${S.pasto.length===1?'o':'i'}</span>
-          <span style="opacity:.8">›</span>
-        </button>` : ''}
     </div>`;
 
   if(!FOODS.length && !PIATTI.length) return `
@@ -1215,137 +1199,6 @@ function salvaRicetta(){
 }
 function fotoRicetta(){ scegliFoto(d => { if(S.rform){ S.rform.foto = d; disegna(); } }); }
 
-/* ---------- schermata: pasto ---------- */
-function totali(){
-  let cho=0,f=0,p=0,max=0,ig='medio',alcol=false;
-  S.pasto.forEach(v => {
-    const c = v.cibo.cho*v.g/100;
-    cho+=c; f+=v.cibo.f*v.g/100; p+=v.cibo.p*v.g/100;
-    if(c>max){ max=c; ig=v.cibo.ig; }
-    if(v.cibo.alcol) alcol=true;
-  });
-  return {cho,f,p,ig,alcol};
-}
-
-function vistaPasto(){
-  if(!S.pasto.length) return `
-    <div class="hero" style="text-align:center">
-      <button class="fab fabHero" data-a="pastoPiu" aria-label="Aggiungi alimenti e piatti al pasto">${ico('piu',24)}</button>
-      <div style="font-size:44px">🍽️</div>
-      <div class="titolone" style="margin-top:6px">Il pasto è vuoto</div>
-      <div class="datali" style="text-transform:none">Tocca + per scegliere alimenti e piatti dalla tua anagrafica:
-        qui vedrai la somma dei carboidrati e la forma di bolo suggerita.</div>
-    </div>`;
-
-  const t = totali();
-  const b = calcolaBolo(t.cho, t.f, t.p, t.ig);
-
-  const lista = S.pasto.map((v,i) => `
-    <div class="card riga" style="border-radius:22px;box-shadow:0 3px 10px rgba(19,32,25,.05)">
-      ${v.cibo.foto ? `<img class="emt" src="${v.cibo.foto}" alt="" style="object-fit:cover">` : `<span class="emt">${v.cibo.e}</span>`}
-      <div style="flex:1;min-width:0">
-        <div class="nome">${esc(v.cibo.n)}</div><div class="sotto">${gr1(v.g)} g</div>
-      </div>
-      <span class="chopill num">${gr1(v.cibo.cho*v.g/100)} g</span>
-      <button style="padding:8px;color:#B9C2BB" data-a="togli:${i}">${ico('cestino',18)}</button>
-    </div>`).join('');
-
-  const barra = b.split ? `
-    <div style="display:flex;height:36px;border-radius:12px;overflow:hidden;border:1px solid #EBD5B4;margin-bottom:8px">
-      <div style="width:${b.split[0]}%;background:var(--wave);color:#fff;font-weight:700;font-size:13px;
-        display:flex;align-items:center;justify-content:center">${b.split[0]}% subito</div>
-      <div style="width:${b.split[1]}%;background:#F3DFBF;color:var(--wave);font-weight:700;font-size:13px;
-        display:flex;align-items:center;justify-content:center">${b.split[1]}% esteso</div>
-    </div>
-    <div style="font-size:12px;color:var(--ink2);margin-bottom:8px">Durata della coda: ${b.durata}</div>`
-    : (b.durata ? `<p style="font-size:14px">Erogazione distribuita su ${b.durata}.</p>` : '');
-
-  return `
-    <div class="totale" style="position:relative">
-      <button class="fab fabHero" data-a="pastoPiu" aria-label="Aggiungi altri alimenti o piatti">${ico('piu',24)}</button>
-      <div class="big num">${gr1(t.cho)}</div>
-      <div style="font-weight:600;margin-top:4px">grammi di carboidrati</div>
-      <div style="font-size:14px;opacity:.85;margin-top:4px">
-        ${gr1(t.f)} g grassi · ${gr1(t.p)} g proteine · ${b.ugp.toFixed(1)} UGP</div>
-    </div>
-    ${lista}
-    <div class="box" style="background:var(--wave-soft);border:1px solid #F0DFC4;margin-top:16px;box-shadow:0 4px 14px rgba(168,91,12,.1)">
-      <div style="font-weight:700;color:var(--wave);margin-bottom:12px">🌊 ${b.tipo}</div>
-      ${barra}
-      ${b.prebolo ? `<p style="font-size:14px">Momento del bolo: ${b.prebolo}.</p>` : ''}
-      <p style="font-size:14px;color:var(--ink2);margin:0">${b.spiega}</p>
-    </div>
-    ${t.alcol ? `<div class="avvisoBox" style="background:var(--hypo-soft);color:var(--hypo)">
-      <span>⚠️</span><span>Il pasto contiene alcol. L'ipoglicemia può presentarsi diverse ore dopo, tipicamente di notte.</span></div>` : ''}
-    <div class="avvisoBox" style="background:var(--card);border:1px solid var(--line);color:var(--ink2)">
-      <span>ℹ️</span><span>Inserisci i grammi di carboidrati nel microinfusore: sarà lui a calcolare le unità con i rapporti
-      impostati dal tuo diabetologo. Percentuali e durate qui sopra sono un punto di partenza da tarare con il tuo team.</span></div>
-    <button class="card" style="width:100%;padding:14px;color:var(--ink2);font-weight:600" data-a="svuota">Svuota il pasto</button>`;
-}
-
-/* ---------- schermata: piatti ---------- */
-/* ---------- strato: aggiunta al pasto (scelta e liste) ---------- */
-function stratoScegliPasto(){
-  const m = S.scegliPasto; if(!m) return '';
-  const testa = tit => `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div style="font-weight:700;font-size:19px">${tit}</div>
-      <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiScegli">${ico('chiudi',20)}</button>
-    </div>`;
-
-  if(m === 'menu') return `
-  <div class="velo" data-a="chiudiScegli">
-    <div class="foglio" data-stop="1">
-      ${testa('Cosa aggiungi al pasto?')}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:8px"
-          data-a="pastoLista:alimenti">
-          <span style="font-size:34px;line-height:1">🥦</span>
-          <span style="font-weight:700">Alimento</span>
-        </button>
-        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:8px"
-          data-a="pastoLista:piatti">
-          <span style="font-size:34px;line-height:1">🍽️</span>
-          <span style="font-weight:700">Piatto</span>
-        </button>
-      </div>
-    </div>
-  </div>`;
-
-  const qn = S.qp.trim() ? norm(S.qp.trim()) : null;
-  const righe = m === 'alimenti'
-    ? FOODS.filter(f => !qn || norm(f.n).includes(qn)).map(f => `
-      <button class="card riga" style="width:100%;text-align:left" data-a="apri:${f.id}">
-        ${f.foto ? `<img class="emt" src="${f.foto}" alt="" style="object-fit:cover">` : `<span class="emt">${f.e}</span>`}
-        <span style="flex:1;min-width:0"><span class="nome" style="display:block">${esc(f.n)}</span>
-          <span class="sotto" style="display:block">${f.cho} g CHO per 100 g</span></span>
-        <span class="chopill num">${f.cho} g</span>
-      </button>`)
-    : PIATTI.filter(pl => !qn || norm(pl.n).includes(qn)).map(pl => {
-      const t = totaliPiatto(pl.ing);
-      return `
-      <button class="card riga" style="width:100%;text-align:left" data-a="apriPiatto:${pl.id}">
-        ${pl.foto ? `<img class="emt" src="${pl.foto}" alt="" style="object-fit:cover">` : `<span class="emt">${pl.e}</span>`}
-        <span style="flex:1;min-width:0"><span class="nome" style="display:block">${esc(pl.n)}</span>
-          <span class="sotto" style="display:block">${pl.ing.length} ingredient${pl.ing.length===1?'e':'i'}</span></span>
-        <span class="chopill num" style="background:linear-gradient(135deg,#C97B1F,#A85B0C)">${gr1(t.cho)} g</span>
-      </button>`;
-    });
-
-  return `
-  <div class="velo" data-a="chiudiScegli">
-    <div class="foglio" data-stop="1">
-      ${testa(m === 'alimenti' ? 'Scegli un alimento' : 'Scegli un piatto')}
-      <div class="cerca" style="margin-bottom:10px">${ico('cerca',20)}
-        <input id="qp" placeholder="Cerca" value="${esc(S.qp)}">
-      </div>
-      ${righe.length ? righe.join('')
-        : `<div style="text-align:center;padding:30px 0;color:var(--ink2)">${
-            m === 'alimenti' ? 'Nessun alimento trovato.' : 'Nessun piatto ancora: creane uno dalla Home col +.'}</div>`}
-    </div>
-  </div>`;
-}
-
 /* ---------- strato: uso di un piatto ---------- */
 function stratoPiattoUso(){
   if(!S.uso) return '';
@@ -1393,7 +1246,6 @@ function stratoPiattoUso(){
           · ${b.tipo}${b.split ? ` ${b.split[0]}/${b.split[1]}%` : ''}${b.durata ? ` su ${b.durata}` : ''}</div>
       </div>
       ${righe}
-      <button class="primario" style="margin-top:6px" data-a="usoAggiungi">Aggiungi al pasto</button>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2)" data-a="modificaPiatto:${pl.id}">Modifica</button>
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--hypo)" data-a="eliminaPiatto:${pl.id}">Elimina</button>
@@ -1403,7 +1255,7 @@ function stratoPiattoUso(){
 }
 
 function stratiHTML(){
-  return stratoScegliPasto() + (S.aperto ? stratoPorzione() : '') + stratoNuovo() + stratoPiattoUso() + stratoPiattoForm()
+  return (S.aperto ? stratoPorzione() : '') + stratoNuovo() + stratoPiattoUso() + stratoPiattoForm()
     + (S.ricettaAperta ? stratoRicetta() : '') + stratoRicettaForm()
     + (S.paramSport ? stratoParametri() : '') + (S.sessioneAperta ? stratoSessione() : '')
     + (leggi().avvisoVisto ? '' : stratoAvviso());
@@ -1573,6 +1425,7 @@ function vistaPeso(){
   const ultimo = PESO[PESO.length-1], prec = PESO[PESO.length-2];
   const delta = ultimo && prec ? Math.round((ultimo.kg - prec.kg)*10)/10 : null;
   const hero = `
+    <button class="chip" data-a="tab:sport" style="margin:10px 0 2px">‹ Attività fisica</button>
     <div class="hero blu">
       <div class="occhiello">Registro del peso</div>
       ${ultimo ? `
@@ -1642,6 +1495,15 @@ function vistaSport(){
           <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
         </button>`).join('')}
     </div>
+    <button class="card" style="width:100%;display:flex;align-items:center;gap:12px;padding:13px 14px;margin-bottom:12px;text-align:left" data-a="tab:peso">
+      <span style="width:42px;height:42px;border-radius:14px;background:#E3EDF8;color:#2E6BB0;display:flex;
+        align-items:center;justify-content:center;flex:none">${ico('peso',22)}</span>
+      <span style="flex:1;min-width:0">
+        <span style="display:block;font-weight:700">Il tuo peso</span>
+        <span style="display:block;font-size:12px;color:var(--ink2)">Registro e andamento nel tempo</span>
+      </span>
+      <span style="color:var(--ink2);font-weight:700">›</span>
+    </button>
     ${sess.length ? `
     <div class="card" style="padding:12px 14px">
       <div style="font-weight:700;font-size:14px;margin-bottom:4px">Ultime attività</div>
@@ -1903,7 +1765,7 @@ function stratoPorzione(){
       <div class="chips-wrap">${f.porz.map(([l,v]) => chip(l, S.gr===v, 'gset:'+v)).join('')}</div>
       ${f.alcol ? `<div class="avvisoBox" style="background:var(--hypo-soft);color:var(--hypo)">
         <span>⚠️</span><span>L'alcol può causare ipoglicemie anche molte ore dopo, soprattutto di notte.</span></div>` : ''}
-      <button class="primario" data-a="aggiungi">Aggiungi al pasto</button>
+      <button class="primario" data-a="chiudi">Fatto</button>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2)" data-a="modifica:${f.id}">Modifica</button>
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--hypo)" data-a="elimina:${f.id}">Elimina</button>
@@ -2027,10 +1889,10 @@ function stratoAvviso(){
     <div class="modale">
       <div style="font-size:28px">⚠️</div>
       <div style="font-size:20px;font-weight:700;margin:8px 0 10px">Uno strumento di conteggio, non di dosaggio</div>
-      <p style="font-size:14px;color:var(--ink2)">Questa app calcola i grammi di carboidrati di un pasto e suggerisce
-      una forma di bolo. Non calcola unità di insulina per i pasti: quelle restano al microinfusore, con i rapporti
-      impostati dal tuo diabetologo. L'unica eccezione è il bolo correttivo per lo sport, calcolato con soglia,
-      FSI e obiettivo che imposti tu nei parametri.</p>
+      <p style="font-size:14px;color:var(--ink2)">Questa app calcola i grammi di carboidrati di alimenti e piatti e
+      suggerisce una forma di bolo. Non calcola unità di insulina per i pasti: quelle restano al microinfusore, con
+      i rapporti impostati dal tuo diabetologo. L'unica eccezione è il bolo correttivo per lo sport, calcolato con
+      soglia, FSI e obiettivo che imposti tu nei parametri.</p>
       <p style="font-size:14px;color:var(--ink2);margin-bottom:20px">I valori degli alimenti sono indicativi e cambiano
       con marca, ricetta e cottura. Verifica sempre le etichette e concorda schemi e correzioni con il tuo team.</p>
       <button class="primario" style="background:var(--ink)" data-a="ok">Ho capito</button>
@@ -2039,8 +1901,8 @@ function stratoAvviso(){
 }
 
 /* ---------- disegno ---------- */
-const TABS = [['atlante','Home','casa'],['pasto','Pasto','piatto'],['ricette','Ricette','libro'],['sport','Sport','sport'],['peso','Peso','peso']];
-const TITOLI = {atlante:'CHO', pasto:'Il tuo pasto', ricette:'Ricettario', sport:'Attività fisica', peso:'Il tuo peso'};
+const TABS = [['atlante','Home','casa'],['ricette','Ricette','libro'],['sport','Sport','sport']];
+const TITOLI = {atlante:'CHO', ricette:'Ricettario', sport:'Attività fisica', peso:'Il tuo peso'};
 
 function disegna(){
   document.body.dataset.tab = S.tab;
@@ -2051,12 +1913,11 @@ function disegna(){
   /* Le animazioni d'ingresso partono solo cambiando schermata, non a ogni tocco. */
   v.classList.toggle('anim', S.tab !== disegna.ultimoTab);
   disegna.ultimoTab = S.tab;
-  v.innerHTML = S.tab==='atlante' ? vistaAtlante() : S.tab==='pasto' ? vistaPasto()
+  v.innerHTML = S.tab==='atlante' ? vistaAtlante()
     : S.tab==='ricette' ? vistaRicette() : S.tab==='peso' ? vistaPeso() : vistaSport();
   document.getElementById('nav').innerHTML = TABS.map(([id,l,i]) => `
-    <button class="${S.tab===id?'on':''}" data-a="tab:${id}">
+    <button class="${S.tab===id || (id==='sport' && S.tab==='peso') ? 'on':''}" data-a="tab:${id}">
       <span class="ic">${ico(i)}</span><span class="lab">${l}</span>
-      ${id==='pasto' && S.pasto.length ? `<span class="badge">${S.pasto.length}</span>` : ''}
     </button>`).join('');
   document.getElementById('strati').innerHTML =
     stratiHTML();
@@ -2076,7 +1937,7 @@ document.addEventListener('click', e => {
   if(a==='tab'){
     /* Rientrando in Sport si riparte sempre dal menu di scelta dell'attività. */
     if(p1 === 'sport' && S.tab !== 'sport'){ S.sport.attivita = null; S.sport.glic = ''; }
-    S.paramSport = null; S.sessioneAperta = null; S.scegliPasto = null;
+    S.paramSport = null; S.sessioneAperta = null;
     S.ricettaAperta = null; S.rform = null; S.editRicettaId = null;
     S.tab = p1;
   }
@@ -2092,8 +1953,6 @@ document.addEventListener('click', e => {
     S.gr = Math.round((p1==='+' ? S.gr+passo : Math.max(0.5, S.gr-passo))*10)/10;
   }
   else if(a==='gset') S.gr = +p1;
-  else if(a==='aggiungi'){ S.pasto.push({cibo: cibo(S.aperto), g: S.gr}); S.aperto = null; S.scegliPasto = null; }
-  else if(a==='pastoPiu'){ S.scegliPasto = 'menu'; S.qp = ''; }
   else if(a==='ricNuova'){ S.rform = { n:'', foto:null, ing:'', proc:'' }; S.editRicettaId = null; }
   else if(a==='ricApri') S.ricettaAperta = p1;
   else if(a==='ricChiudi') S.ricettaAperta = null;
@@ -2113,10 +1972,6 @@ document.addEventListener('click', e => {
   else if(a==='ricSalva'){ salvaRicetta(); return; }
   else if(a==='ricFoto'){ fotoRicetta(); return; }
   else if(a==='ricFotoX'){ if(S.rform) S.rform.foto = null; }
-  else if(a==='pastoLista'){ S.scegliPasto = p1; S.qp = ''; }
-  else if(a==='chiudiScegli'){ S.scegliPasto = null; S.qp = ''; }
-  else if(a==='togli') S.pasto.splice(+p1,1);
-  else if(a==='svuota') S.pasto = [];
   else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
   else if(a==='att'){
     /* Si riparte senza condizione né glicemia: la proposta arriva solo
@@ -2201,17 +2056,6 @@ document.addEventListener('click', e => {
       }
     }
   }
-  else if(a==='usoAggiungi'){
-    if(S.uso){
-      let n = 0;
-      for(const i of S.uso.ing){
-        const c = cibo(i.alimento), g = grIng(i);
-        if(c && g > 0){ S.pasto.push({ cibo:{...c}, g: Math.round(g*10)/10 }); n++; }
-      }
-      S.uso = null; S.scegliPasto = null;
-      if(n) S.tab = 'pasto';
-    }
-  }
   else if(a==='modificaPiatto'){
     const pl = PIATTI.find(x => x.id === p1);
     if(pl){ S.pform = { n:pl.n, e:pl.e, foto:pl.foto, ing: pl.ing.map(i => ({...i})) }; S.editPiattoId = p1; S.uso = null; S.pingQ = ''; }
@@ -2274,12 +2118,6 @@ document.addEventListener('input', e => {
     v.innerHTML = vistaAtlante();
     const q = document.getElementById('q');
     q.focus(); q.setSelectionRange(q.value.length, q.value.length);
-  }
-  else if(id === 'qp'){
-    S.qp = e.target.value;
-    document.getElementById('strati').innerHTML = stratiHTML();
-    const el = document.getElementById('qp');
-    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   }
   else if(id === 'qr'){
     S.qr = e.target.value;
