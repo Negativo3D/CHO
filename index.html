@@ -69,9 +69,6 @@
     background:radial-gradient(circle,rgba(255,255,255,.25),rgba(255,255,255,0) 70%);top:-40px;right:-30px}
   .tile .em{font-size:40px;line-height:1;position:relative}
   .tile .nomeT{font-weight:800;font-size:13px;letter-spacing:.8px;position:relative}
-  .tile .apriT{display:flex;flex-direction:column;align-items:center;gap:9px;width:100%;color:#fff;padding:0}
-  .ingrT{position:absolute;top:6px;right:6px;z-index:2;width:30px;height:30px;border-radius:999px;
-    background:rgba(255,255,255,.24);color:#fff;display:flex;align-items:center;justify-content:center}
 
   .tparam{width:100%;border-collapse:separate;border-spacing:4px 6px;table-layout:fixed}
   .tparam thead th{font-size:11px;font-weight:600;color:var(--ink2);text-align:center;padding:0 2px}
@@ -334,15 +331,21 @@ const ATTIVITA = {
 const INTENSITA = [['leggera','Leggera'],['moderata','Moderata'],['intensa','Intensa']];
 const FASCE = [['mattina','Mattina'],['pomeriggio','Pomeriggio'],['sera','Sera']];
 const DURATE = [[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']];
+const GLICEMIE = [['bassa','Bassa'],['range','In range'],['alta','Alta']];
+const MOMENTI_GLIC = [['unora','1 h prima'],['subito','Subito prima']];
 
 /* Ogni sport ha una tabella di grammi di CHO compilabile dall'utente
    (pulsante "parametri"): "prima" per intensità × fascia oraria,
-   "durante" per intensità × durata. La schermata Sport non calcola
-   nulla: richiama la cella corrispondente alle condizioni scelte.
+   "durante" per intensità × durata, più le correzioni per la glicemia
+   misurata un'ora prima e subito prima di partire (grammi da sommare
+   al "prima": possono essere negativi). La schermata Sport non calcola
+   nulla: richiama le celle corrispondenti alle condizioni scelte.
    I valori di partenza riproducono le vecchie fasce orientative. */
 function tabellaDefault(id){
   const att = ATTIVITA[id] || ATTIVITA.nuoto;
-  const t = { prima:{}, durante:{} };
+  const t = { prima:{}, durante:{}, glicemia:{
+    bassa:{ unora:10, subito:15 }, range:{ unora:0, subito:0 }, alta:{ unora:-5, subito:-10 }
+  } };
   for(const [iv] of INTENSITA){
     const fInt = iv === 'leggera' ? 0.5 : iv === 'moderata' ? 1 : 1.4;
     t.prima[iv] = {}; t.durante[iv] = {};
@@ -360,11 +363,12 @@ function tabellaDefault(id){
 function tabellaSport(id){
   const salvata = (leggi().tabelleSport || {})[id] || {};
   const t = tabellaDefault(id);
-  for(const sez of ['prima','durante'])
+  for(const sez of ['prima','durante','glicemia'])
     for(const riga in t[sez])
       for(const col in t[sez][riga]){
         const v = salvata[sez] && salvata[sez][riga] ? salvata[sez][riga][col] : undefined;
-        if(typeof v === 'number' && isFinite(v) && v >= 0) t[sez][riga][col] = v;
+        /* Le correzioni glicemia possono essere negative, le altre celle no. */
+        if(typeof v === 'number' && isFinite(v) && (sez === 'glicemia' || v >= 0)) t[sez][riga][col] = v;
       }
   return t;
 }
@@ -374,13 +378,14 @@ function salvaCella(id, sez, riga, col, val){
   const s = t[sez] || (t[sez] = {});
   const r = s[riga] || (s[riga] = {});
   const n = parseFloat(String(val).replace(',', '.'));
-  if(isFinite(n) && n >= 0) r[col] = Math.round(n); else delete r[col];
+  if(isFinite(n) && (sez === 'glicemia' || n >= 0)) r[col] = Math.round(n); else delete r[col];
   scrivi({ tabelleSport: tutte });
 }
 
-function calcolaSport({ attivita, intensita, durata, fascia }) {
+function calcolaSport({ attivita, intensita, durata, fascia, glic1h, glic0 }) {
   const t = tabellaSport(attivita);
-  const prima = t.prima[intensita][fascia];
+  const correzione = t.glicemia[glic1h].unora + t.glicemia[glic0].subito;
+  const prima = Math.max(0, t.prima[intensita][fascia] + correzione);
   const durante = t.durante[intensita][durata];
 
   // Profilo basale: forma della riduzione temporanea e anticipo.
@@ -396,7 +401,7 @@ function calcolaSport({ attivita, intensita, durata, fascia }) {
     anticipo: "Nessun anticipo necessario"
   };
 
-  return { prima, durante, basale };
+  return { prima, durante, correzione, basale };
 }
 
 
@@ -424,7 +429,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-04.15';
+const VERSIONE = '2026-09-05.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -606,7 +611,7 @@ function esportaDati(){
 let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', aperto:null, gr:100,
-  sport:{ attivita:null, intensita:'moderata', durata:60, fascia:'pomeriggio' },
+  sport:{ attivita:null, intensita:'moderata', durata:60, fascia:'pomeriggio', glic1h:'range', glic0:'range' },
   paramSport:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
   uso:null, pform:null, editPiattoId:null, pingQ:'',
@@ -1288,12 +1293,9 @@ function vistaSport(){
     </div>
     <div class="attivita">
       ${Object.entries(ATTIVITA).map(([id,a],i) => `
-        <div class="tile" style="animation-delay:${i*60}ms">
-          <button class="apriT" data-a="att:${id}">
-            <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
-          </button>
-          <button class="ingrT" data-a="param:${id}" aria-label="Parametri ${a.nome}">${ico('regola',16)}</button>
-        </div>`).join('')}
+        <button class="tile" style="animation-delay:${i*60}ms" data-a="att:${id}">
+          <span class="em">${a.icona}</span><span class="nomeT">${a.nome.toUpperCase()}</span>
+        </button>`).join('')}
     </div>`;
 
   const att = ATTIVITA[s.attivita];
@@ -1322,11 +1324,14 @@ function vistaSport(){
       ${G('Intensità', INTENSITA, 'intensita')}
       ${G('Durata', DURATE, 'durata')}
       ${G('Fascia oraria', FASCE, 'fascia')}
+      ${G("Glicemia 1 h prima", GLICEMIE, 'glic1h')}
+      ${G('Glicemia subito prima', GLICEMIE, 'glic0')}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="box eroeViola" style="margin:0;padding:14px 16px">
         <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.prima}<span style="font-size:17px;font-weight:700"> g</span></div>
-        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.prima===0 ? 'niente prima di partire' : 'prima, senza bolo'}</div>
+        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.prima===0 ? 'niente prima di partire' : 'prima, senza bolo'}${
+          r.correzione ? ` · ${r.correzione>0?'+':''}${r.correzione} g glicemia` : ''}</div>
       </div>
       <div class="box" style="margin:0;padding:14px 16px;background:var(--sport);color:#fff;box-shadow:0 4px 14px rgba(75,79,184,.3)">
         <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.durante}<span style="font-size:17px;font-weight:700"> g</span></div>
@@ -1349,13 +1354,14 @@ function stratoParametri(){
   const id = S.paramSport; if(!id || !ATTIVITA[id]) return '';
   const a = ATTIVITA[id];
   const t = tabellaSport(id);
-  const tab = (sez, cols, titolo, sotto) => `
+  const tab = (sez, righe, cols, titolo, sotto, negativi) => `
     <div style="font-weight:700;margin:16px 0 2px">${titolo}</div>
     <div style="font-size:12px;color:var(--ink2);margin-bottom:8px">${sotto}</div>
     <table class="tparam">
       <thead><tr><th></th>${cols.map(([,l]) => `<th>${l}</th>`).join('')}</tr></thead>
-      <tbody>${INTENSITA.map(([iv,il]) => `<tr><th>${il}</th>${cols.map(([cv]) => `
-        <td><input type="number" inputmode="numeric" min="0" id="pt-${sez}-${iv}-${cv}" value="${t[sez][iv][cv]}"></td>`).join('')}</tr>`).join('')}
+      <tbody>${righe.map(([rv,rl]) => `<tr><th>${rl}</th>${cols.map(([cv]) => `
+        <td><input type="number" inputmode="${negativi?'text':'numeric'}" ${negativi?'':'min="0"'}
+          id="pt-${sez}-${rv}-${cv}" value="${t[sez][rv][cv]}"></td>`).join('')}</tr>`).join('')}
       </tbody></table>`;
   return `
   <div class="velo" data-a="chiudiParam">
@@ -1369,8 +1375,10 @@ function stratoParametri(){
       </div>
       <p style="font-size:13px;color:var(--ink2)">Grammi di carboidrati per ogni condizione: la schermata Sport
         richiama la cella che corrisponde a intensità, durata e fascia scelte. Si salvano da soli su questo telefono.</p>
-      ${tab('prima', FASCE, 'CHO prima di partire', 'Grammi per intensità (righe) e fascia oraria (colonne).')}
-      ${tab('durante', DURATE, "CHO durante l'attività", 'Grammi totali della sessione, per intensità e durata.')}
+      ${tab('prima', INTENSITA, FASCE, 'CHO prima di partire', 'Grammi per intensità (righe) e fascia oraria (colonne).')}
+      ${tab('durante', INTENSITA, DURATE, "CHO durante l'attività", 'Grammi totali della sessione, per intensità e durata.')}
+      ${tab('glicemia', GLICEMIE, MOMENTI_GLIC, 'Correzione per glicemia',
+        'Grammi da sommare al "prima" secondo la glicemia misurata 1 ora prima e subito prima di partire. Valori negativi = meno carboidrati.', true)}
       <button class="primario" style="background:var(--sport);margin-top:18px" data-a="chiudiParam">Fatto</button>
     </div>
   </div>`;
