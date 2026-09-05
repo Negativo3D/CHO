@@ -329,27 +329,27 @@ function calcolaBolo(cho, grassi, proteine, igPrevalente) {
    trekking) o la distanza in km (corsa). Per ogni valore c'è una riga
    di parametri compilabile (CHO prima e durante); i valori di partenza
    sotto ("base": [prima, durante]) sono indicativi. */
-/* "base" per ogni durata/distanza: [CHO prima (g), basale esercizio
-   (riduzione %), anticipo del basale (minuti prima della partenza)].
-   Tutto modificabile dai parametri dello sport. */
+/* "base" per ogni durata/distanza: [CHO prima (g), anticipo in minuti
+   con cui applicare il profilo basale "Esercizio" del microinfusore
+   rispetto alla partenza]. Tutto modificabile dai parametri. */
 const ATTIVITA = {
   nuoto:    { nome:'Nuoto',    icona:'🏊', sotto:'Aerobica in acqua',        cond:'Durata',
     opzioni:[[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']],
-    base:{ 30:[10,20,60], 60:[18,40,60], 90:[20,50,75], 120:[25,50,90] } },
+    base:{ 30:[10,60], 60:[18,60], 90:[20,75], 120:[25,90] } },
   corsa:    { nome:'Corsa',    icona:'🏃', sotto:'Aerobica ad alto consumo', cond:'Distanza',
     opzioni:[[5,'5 km'],[10,'10 km'],[15,'15 km'],[21,'21 km']],
-    base:{ 5:[15,40,60], 10:[22,40,60], 15:[26,50,75], 21:[30,50,90] } },
+    base:{ 5:[15,60], 10:[22,60], 15:[26,75], 21:[30,90] } },
   trekking: { nome:'Trekking', icona:'🥾', sotto:'Camminata lunga',          cond:'Durata',
     opzioni:[[30,'30 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']],
-    base:{ 30:[8,20,60], 60:[14,30,60], 90:[16,40,75], 120:[20,40,90] } }
+    base:{ 30:[8,60], 60:[14,60], 90:[16,75], 120:[20,90] } }
 };
 
 function tabellaDefault(id){
   const att = ATTIVITA[id] || ATTIVITA.nuoto;
   const t = { voci:{} };
   for(const [v] of att.opzioni){
-    const b = att.base[v] || [0, 0, 60];
-    t.voci[v] = { prima:b[0], basale:b[1], anticipo:b[2] };
+    const b = att.base[v] || [0, 60];
+    t.voci[v] = { prima:b[0], anticipo:b[1] };
   }
   return t;
 }
@@ -400,10 +400,10 @@ function calcolaSport({ attivita, cond, glic }) {
   const g = parseFloat(String(glic ?? '').replace(',', '.'));
   const glicOk = isFinite(g) && g >= 20 && g <= 600;
 
-  /* Basale esercizio: riduzione % e anticipo presi dalla riga della
-     tabella per la durata/distanza scelta. */
-  const v = cond != null ? (tabellaSport(attivita).voci[cond] || { prima:0, basale:0, anticipo:60 }) : null;
-  const basale = v ? { pct: v.basale, anticipo: v.anticipo } : null;
+  /* Profilo basale "Esercizio": l'app dice solo quale profilo usare e
+     con quanti minuti di anticipo applicarlo, dalla riga scelta. */
+  const v = cond != null ? (tabellaSport(attivita).voci[cond] || { prima:0, anticipo:60 }) : null;
+  const basale = v ? { anticipo: v.anticipo } : null;
 
   /* Nessuna proposta CHO finché mancano la condizione o la glicemia. */
   if(cond == null || !glicOk) return { pronto:false, basale, prima:0, correzione:0 };
@@ -535,7 +535,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.27';
+const VERSIONE = '2026-09-05.28';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1805,18 +1805,14 @@ function vistaSport(){
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       ${boxPrima(r, att)}
-      ${r.basale ? (r.basale.pct > 0 ? `
+      ${r.basale ? `
       <div class="box" style="margin:0;padding:14px 16px;background:var(--sport);color:#fff;box-shadow:0 4px 14px rgba(75,79,184,.3)">
-        <div class="num" style="font-size:38px;font-weight:800;line-height:1">−${r.basale.pct}<span style="font-size:17px;font-weight:700">%</span></div>
-        <div style="font-size:12px;opacity:.9;margin-top:5px">basale esercizio · da ${r.basale.anticipo} min prima</div>
+        <div style="font-size:24px;font-weight:800;line-height:1.15">Basale<br>Esercizio</div>
+        <div style="font-size:12px;opacity:.9;margin-top:6px">da applicare ${r.basale.anticipo} min prima</div>
       </div>` : `
-      <div class="box" style="margin:0;padding:14px 16px;background:var(--sport);color:#fff;box-shadow:0 4px 14px rgba(75,79,184,.3)">
-        <div class="num" style="font-size:26px;font-weight:800;line-height:1.2">Profilo<br>abituale</div>
-        <div style="font-size:12px;opacity:.9;margin-top:5px">nessuna riduzione basale</div>
-      </div>`) : `
       <div class="box" style="margin:0;padding:14px 16px;background:var(--card);border:1px dashed var(--line);box-shadow:none">
         <div class="num" style="font-size:34px;font-weight:800;line-height:1;color:var(--ink2)">—</div>
-        <div style="font-size:12px;color:var(--ink2);margin-top:5px">basale esercizio</div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:5px">basale Esercizio</div>
       </div>`}
     </div>`;
 }
@@ -1838,7 +1834,7 @@ function stratoSessione(){
       </div>
       <p style="font-size:13px;color:var(--ink2)">${a.nome}${s.cond != null ? ' · ' + etichettaDi(a.opzioni || [], s.cond) : ''}
         — ${s.bolo ? `glicemia alta: bolo correttivo${s.boloU != null ? ' da ' + String(s.boloU).replace('.', ',') + ' U' : ''}, niente CHO`
-                   : `suggeriti ${s.suggPrima} g prima`}${s.basale ? ` · basale −${s.basale}% da ${s.anticipo} min prima` : ''}.
+                   : `suggeriti ${s.suggPrima} g prima`}${s.anticipo ? ` · basale Esercizio da ${s.anticipo} min prima` : ''}.
         L'orario di registrazione vale come partenza dell'attività.</p>
       <div style="margin-bottom:12px;max-width:200px"><div class="etich">CHO presi prima (g)</div>
         <input id="ss-prima" class="campo" inputmode="decimal" value="${esc(String(s.presiPrima))}"></div>
@@ -1874,7 +1870,7 @@ function salvaSessione(){
        momento in cui si parte. */
     rec = { id: nuovoId(), quando: Date.now(), attivita:s.attivita, cond:s.cond,
       suggPrima:s.suggPrima, correzione:s.correzione || 0,
-      basale:s.basale || 0, anticipo:s.anticipo || 0,
+      anticipo:s.anticipo || 0,
       ...(s.bolo ? { bolo:true, boloU:s.boloU } : {}),
       presiPrima:Math.round(prima*10)/10, presiDurante:0,
       glicPrima: glicPrima !== null ? Math.round(glicPrima) : null,
@@ -1957,9 +1953,9 @@ function stratoParametri(){
       </div>
       <p style="font-size:13px;color:var(--ink2)">Grammi di carboidrati per ogni ${a.cond === 'Distanza' ? 'distanza' : 'durata'}:
         la schermata Sport richiama la riga scelta. Si salvano da soli su questo telefono e si tarano con gli esiti registrati.</p>
-      ${tab('voci', a.opzioni, [['prima','CHO (g)'],['basale','Basale −%'],['anticipo','Min prima']],
-        'CHO e basale esercizio per ' + a.cond.toLowerCase(),
-        'Per ogni riga: grammi prima di partire, riduzione % del basale esercizio e quanti minuti prima della partenza inserirlo (0% = profilo abituale).')}
+      ${tab('voci', a.opzioni, [['prima','CHO (g)'],['anticipo','Min prima']],
+        'CHO e basale Esercizio per ' + a.cond.toLowerCase(),
+        'Per ogni riga: grammi prima di partire e con quanti minuti di anticipo applicare il profilo basale Esercizio.')}
       ${(() => { const P = glicParam();
         const campoG = (id, lab, val, ph) => `
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -2335,7 +2331,7 @@ document.addEventListener('click', e => {
     }
     S.sessioneAperta = { nuova:true, attivita:S.sport.attivita, cond:S.sport.cond,
       suggPrima:r.prima, correzione:r.correzione,
-      basale: r.basale ? r.basale.pct : 0, anticipo: r.basale ? r.basale.anticipo : 0,
+      anticipo: r.basale ? r.basale.anticipo : 0,
       bolo: r.bolo ? true : undefined, boloU: r.bolo ? r.bolo.unita : null,
       glicPrima:String(S.sport.glic || ''),
       presiPrima:String(r.prima), glicDopo:'' };
