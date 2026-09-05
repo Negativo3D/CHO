@@ -149,6 +149,9 @@
     background:var(--card);font-size:16px;color:var(--ink);outline:none
   }
   .cerca svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--ink2)}
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px;margin-bottom:10px}
+  .seg button{flex:1;padding:8px 0;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink2)}
+  .seg button.on{background:var(--cho);color:#fff;box-shadow:0 3px 8px rgba(14,122,87,.3)}
   .chips{display:flex;gap:8px;overflow-x:auto;padding:0 16px 12px;margin:0 -16px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{
@@ -467,7 +470,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.4';
+const VERSIONE = '2026-09-05.5';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -673,7 +676,7 @@ function esportaDati(){
 
 let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
-  q:'', cat:'Tutti', aperto:null, gr:100,
+  q:'', cat:'Tutti', vedi:'tutto', aperto:null, gr:100,
   sport:{ attivita:null, cond:60 },
   paramSport:null, sessioneAperta:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
@@ -928,27 +931,52 @@ function vistaAtlante(){
       <div class="azioni">
         <button class="azione" data-a="nuovoBarcode" aria-label="Codice a barre">${ico('barcode',26)}</button>
         <button class="azione" data-a="nuovoFoto" aria-label="Da una fotografia">${ico('camera',26)}</button>
-        <button class="azione" data-a="nuovoForm" aria-label="Aggiungi a mano">${ico('piu',26)}</button>
+        <button class="azione" data-a="nuovo" aria-label="Aggiungi alimento o piatto">${ico('piu',26)}</button>
       </div>
     </div>`;
 
-  if(!FOODS.length) return `
+  if(!FOODS.length && !PIATTI.length) return `
     ${hero}
     <div class="card" style="padding:28px 24px;text-align:center">
       <div style="font-size:36px">🧺</div>
       <div style="font-weight:700;font-size:18px;margin-top:8px">Il tuo elenco è vuoto</div>
       <p style="color:var(--ink2);font-size:14px;margin:8px 0 0">
-        Qui trovi solo gli alimenti che aggiungi tu, con i pulsanti qui sopra: leggendo il codice a barre,
+        Qui trovi gli alimenti e i piatti che aggiungi tu, col pulsante + qui sopra: leggendo il codice a barre,
         da una fotografia del codice o compilando un modulo.</p>
     </div>`;
 
-  let l = FOODS;
+  const qn = S.q.trim() ? norm(S.q.trim()) : null;
+
+  /* Piatti e alimenti convivono nella stessa griglia: i piatti (con
+     l'etichetta) vengono prima, e spariscono filtrando per categoria
+     o preferiti, che riguardano solo gli alimenti. */
+  let l = S.vedi === 'piatti' ? [] : FOODS;
   if(S.cat === 'Preferiti') l = l.filter(f => S.preferiti.includes(f.id));
   else if(S.cat !== 'Tutti') l = l.filter(f => f.cat === S.cat);
-  if(S.q.trim()) l = l.filter(f => norm(f.n).includes(norm(S.q.trim())));
+  if(qn) l = l.filter(f => norm(f.n).includes(qn));
 
-  const celle = l.map((f,i) => `
+  const piattiVis = (S.vedi === 'alimenti' || S.cat !== 'Tutti') ? []
+    : PIATTI.filter(pl => !qn || norm(pl.n).includes(qn));
+
+  const cellePiatti = piattiVis.map((pl,i) => {
+    const t = totaliPiatto(pl.ing);
+    return `
     <div class="cella" style="animation-delay:${Math.min(i,8)*45}ms">
+      <button class="apri" data-a="apriPiatto:${pl.id}">
+        ${pl.foto
+          ? `<img src="${pl.foto}" alt="" style="width:100%;height:92px;object-fit:cover;border-radius:16px;display:block">`
+          : `<span class="emg">${pl.e}</span>`}
+        <span class="nome2">${esc(pl.n)}</span>
+        <span class="chopill num" style="background:linear-gradient(135deg,#C97B1F,#A85B0C)">${gr1(t.cho)} g</span>
+        <span style="font-size:11px;color:var(--ink2)"> CHO</span>
+      </button>
+      <span style="position:absolute;top:10px;right:10px;background:var(--wave-soft);color:var(--wave);
+        font-size:10px;font-weight:700;letter-spacing:.5px;padding:3px 8px;border-radius:999px">PIATTO</span>
+    </div>`;
+  }).join('');
+
+  const celleAlimenti = l.map((f,i) => `
+    <div class="cella" style="animation-delay:${Math.min(piattiVis.length+i,8)*45}ms">
       <button class="apri" data-a="apri:${f.id}">
         ${f.foto ? `<img class="emg" src="${f.foto}" alt="" style="object-fit:cover">` : `<span class="emg">${f.e}</span>`}
         <span class="nome2">${esc(f.n)}</span>
@@ -960,24 +988,31 @@ function vistaAtlante(){
       </button>
     </div>`).join('');
 
+  const celle = cellePiatti + celleAlimenti;
+
   const vuoto = S.cat === 'Preferiti'
     ? 'Tocca la stella sugli alimenti che usi spesso per ritrovarli qui.'
-    : 'Nessun alimento con questo nome. Prova con una parola più corta.';
+    : 'Niente con questo nome. Prova con una parola più corta.';
 
   const catInUso = ['Preferiti','Tutti', ...CATS.filter(c => FOODS.some(f => f.cat === c))];
 
   return `
     ${hero}
     <div class="cerca">${ico('cerca',20)}
-      <input id="q" placeholder="Cerca tra i tuoi alimenti" value="${esc(S.q)}">
+      <input id="q" placeholder="Cerca tra alimenti e piatti" value="${esc(S.q)}">
     </div>
-    <div class="chips">${catInUso.map(c => chip(`${CAT_EMOJI[c]||''} ${c}`, S.cat===c, 'cat:'+c)).join('')}</div>
+    <div class="seg">
+      ${[['tutto','Tutto'],['alimenti','Alimenti'],['piatti','Piatti']].map(([v,t]) =>
+        `<button class="${S.vedi===v?'on':''}" data-a="vedi:${v}">${t}</button>`).join('')}
+    </div>
+    ${S.vedi === 'piatti' ? '' :
+      `<div class="chips">${catInUso.map(c => chip(`${CAT_EMOJI[c]||''} ${c}`, S.cat===c, 'cat:'+c)).join('')}</div>`}
     ${celle ? `<div class="griglia">${celle}</div>`
       : `<div style="text-align:center;padding:48px 0;color:var(--ink2)">${vuoto}</div>`}
     <button class="card" style="width:100%;padding:14px;margin-top:14px;font-weight:600;color:var(--ink2);
       display:flex;align-items:center;justify-content:center;gap:8px" data-a="esporta">
       📄 Esporta i tuoi alimenti in PDF</button>
-    <button class="fab" data-a="nuovo" aria-label="Aggiungi alimento">${ico('piu',26)}</button>`;
+    <button class="fab" data-a="nuovo" aria-label="Aggiungi alimento o piatto">${ico('piu',26)}</button>`;
 }
 
 /* ---------- schermata: pasto ---------- */
@@ -1049,48 +1084,6 @@ function vistaPasto(){
 }
 
 /* ---------- schermata: piatti ---------- */
-function vistaPiatti(){
-  if(!PIATTI.length) return `
-    <div class="hero">
-      <div class="occhiello">Anagrafica piatti</div>
-      <div class="titolone">I tuoi piatti<br>di tutti i giorni</div>
-      <div class="datali" style="text-transform:none">Componi una volta il piatto che mangi abitualmente
-        — pasta da 90 g, due pasticcini — e l'app ne calcola i carboidrati dal tuo database degli alimenti.</div>
-    </div>
-    <div class="card" style="padding:28px 24px;text-align:center">
-      <div style="font-size:36px">🍝</div>
-      <div style="font-weight:700;font-size:18px;margin-top:8px">Nessun piatto ancora</div>
-      <p style="color:var(--ink2);font-size:14px;margin:8px 0 20px">Un piatto è fatto di alimenti della tua
-        anagrafica, già porzionati: quantità di default che puoi comunque cambiare al momento. Puoi anche
-        aggiungere una foto del piatto.</p>
-      <button class="primario" style="width:auto;padding:12px 24px" data-a="nuovoPiatto">Crea il primo piatto</button>
-    </div>`;
-
-  const celle = PIATTI.map((pl,i) => {
-    const t = totaliPiatto(pl.ing);
-    return `
-    <div class="cella" style="animation-delay:${Math.min(i,8)*45}ms">
-      <button class="apri" data-a="apriPiatto:${pl.id}">
-        ${pl.foto
-          ? `<img src="${pl.foto}" alt="" style="width:100%;height:92px;object-fit:cover;border-radius:16px;display:block">`
-          : `<span class="emg">${pl.e}</span>`}
-        <span class="nome2">${esc(pl.n)}</span>
-        <span class="chopill num">${gr1(t.cho)} g</span>
-        <span style="font-size:11px;color:var(--ink2)"> CHO</span>
-      </button>
-    </div>`;
-  }).join('');
-
-  return `
-    <div class="hero">
-      <div class="occhiello">Anagrafica piatti</div>
-      <div class="titolone">I tuoi piatti 🍽️</div>
-      <div class="datali" style="text-transform:none">Tocca un piatto: quantità già pronte, carboidrati calcolati.</div>
-    </div>
-    <div class="griglia">${celle}</div>
-    <button class="fab" data-a="nuovoPiatto" aria-label="Crea piatto">${ico('piu',26)}</button>`;
-}
-
 /* ---------- strato: uso di un piatto ---------- */
 function stratoPiattoUso(){
   if(!S.uso) return '';
@@ -1613,6 +1606,27 @@ function stratoNuovo(){
         <span class="sotto" style="display:block;white-space:normal">${sotto}</span>
       </span></button>`;
 
+  if(S.nuovo === 'scegli') return `
+  <div class="velo" data-a="chiudiNuovo">
+    <div class="foglio" data-stop="1">
+      ${testa('Cosa vuoi aggiungere?')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:8px"
+          data-a="nuovoAlimento">
+          <span style="font-size:34px;line-height:1">🥦</span>
+          <span style="font-weight:700">Alimento</span>
+          <span style="font-size:12px;color:var(--ink2);text-align:center;line-height:1.35">Un singolo cibo,<br>valori per 100 g</span>
+        </button>
+        <button class="card" style="padding:22px 10px;display:flex;flex-direction:column;align-items:center;gap:8px"
+          data-a="nuovoPiatto">
+          <span style="font-size:34px;line-height:1">🍽️</span>
+          <span style="font-weight:700">Piatto</span>
+          <span style="font-size:12px;color:var(--ink2);text-align:center;line-height:1.35">Più alimenti<br>già porzionati</span>
+        </button>
+      </div>
+    </div>
+  </div>`;
+
   if(S.nuovo === 'menu') return `
   <div class="velo" data-a="chiudiNuovo">
     <div class="foglio" data-stop="1">
@@ -1702,8 +1716,8 @@ function stratoAvviso(){
 }
 
 /* ---------- disegno ---------- */
-const TABS = [['atlante','Home','casa'],['piatti','Piatti','piatti'],['pasto','Pasto','piatto'],['sport','Sport','sport'],['peso','Peso','peso']];
-const TITOLI = {atlante:'CHO', piatti:'I miei piatti', pasto:'Il tuo pasto', sport:'Attività fisica', peso:'Il tuo peso'};
+const TABS = [['atlante','Home','casa'],['pasto','Pasto','piatto'],['sport','Sport','sport'],['peso','Peso','peso']];
+const TITOLI = {atlante:'CHO', pasto:'Il tuo pasto', sport:'Attività fisica', peso:'Il tuo peso'};
 
 function disegna(){
   document.body.dataset.tab = S.tab;
@@ -1714,7 +1728,7 @@ function disegna(){
   /* Le animazioni d'ingresso partono solo cambiando schermata, non a ogni tocco. */
   v.classList.toggle('anim', S.tab !== disegna.ultimoTab);
   disegna.ultimoTab = S.tab;
-  v.innerHTML = S.tab==='atlante' ? vistaAtlante() : S.tab==='piatti' ? vistaPiatti()
+  v.innerHTML = S.tab==='atlante' ? vistaAtlante()
     : S.tab==='pasto' ? vistaPasto() : S.tab==='peso' ? vistaPeso() : vistaSport();
   document.getElementById('nav').innerHTML = TABS.map(([id,l,i]) => `
     <button class="${S.tab===id?'on':''}" data-a="tab:${id}">
@@ -1779,7 +1793,9 @@ document.addEventListener('click', e => {
   }
   else if(a==='chiudiSessione') S.sessioneAperta = null;
   else if(a==='salvaSessione'){ salvaSessione(); return; }
-  else if(a==='nuovo') S.nuovo = 'menu';
+  else if(a==='nuovo') S.nuovo = 'scegli';
+  else if(a==='nuovoAlimento') S.nuovo = 'menu';
+  else if(a==='vedi') S.vedi = p1;
   else if(a==='chiudiNuovo'){ fermaScanner(); S.nuovo = null; S.form = null; S.editId = null; S.caricamento = false; }
   else if(a==='nuovoForm'){ S.form = formVuoto(); S.editId = null; S.nuovo = 'form'; }
   else if(a==='nuovoBarcode'){ S.nuovo = 'barcode'; S.codice = ''; S.caricamento = false; avviaScanner(); }
@@ -1812,6 +1828,7 @@ document.addEventListener('click', e => {
   }
   else if(a==='nuovoPiatto'){
     if(!FOODS.length){ alert('Prima aggiungi qualche alimento alla tua anagrafica: i piatti si compongono da lì.'); return; }
+    S.nuovo = null;
     S.pform = { n:'', e:'', foto:null, ing:[] }; S.editPiattoId = null; S.pingQ = '';
   }
   else if(a==='apriPiatto'){
