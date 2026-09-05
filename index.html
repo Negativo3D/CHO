@@ -532,7 +532,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.25';
+const VERSIONE = '2026-09-05.26';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -638,12 +638,14 @@ function sanificaRicetta(o){
   })).filter(s => s.voci.length || s.titolo) : null;
   /* Ogni passaggio può avere una foto; i vecchi passi a stringa migrano. */
   const fotoOk = f => typeof f === 'string' && (f.startsWith('data:image') || f.startsWith('https://')) ? f : null;
-  let passi = Array.isArray(o.passi)
-    ? o.passi.map(x => {
+  const listaPassi = arr => Array.isArray(arr)
+    ? arr.map(x => {
         if(typeof x === 'string') return { t: x.trim(), foto: null };
         if(x && typeof x === 'object') return { t: typeof x.t === 'string' ? x.t.trim() : '', foto: fotoOk(x.foto) };
         return null;
       }).filter(x => x && (x.t || x.foto)) : null;
+  let passi = listaPassi(o.passi);
+  const cottura = listaPassi(o.cottura) || [];
   /* Migrazione dal vecchio formato a testo libero. */
   if(!sezioni && typeof o.ing === 'string' && o.ing.trim())
     sezioni = [{ titolo:'', voci: o.ing.split('\n').map(x => x.trim()).filter(Boolean).map(n => ({ n, q:'' })) }];
@@ -654,7 +656,8 @@ function sanificaRicetta(o){
     n: o.n.trim(),
     foto: typeof o.foto === 'string' && (o.foto.startsWith('data:image') || o.foto.startsWith('https://')) ? o.foto : null,
     sezioni: sezioni || [],
-    passi: passi || []
+    passi: passi || [],
+    cottura
   };
 }
 let RICETTE = (leggi().ricette || []).map(sanificaRicetta).filter(Boolean);
@@ -702,7 +705,7 @@ if(!RICETTE.length && !leggi().ricettaBase){
         { n:'Cipolle rosse', q:'200' }, { n:'Carote', q:'180' },
         { n:"Olio extravergine d'oliva", q:'q.b.' }, { n:'Sale fino', q:'q.b.' } ] },
       { titolo: 'Per la besciamella', voci: [
-        { n:'Latte intero', q:'600' }, { n:'Farina 00', q:'50' }, { n:'Burro', q:'50' },
+        { n:'Latte intero', q:'1000' }, { n:'Farina 00', q:'85' }, { n:'Burro', q:'85' },
         { n:'Sale fino', q:'q.b.' }, { n:'Noce moscata', q:'q.b.' } ] }
     ],
     passi: [
@@ -711,7 +714,9 @@ if(!RICETTE.length && !leggi().ricettaBase){
       { t: "In padella con un filo d'olio rosola la cipolla.", foto: FOTO_ROSOLATURA_CIPOLLA },
       { t: TESTO_VERDURE_PADELLA, foto: FOTO_VERDURE_PADELLA },
       'Componi le lasagne: sul fondo della pirofila un velo di besciamella, poi sfoglia, sugo di verdure, besciamella, scamorza a dadini e formaggio grattugiato.',
-      'Prosegui a strati fino a esaurire gli ingredienti, terminando con besciamella e abbondante formaggio.',
+      'Prosegui a strati fino a esaurire gli ingredienti, terminando con besciamella e abbondante formaggio.'
+    ],
+    cottura: [
       'Cuoci in forno statico a 180° per circa 30 minuti, fino a gratinatura. Lascia riposare qualche minuto prima di servire.'
     ]
   })].filter(Boolean);
@@ -753,6 +758,30 @@ if(!leggi().fotoVerdureLasagne){
     scrivi({ ricette: RICETTE });
   }
   scrivi({ fotoVerdureLasagne: true });
+}
+/* Besciamella rapportata a un litro di latte e passo del forno spostato
+   nella nuova parte Cottura, anche per la copia già salvata. */
+if(!leggi().lasagneLitroCottura){
+  const r = RICETTE.find(x => x.n === 'Lasagne vegetariane');
+  if(r){
+    let cambiata = false;
+    const bes = r.sezioni.find(sz => /besciamella/i.test(sz.titolo));
+    if(bes){
+      const latte = bes.voci.find(v => /latte/i.test(v.n));
+      if(latte && latte.q === '600'){
+        latte.q = '1000'; cambiata = true;
+        const farina = bes.voci.find(v => /farina/i.test(v.n));
+        if(farina && farina.q === '50') farina.q = '85';
+        const burro = bes.voci.find(v => /burro/i.test(v.n));
+        if(burro && burro.q === '50') burro.q = '85';
+      }
+    }
+    if(!r.cottura.length && r.passi.length && /forno statico/i.test(r.passi[r.passi.length - 1].t)){
+      r.cottura = [r.passi.pop()]; cambiata = true;
+    }
+    if(cambiata) scrivi({ ricette: RICETTE });
+  }
+  scrivi({ lasagneLitroCottura: true });
 }
 
 /* ---------- registro del peso ---------- */
@@ -878,7 +907,7 @@ function esportaDati(){
 let S = {
   tab:'atlante', preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', vedi:'tutto', aperto:null, gr:100,
-  qr:'', ricettaAperta:null, rform:null, editRicettaId:null, rformUnita:null,
+  qr:'', ricettaAperta:null, rform:null, editRicettaId:null, rformUnita:null, ricettaEspansi:null,
   sport:{ attivita:null, cond:60, glic:'' },
   paramSport:null, sessioneAperta:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
@@ -1259,12 +1288,46 @@ function vistaRicette(){
 /* ---------- strato: lettura di una ricetta (stile ricettario) ---------- */
 function stratoRicetta(){
   const r = RICETTE.find(x => x.id === S.ricettaAperta); if(!r) return '';
-  const titSez = t => `
-    <div style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--wave);text-transform:uppercase;
-      margin:9px 0 1px;padding-bottom:3px;border-bottom:1px solid var(--line)">${esc(t)}</div>`;
-  const intest = t => `
-    <div style="font-weight:800;font-size:19px;letter-spacing:-.2px;margin:14px 0 2px">${t}
-      <div style="width:34px;height:3px;background:var(--wave);border-radius:2px;margin-top:4px"></div></div>`;
+  /* Fisarmonica a due livelli: le parti (Ingredienti, Preparazione,
+     Cottura) partono compresse; sotto Ingredienti ogni sezione è a sua
+     volta espandibile. */
+  const esp = S.ricettaEspansi || {};
+  const parte = (chiave, titolo, contenuto) => `
+    <button style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:13px 0;border-bottom:1px solid var(--line);text-align:left" data-a="ricEsp:${chiave}">
+      <span style="font-weight:800;font-size:19px;letter-spacing:-.2px">${titolo}
+        <span style="display:block;width:34px;height:3px;background:var(--wave);border-radius:2px;margin-top:4px"></span></span>
+      <span style="color:var(--wave)">${ico(esp[chiave] ? 'su' : 'giu', 19)}</span>
+    </button>
+    ${esp[chiave] ? `<div style="padding:4px 0 10px">${contenuto}</div>` : ''}`;
+
+  const righeVoci = voci => voci.map((v,i) => `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+      padding:3px 0;font-size:13.5px${i ? ';border-top:1px dashed var(--line)' : ''}">
+      <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${qtaVoceHTML(v)}</span>
+    </div>`).join('');
+
+  const contenutoIng = r.sezioni.map((s,i) => {
+    const chiave = 'sez' + i;
+    return `
+    <button style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:8px 0 4px;text-align:left;border-bottom:1px solid var(--line)" data-a="ricEsp:${chiave}">
+      <span style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--wave);text-transform:uppercase">${esc(s.titolo || 'Ingredienti')}</span>
+      <span style="color:var(--wave)">${ico(esp[chiave] ? 'su' : 'giu', 15)}</span>
+    </button>
+    ${esp[chiave] ? `<div style="padding:2px 0 6px">${righeVoci(s.voci)}</div>` : ''}`;
+  }).join('');
+
+  const passiHTML = lista => lista.map((x,k) => `
+    <div style="display:flex;gap:11px;margin-top:12px">
+      <span style="width:26px;height:26px;border-radius:8px;background:var(--wave);color:#fff;font-weight:700;
+        font-size:13px;display:flex;align-items:center;justify-content:center;flex:none">${k+1}</span>
+      <div style="flex:1;min-width:0">
+        <p style="font-size:14px;margin:2px 0 0">${esc(x.t)}</p>
+        ${x.foto ? `<img src="${x.foto}" alt="" style="width:100%;border-radius:14px;display:block;margin-top:8px">` : ''}
+      </div>
+    </div>`).join('');
+
   return `
   <div class="velo" data-a="ricChiudi">
     <div class="foglio" data-stop="1">
@@ -1274,28 +1337,12 @@ function stratoRicetta(){
           data-a="ricModifica:${r.id}" aria-label="Modifica ricetta">${ico('matita',19)}</button>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2);flex:none" data-a="ricChiudi">${ico('chiudi',20)}</button>
       </div>
-      ${r.foto ? `<img src="${r.foto}" alt="" style="width:100%;height:180px;object-fit:cover;border-radius:18px;display:block">` : ''}
-      ${r.sezioni.length ? `
-        ${intest('Ingredienti')}
-        ${r.sezioni.map(s => `
-          ${s.titolo ? titSez(s.titolo) : ''}
-          ${s.voci.map((v,i) => `
-            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;
-              padding:3px 0;font-size:13.5px${i ? ';border-top:1px dashed var(--line)' : ''}">
-              <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${qtaVoceHTML(v)}</span>
-            </div>`).join('')}`).join('')}` : ''}
-      ${r.passi.length ? `
-        ${intest('Preparazione')}
-        ${r.passi.map((x,k) => `
-          <div style="display:flex;gap:11px;margin-top:12px">
-            <span style="width:26px;height:26px;border-radius:8px;background:var(--wave);color:#fff;font-weight:700;
-              font-size:13px;display:flex;align-items:center;justify-content:center;flex:none">${k+1}</span>
-            <div style="flex:1;min-width:0">
-              <p style="font-size:14px;margin:2px 0 0">${esc(x.t)}</p>
-              ${x.foto ? `<img src="${x.foto}" alt="" style="width:100%;border-radius:14px;display:block;margin-top:8px">` : ''}
-            </div>
-          </div>`).join('')}` : ''}
-      ${!r.sezioni.length && !r.passi.length ? `<p style="color:var(--ink2);font-size:14px">Ricetta ancora da completare: tocca Modifica.</p>` : ''}
+      ${r.foto ? `<img src="${r.foto}" alt="" style="width:100%;height:180px;object-fit:cover;border-radius:18px;display:block;margin-bottom:4px">` : ''}
+      ${r.sezioni.length ? parte('ing', 'Ingredienti', contenutoIng) : ''}
+      ${r.passi.length ? parte('prep', 'Preparazione', passiHTML(r.passi)) : ''}
+      ${r.cottura.length ? parte('cott', 'Cottura', passiHTML(r.cottura)) : ''}
+      ${!r.sezioni.length && !r.passi.length && !r.cottura.length
+        ? `<p style="color:var(--ink2);font-size:14px">Ricetta ancora da completare: tocca la matita.</p>` : ''}
       <button class="card" style="width:100%;padding:13px;font-weight:600;color:var(--hypo);margin-top:20px"
         data-a="ricElimina:${r.id}">Elimina la ricetta</button>
     </div>
@@ -1354,30 +1401,37 @@ function stratoRicettaForm(){
       </div>`).join('')}
       <button class="chip" data-a="rSezAdd" style="--c:var(--wave);margin-bottom:16px">+ sezione ingredienti</button>
 
-      <div class="etich" style="font-size:14px;margin-bottom:8px">Preparazione</div>
-      ${F.passi.map((pp,k) => `
+      ${[['p','Preparazione',F.passi],['c','Cottura',F.cottura]].map(([g,lab,lista]) => `
+      <div class="etich" style="font-size:14px;margin-bottom:8px">${lab}</div>
+      ${lista.map((pp,k) => `
       <div style="display:flex;gap:6px;margin-bottom:4px;align-items:flex-start">
         <span style="width:26px;height:26px;border-radius:8px;background:var(--wave);color:#fff;font-weight:700;
           font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:9px">${k+1}</span>
-        <textarea id="rp-${k}" class="campo" rows="3" placeholder="Descrivi il passaggio…" style="flex:1;min-width:0">${esc(pp.t)}</textarea>
-        <button class="card" style="padding:8px 10px;color:var(--ink2);margin-top:6px" data-a="rPassoDel:${k}">${ico('chiudi',14)}</button>
+        <textarea id="rp-${g}-${k}" class="campo" rows="3" placeholder="Descrivi il passaggio…" style="flex:1;min-width:0">${esc(pp.t)}</textarea>
+        <button class="card" style="padding:8px 10px;color:var(--ink2);margin-top:6px" data-a="rPassoDel:${g}:${k}">${ico('chiudi',14)}</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin:0 0 10px 32px">
         ${pp.foto ? `<img src="${esc(pp.foto)}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px">` : ''}
-        <button class="chip" data-a="rPassoFoto:${k}" style="--c:var(--wave);font-size:12px;padding:6px 12px">${pp.foto ? 'cambia foto' : '+ foto del passaggio'}</button>
-        ${pp.foto ? `<button class="chip" data-a="rPassoFotoX:${k}" style="font-size:12px;padding:6px 12px;color:var(--hypo)">togli</button>` : ''}
+        <button class="chip" data-a="rPassoFoto:${g}:${k}" style="--c:var(--wave);font-size:12px;padding:6px 12px">${pp.foto ? 'cambia foto' : '+ foto del passaggio'}</button>
+        ${pp.foto ? `<button class="chip" data-a="rPassoFotoX:${g}:${k}" style="font-size:12px;padding:6px 12px;color:var(--hypo)">togli</button>` : ''}
       </div>`).join('')}
-      <button class="chip" data-a="rPassoAdd" style="--c:var(--wave);margin-bottom:18px">+ passaggio</button>
+      <button class="chip" data-a="rPassoAdd:${g}" style="--c:var(--wave);margin-bottom:18px">+ passaggio</button><br>`).join('')}
 
       <button class="primario" style="background:var(--wave)" data-a="ricSalva">${S.editRicettaId ? 'Salva le modifiche' : 'Salva la ricetta'}</button>
     </div>
   </div>`;
 }
 
+/* La lista di passaggi (Preparazione o Cottura) indicata dal gruppo. */
+function gruppoPassi(g){
+  if(!S.rform) return null;
+  return g === 'c' ? S.rform.cottura : S.rform.passi;
+}
+
 function salvaRicetta(){
   const F = S.rform; if(!F) return;
   if(!F.n.trim()){ alert('Dai un nome alla ricetta.'); return; }
-  const dati = sanificaRicetta({ id: S.editRicettaId || undefined, n:F.n, foto:F.foto, sezioni:F.sezioni, passi:F.passi });
+  const dati = sanificaRicetta({ id: S.editRicettaId || undefined, n:F.n, foto:F.foto, sezioni:F.sezioni, passi:F.passi, cottura:F.cottura });
   if(S.editRicettaId){
     const i = RICETTE.findIndex(x => x.id === S.editRicettaId);
     if(i >= 0) RICETTE[i] = dati; else RICETTE.push(dati);
@@ -2199,7 +2253,7 @@ document.addEventListener('click', e => {
   }
   else if(a==='gset') S.gr = +p1;
   else if(a==='ricNuova'){
-    S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }], passi:[{ t:'', foto:null }] };
+    S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }], passi:[{ t:'', foto:null }], cottura:[] };
     S.editRicettaId = null;
   }
   else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'', u:'g' }] }); }
@@ -2220,15 +2274,19 @@ document.addEventListener('click', e => {
     }
     S.rformUnita = null;
   }
-  else if(a==='rPassoAdd'){ if(S.rform) S.rform.passi.push({ t:'', foto:null }); }
-  else if(a==='rPassoDel'){ if(S.rform){ S.rform.passi.splice(+p1, 1); if(!S.rform.passi.length) S.rform.passi.push({ t:'', foto:null }); } }
+  else if(a==='rPassoAdd'){ const l = gruppoPassi(p1); if(l) l.push({ t:'', foto:null }); }
+  else if(a==='rPassoDel'){
+    const l = gruppoPassi(p1);
+    if(l){ l.splice(+p2, 1); if(p1 === 'p' && !l.length) l.push({ t:'', foto:null }); }
+  }
   else if(a==='rPassoFoto'){
-    const k = +p1;
-    scegliFoto(d => { if(S.rform && S.rform.passi[k]){ S.rform.passi[k].foto = d; disegna(); } });
+    const l = gruppoPassi(p1), k = +p2;
+    if(l) scegliFoto(d => { if(S.rform && l[k]){ l[k].foto = d; disegna(); } });
     return;
   }
-  else if(a==='rPassoFotoX'){ if(S.rform && S.rform.passi[+p1]) S.rform.passi[+p1].foto = null; }
-  else if(a==='ricApri') S.ricettaAperta = p1;
+  else if(a==='rPassoFotoX'){ const l = gruppoPassi(p1); if(l && l[+p2]) l[+p2].foto = null; }
+  else if(a==='ricApri'){ S.ricettaAperta = p1; S.ricettaEspansi = {}; }
+  else if(a==='ricEsp'){ S.ricettaEspansi = S.ricettaEspansi || {}; S.ricettaEspansi[p1] = !S.ricettaEspansi[p1]; }
   else if(a==='ricChiudi') S.ricettaAperta = null;
   else if(a==='ricAnnulla'){ S.rform = null; S.editRicettaId = null; }
   else if(a==='ricModifica'){
@@ -2238,7 +2296,8 @@ document.addEventListener('click', e => {
         sezioni: r.sezioni.length
           ? r.sezioni.map(sz => ({ titolo:sz.titolo, voci: sz.voci.length ? sz.voci.map(v => ({...v})) : [{ n:'', q:'' }] }))
           : [{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
-        passi: r.passi.length ? r.passi.map(x => ({...x})) : [{ t:'', foto:null }] };
+        passi: r.passi.length ? r.passi.map(x => ({...x})) : [{ t:'', foto:null }],
+        cottura: r.cottura.map(x => ({...x})) };
       S.editRicettaId = p1; S.ricettaAperta = null;
     }
   }
@@ -2419,8 +2478,9 @@ document.addEventListener('input', e => {
     if(v && (campo === 'n' || campo === 'q')) v[campo] = e.target.value;
   }
   else if(id.startsWith('rp-') && S.rform){
-    const k = +id.slice(3);
-    if(S.rform.passi[k]) S.rform.passi[k].t = e.target.value;
+    const [, g, k] = id.split('-');
+    const l = gruppoPassi(g);
+    if(l && l[+k]) l[+k].t = e.target.value;
   }
   else if(id === 'fbarcode') S.codice = e.target.value;
   else if(id.startsWith('fi-') && S.form) S.form[id.slice(3)] = e.target.value;
