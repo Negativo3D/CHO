@@ -535,7 +535,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.29';
+const VERSIONE = '2026-09-05.30';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -679,13 +679,28 @@ function sanificaRicetta(o){
         if(x && typeof x === 'object') return { t: typeof x.t === 'string' ? x.t.trim() : '', foto: fotoOk(x.foto) };
         return null;
       }).filter(x => x && (x.t || x.foto)) : null;
-  let passi = listaPassi(o.passi);
+  /* La preparazione è ad albero come gli ingredienti: sezioni con
+     titolo e passi. Il vecchio elenco piatto migra in un'unica
+     sezione senza titolo. */
+  let passi = null;
+  if(Array.isArray(o.passi)){
+    const aSezioni = o.passi.length && o.passi.every(x => x && typeof x === 'object' && Array.isArray(x.passi));
+    if(aSezioni){
+      passi = o.passi.map(sz => ({
+        titolo: typeof sz.titolo === 'string' ? sz.titolo.trim() : '',
+        passi: listaPassi(sz.passi) || []
+      })).filter(sz => sz.passi.length || sz.titolo);
+    } else {
+      const piatti = listaPassi(o.passi) || [];
+      passi = piatti.length ? [{ titolo:'', passi: piatti }] : [];
+    }
+  }
   const cottura = listaPassi(o.cottura) || [];
   /* Migrazione dal vecchio formato a testo libero. */
   if(!sezioni && typeof o.ing === 'string' && o.ing.trim())
     sezioni = [{ titolo:'', voci: o.ing.split('\n').map(x => x.trim()).filter(Boolean).map(n => ({ n, q:'' })) }];
   if(!passi && typeof o.proc === 'string' && o.proc.trim())
-    passi = o.proc.split('\n').map(x => x.trim()).filter(Boolean).map(t => ({ t, foto: null }));
+    passi = [{ titolo:'', passi: o.proc.split('\n').map(x => x.trim()).filter(Boolean).map(t => ({ t, foto: null })) }];
   return {
     id: typeof o.id === 'string' && o.id ? o.id : nuovoId(),
     n: o.n.trim(),
@@ -744,18 +759,24 @@ if(!RICETTE.length && !leggi().ricettaBase){
         { n:'Sale fino', q:'q.b.' }, { n:'Noce moscata', q:'q.b.' } ] }
     ],
     passi: [
-      'Prepara la besciamella: scalda il latte con sale e noce moscata. In un tegame sciogli il burro, unisci la farina e mescola con la frusta; versa il latte caldo poco alla volta e cuoci finché si addensa.',
-      { t: TESTO_TAGLIO_VERDURE, foto: FOTO_TAGLIO_VERDURE },
-      { t: "In padella con un filo d'olio rosola la cipolla.", foto: FOTO_ROSOLATURA_CIPOLLA },
-      { t: TESTO_VERDURE_PADELLA, foto: FOTO_VERDURE_PADELLA },
-      'Componi le lasagne: sul fondo della pirofila un velo di besciamella, poi sfoglia, sugo di verdure, besciamella, scamorza a dadini e formaggio grattugiato.',
-      'Prosegui a strati fino a esaurire gli ingredienti, terminando con besciamella e abbondante formaggio.'
+      { titolo: 'Per il sugo di verdure', passi: [
+        { t: TESTO_TAGLIO_VERDURE, foto: FOTO_TAGLIO_VERDURE },
+        { t: "In padella con un filo d'olio rosola la cipolla.", foto: FOTO_ROSOLATURA_CIPOLLA },
+        { t: TESTO_VERDURE_PADELLA, foto: FOTO_VERDURE_PADELLA } ] },
+      { titolo: 'Per la besciamella', passi: [
+        { t: 'Prepara la besciamella: scalda il latte con sale e noce moscata. In un tegame sciogli il burro, unisci la farina e mescola con la frusta; versa il latte caldo poco alla volta e cuoci finché si addensa.' } ] },
+      { titolo: 'Assemblaggio', passi: [
+        { t: 'Componi le lasagne: sul fondo della pirofila un velo di besciamella, poi sfoglia, sugo di verdure, besciamella, scamorza a dadini e formaggio grattugiato.' },
+        { t: 'Prosegui a strati fino a esaurire gli ingredienti, terminando con besciamella e abbondante formaggio.' } ] }
     ],
     cottura: [
       'Cuoci in forno statico a 180° per circa 30 minuti, fino a gratinatura. Lascia riposare qualche minuto prima di servire.'
     ]
   })].filter(Boolean);
-  scrivi({ ricette: RICETTE, ricettaBase: true });
+  /* Il seed nasce già nella forma finale: i vecchi aggiornamenti una
+     tantum non devono ritoccarlo. */
+  scrivi({ ricette: RICETTE, ricettaBase: true, fotoTaglioLasagne: true,
+    fotoCipollaLasagne: true, fotoVerdureLasagne: true, lasagneLitroCottura: true, lasagnePrepAlbero: true });
 }
 
 /* Aggiornamento una tantum per chi ha già la ricetta di partenza:
@@ -817,6 +838,26 @@ if(!leggi().lasagneLitroCottura){
     if(cambiata) scrivi({ ricette: RICETTE });
   }
   scrivi({ lasagneLitroCottura: true });
+}
+/* La preparazione delle Lasagne diventa ad albero: prima le verdure,
+   poi la besciamella, poi l'assemblaggio (per la copia già salvata). */
+if(!leggi().lasagnePrepAlbero){
+  const r = RICETTE.find(x => x.n === 'Lasagne vegetariane');
+  if(r && r.passi.length === 1 && !r.passi[0].titolo){
+    const p = r.passi[0].passi;
+    const bes = p.filter(x => /besciamella/i.test(x.t) && !/Componi|strati/i.test(x.t));
+    const verd = p.filter(x => /bastoncini|rosola|saltare/i.test(x.t));
+    const resto = p.filter(x => !bes.includes(x) && !verd.includes(x));
+    if(bes.length && verd.length){
+      r.passi = [
+        { titolo: 'Per il sugo di verdure', passi: verd },
+        { titolo: 'Per la besciamella', passi: bes },
+        ...(resto.length ? [{ titolo: 'Assemblaggio', passi: resto }] : [])
+      ];
+      scrivi({ ricette: RICETTE });
+    }
+  }
+  scrivi({ lasagnePrepAlbero: true });
 }
 
 /* ---------- registro del peso ---------- */
@@ -1342,16 +1383,16 @@ function stratoRicetta(){
       <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${qtaVoceHTML(v)}</span>
     </div>`).join('');
 
-  const contenutoIng = r.sezioni.map((s,i) => {
-    const chiave = 'sez' + i;
-    return `
+  const sottoParte = (chiave, titolo, contenuto) => `
     <button style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
       padding:8px 0 4px;text-align:left;border-bottom:1px solid var(--line)" data-a="ricEsp:${chiave}">
-      <span style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--wave);text-transform:uppercase">${esc(s.titolo || 'Ingredienti')}</span>
+      <span style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--wave);text-transform:uppercase">${esc(titolo)}</span>
       <span style="color:var(--wave)">${ico(esp[chiave] ? 'su' : 'giu', 15)}</span>
     </button>
-    ${esp[chiave] ? `<div style="padding:2px 0 6px">${righeVoci(s.voci)}</div>` : ''}`;
-  }).join('');
+    ${esp[chiave] ? `<div style="padding:2px 0 6px">${contenuto}</div>` : ''}`;
+
+  const contenutoIng = r.sezioni.map((s,i) =>
+    sottoParte('sez' + i, s.titolo || 'Ingredienti', righeVoci(s.voci))).join('');
 
   const passiHTML = lista => lista.map((x,k) => `
     <div style="display:flex;gap:11px;margin-top:12px">
@@ -1374,7 +1415,10 @@ function stratoRicetta(){
       </div>
       ${r.foto ? `<img src="${r.foto}" alt="" style="width:100%;height:180px;object-fit:cover;border-radius:18px;display:block;margin-bottom:4px">` : ''}
       ${r.sezioni.length ? parte('ing', 'Ingredienti', contenutoIng) : ''}
-      ${r.passi.length ? parte('prep', 'Preparazione', passiHTML(r.passi)) : ''}
+      ${r.passi.length ? parte('prep', 'Preparazione',
+        r.passi.length === 1 && !r.passi[0].titolo
+          ? passiHTML(r.passi[0].passi)
+          : r.passi.map((sz,i) => sottoParte('psez' + i, sz.titolo || 'Preparazione', passiHTML(sz.passi))).join('')) : ''}
       ${r.cottura.length ? parte('cott', 'Cottura', passiHTML(r.cottura)) : ''}
       ${!r.sezioni.length && !r.passi.length && !r.cottura.length
         ? `<p style="color:var(--ink2);font-size:14px">Ricetta ancora da completare: tocca la matita.</p>` : ''}
@@ -1436,31 +1480,50 @@ function stratoRicettaForm(){
       </div>`).join('')}
       <button class="chip" data-a="rSezAdd" style="--c:var(--wave);margin-bottom:16px">+ sezione ingredienti</button>
 
-      ${[['p','Preparazione',F.passi],['c','Cottura',F.cottura]].map(([g,lab,lista]) => `
-      <div class="etich" style="font-size:14px;margin-bottom:8px">${lab}</div>
-      ${lista.map((pp,k) => `
-      <div style="display:flex;gap:6px;margin-bottom:4px;align-items:flex-start">
-        <span style="width:26px;height:26px;border-radius:8px;background:var(--wave);color:#fff;font-weight:700;
-          font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:9px">${k+1}</span>
-        <textarea id="rp-${g}-${k}" class="campo" rows="3" placeholder="Descrivi il passaggio…" style="flex:1;min-width:0">${esc(pp.t)}</textarea>
-        <button class="card" style="padding:8px 10px;color:var(--ink2);margin-top:6px" data-a="rPassoDel:${g}:${k}">${ico('chiudi',14)}</button>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;margin:0 0 10px 32px">
-        ${pp.foto ? `<img src="${esc(pp.foto)}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px">` : ''}
-        <button class="chip" data-a="rPassoFoto:${g}:${k}" style="--c:var(--wave);font-size:12px;padding:6px 12px">${pp.foto ? 'cambia foto' : '+ foto del passaggio'}</button>
-        ${pp.foto ? `<button class="chip" data-a="rPassoFotoX:${g}:${k}" style="font-size:12px;padding:6px 12px;color:var(--hypo)">togli</button>` : ''}
+      ${(() => {
+        const passiForm = (lista, g) => lista.map((pp,k) => `
+        <div style="display:flex;gap:6px;margin-bottom:4px;align-items:flex-start">
+          <span style="width:26px;height:26px;border-radius:8px;background:var(--wave);color:#fff;font-weight:700;
+            font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:9px">${k+1}</span>
+          <textarea id="rp-${g}-${k}" class="campo" rows="3" placeholder="Descrivi il passaggio…" style="flex:1;min-width:0">${esc(pp.t)}</textarea>
+          <button class="card" style="padding:8px 10px;color:var(--ink2);margin-top:6px" data-a="rPassoDel:${g}:${k}">${ico('chiudi',14)}</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin:0 0 10px 32px">
+          ${pp.foto ? `<img src="${esc(pp.foto)}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px">` : ''}
+          <button class="chip" data-a="rPassoFoto:${g}:${k}" style="--c:var(--wave);font-size:12px;padding:6px 12px">${pp.foto ? 'cambia foto' : '+ foto del passaggio'}</button>
+          ${pp.foto ? `<button class="chip" data-a="rPassoFotoX:${g}:${k}" style="font-size:12px;padding:6px 12px;color:var(--hypo)">togli</button>` : ''}
+        </div>`).join('');
+        return `
+      <div class="etich" style="font-size:14px;margin-bottom:8px">Preparazione</div>
+      ${F.passi.map((sz,s) => `
+      <div class="card" style="padding:12px;margin-bottom:10px">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="rpsez-${s}" class="campo" placeholder="Titolo sezione (es. Per la besciamella)"
+            value="${esc(sz.titolo)}" style="flex:1;padding:10px 12px;font-weight:600">
+          ${F.passi.length > 1 ? `<button class="card" style="padding:0 12px;color:var(--hypo)" data-a="rPrepSezDel:${s}">${ico('cestino',16)}</button>` : ''}
+        </div>
+        ${passiForm(sz.passi, 'p' + s)}
+        <button class="chip" data-a="rPassoAdd:p${s}" style="--c:var(--wave)">+ passaggio</button>
       </div>`).join('')}
-      <button class="chip" data-a="rPassoAdd:${g}" style="--c:var(--wave);margin-bottom:18px">+ passaggio</button><br>`).join('')}
+      <button class="chip" data-a="rPrepSezAdd" style="--c:var(--wave);margin-bottom:16px">+ sezione preparazione</button>
+
+      <div class="etich" style="font-size:14px;margin-bottom:8px">Cottura</div>
+      ${passiForm(F.cottura, 'c')}
+      <button class="chip" data-a="rPassoAdd:c" style="--c:var(--wave);margin-bottom:18px">+ passaggio</button><br>`;
+      })()}
 
       <button class="primario" style="background:var(--wave)" data-a="ricSalva">${S.editRicettaId ? 'Salva le modifiche' : 'Salva la ricetta'}</button>
     </div>
   </div>`;
 }
 
-/* La lista di passaggi (Preparazione o Cottura) indicata dal gruppo. */
+/* La lista di passaggi indicata dal gruppo: 'c' è la Cottura,
+   'p0','p1',… sono le sezioni della Preparazione. */
 function gruppoPassi(g){
   if(!S.rform) return null;
-  return g === 'c' ? S.rform.cottura : S.rform.passi;
+  if(g === 'c') return S.rform.cottura;
+  const sz = /^p\d+$/.test(String(g)) ? S.rform.passi[+String(g).slice(1)] : null;
+  return sz ? sz.passi : null;
 }
 
 function salvaRicetta(){
@@ -2292,7 +2355,8 @@ document.addEventListener('click', e => {
   }
   else if(a==='gset') S.gr = +p1;
   else if(a==='ricNuova'){
-    S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }], passi:[{ t:'', foto:null }], cottura:[] };
+    S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
+      passi:[{ titolo:'', passi:[{ t:'', foto:null }] }], cottura:[] };
     S.editRicettaId = null;
   }
   else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'', u:'g' }] }); }
@@ -2316,7 +2380,12 @@ document.addEventListener('click', e => {
   else if(a==='rPassoAdd'){ const l = gruppoPassi(p1); if(l) l.push({ t:'', foto:null }); }
   else if(a==='rPassoDel'){
     const l = gruppoPassi(p1);
-    if(l){ l.splice(+p2, 1); if(p1 === 'p' && !l.length) l.push({ t:'', foto:null }); }
+    if(l){ l.splice(+p2, 1); if(p1 !== 'c' && !l.length) l.push({ t:'', foto:null }); }
+  }
+  else if(a==='rPrepSezAdd'){ if(S.rform) S.rform.passi.push({ titolo:'', passi:[{ t:'', foto:null }] }); }
+  else if(a==='rPrepSezDel'){
+    if(S.rform){ S.rform.passi.splice(+p1, 1);
+      if(!S.rform.passi.length) S.rform.passi.push({ titolo:'', passi:[{ t:'', foto:null }] }); }
   }
   else if(a==='rPassoFoto'){
     const l = gruppoPassi(p1), k = +p2;
@@ -2335,7 +2404,9 @@ document.addEventListener('click', e => {
         sezioni: r.sezioni.length
           ? r.sezioni.map(sz => ({ titolo:sz.titolo, voci: sz.voci.length ? sz.voci.map(v => ({...v})) : [{ n:'', q:'' }] }))
           : [{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
-        passi: r.passi.length ? r.passi.map(x => ({...x})) : [{ t:'', foto:null }],
+        passi: r.passi.length
+          ? r.passi.map(sz => ({ titolo: sz.titolo, passi: sz.passi.length ? sz.passi.map(x => ({...x})) : [{ t:'', foto:null }] }))
+          : [{ titolo:'', passi:[{ t:'', foto:null }] }],
         cottura: r.cottura.map(x => ({...x})) };
       S.editRicettaId = p1; S.ricettaAperta = null;
     }
@@ -2517,6 +2588,10 @@ document.addEventListener('input', e => {
     const [, s, k, campo] = id.split('-');
     const v = S.rform.sezioni[+s] && S.rform.sezioni[+s].voci[+k];
     if(v && (campo === 'n' || campo === 'q')) v[campo] = e.target.value;
+  }
+  else if(id.startsWith('rpsez-') && S.rform){
+    const sz = S.rform.passi[+id.slice(6)];
+    if(sz) sz.titolo = e.target.value;
   }
   else if(id.startsWith('rp-') && S.rform){
     const [, g, k] = id.split('-');
