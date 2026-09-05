@@ -125,8 +125,8 @@
     box-shadow:0 10px 26px rgba(14,122,87,.45), 0 0 0 6px rgba(14,122,87,.08)
   }
   /* Stessa grafica del vecchio pulsante flottante, ma ancorato in alto
-     a destra della testata della Home. */
-  .fabHero{position:absolute;top:16px;right:16px;bottom:auto;left:auto;width:52px;height:52px;
+     a destra della testata (Home e Pasto). */
+  .fab.fabHero{position:absolute;top:16px;right:16px;bottom:auto;left:auto;width:52px;height:52px;
     border-radius:19px;z-index:2;
     box-shadow:0 8px 20px rgba(6,50,35,.35), 0 0 0 5px rgba(255,255,255,.14)}
   main{padding:0 16px 150px}
@@ -475,7 +475,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.8';
+const VERSIONE = '2026-09-05.9';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1033,12 +1033,11 @@ function totali(){
 function vistaPasto(){
   if(!S.pasto.length) return `
     <div class="hero" style="text-align:center">
+      <button class="fab fabHero" data-a="tab:atlante" aria-label="Aggiungi alimenti e piatti al pasto">${ico('piu',24)}</button>
       <div style="font-size:44px">🍽️</div>
       <div class="titolone" style="margin-top:6px">Il pasto è vuoto</div>
-      <div class="datali" style="text-transform:none">Aggiungi gli alimenti per vedere il totale dei carboidrati
-        e la forma di bolo suggerita.</div>
-      <button class="primario" style="width:auto;padding:12px 26px;margin-top:16px;background:rgba(255,255,255,.18);
-        border:1px solid rgba(255,255,255,.3)" data-a="tab:atlante">Apri gli alimenti</button>
+      <div class="datali" style="text-transform:none">Tocca + per scegliere alimenti e piatti dalla tua anagrafica:
+        qui vedrai la somma dei carboidrati e la forma di bolo suggerita.</div>
     </div>`;
 
   const t = totali();
@@ -1065,7 +1064,8 @@ function vistaPasto(){
     : (b.durata ? `<p style="font-size:14px">Erogazione distribuita su ${b.durata}.</p>` : '');
 
   return `
-    <div class="totale">
+    <div class="totale" style="position:relative">
+      <button class="fab fabHero" data-a="tab:atlante" aria-label="Aggiungi altri alimenti o piatti">${ico('piu',24)}</button>
       <div class="big num">${gr1(t.cho)}</div>
       <div style="font-weight:600;margin-top:4px">grammi di carboidrati</div>
       <div style="font-size:14px;opacity:.85;margin-top:4px">
