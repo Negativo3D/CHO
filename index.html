@@ -372,9 +372,19 @@ function salvaCella(id, sez, riga, col, val){
   scrivi({ tabelleSport: tutte });
 }
 
-function calcolaSport({ attivita, cond }) {
+/* Correzione del "prima" in base alla glicemia dichiarata: sotto 70
+   e tra 70 e 90 si aggiunge, tra 90 e 180 nulla, sopra si toglie. */
+function correzioneGlicemia(glic){
+  const g = parseFloat(String(glic ?? '').replace(',', '.'));
+  if(!isFinite(g) || g < 20 || g > 600) return 0;
+  return g < 70 ? 15 : g < 90 ? 10 : g <= 180 ? 0 : g <= 250 ? -5 : -10;
+}
+
+function calcolaSport({ attivita, cond, glic }) {
   const att = ATTIVITA[attivita] || ATTIVITA.nuoto;
   const v = tabellaSport(attivita).voci[cond] || { prima:0, durante:0 };
+  const correzione = correzioneGlicemia(glic);
+  const prima = Math.max(0, v.prima + correzione);
 
   // Profilo basale: riduzione più marcata per sessioni lunghe.
   const lungo = att.cond === 'Distanza' ? cond >= 15 : cond >= 90;
@@ -385,7 +395,7 @@ function calcolaSport({ attivita, cond }) {
     anticipo: '60-90 minuti prima'
   };
 
-  return { prima: v.prima, durante: v.durante, basale };
+  return { prima, durante: v.durante, correzione, basale };
 }
 
 /* ---------- autoallineamento sport ----------
@@ -407,7 +417,8 @@ function autoallinea(s, glicDopo){
   let nota;
   if(cella){
     const vecchia = cella.prima;
-    const target = Math.max(0, Math.round(s.presiPrima + delta));
+    /* La taratura ragiona al netto della correzione glicemica del giorno. */
+    const target = Math.max(0, Math.round(s.presiPrima + delta - (s.correzione || 0)));
     const nuova = Math.max(0, Math.round((vecchia + target) / 2));
     if(nuova !== vecchia) salvaCella(s.attivita, 'voci', s.cond, 'prima', nuova);
     const dove = `${att.nome} · ${etichettaDi(att.opzioni, s.cond)}`;
@@ -475,7 +486,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.9';
+const VERSIONE = '2026-09-05.10';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -682,7 +693,7 @@ function esportaDati(){
 let S = {
   tab:'atlante', pasto:[], preferiti: leggi().preferiti || [],
   q:'', cat:'Tutti', vedi:'tutto', aperto:null, gr:100,
-  sport:{ attivita:null, cond:60 },
+  sport:{ attivita:null, cond:60, glic:'' },
   paramSport:null, sessioneAperta:null,
   nuovo:null, form:null, editId:null, codice:'', caricamento:false, msgScanner:'',
   uso:null, pform:null, editPiattoId:null, pingQ:'',
@@ -1431,11 +1442,17 @@ function vistaSport(){
           style="--c:var(--sport);display:flex;align-items:center">${ico('piu',16)}</button>
       </div>
       ${G(att.cond, att.opzioni, 'cond')}
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:600;color:var(--ink2);flex:1">Glicemia prima (mg/dl)</div>
+        <input id="sp-glic" class="campo" inputmode="numeric" placeholder="—" value="${esc(String(s.glic||''))}"
+          style="width:110px;padding:10px 12px;text-align:center;font-weight:600">
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="box eroeViola" style="margin:0;padding:14px 16px">
-        <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.prima}<span style="font-size:17px;font-weight:700"> g</span></div>
-        <div style="font-size:12px;opacity:.9;margin-top:5px">${r.prima===0 ? 'niente prima di partire' : 'prima, senza bolo'}</div>
+        <div class="num" id="r-prima" style="font-size:38px;font-weight:800;line-height:1">${r.prima}<span style="font-size:17px;font-weight:700"> g</span></div>
+        <div id="r-primaSotto" style="font-size:12px;opacity:.9;margin-top:5px">${r.prima===0 ? 'niente prima di partire' : 'prima, senza bolo'}${
+          r.correzione ? ` · ${r.correzione>0?'+':''}${r.correzione} g glicemia` : ''}</div>
       </div>
       <div class="box" style="margin:0;padding:14px 16px;background:var(--sport);color:#fff;box-shadow:0 4px 14px rgba(75,79,184,.3)">
         <div class="num" style="font-size:38px;font-weight:800;line-height:1">${r.durante}<span style="font-size:17px;font-weight:700"> g</span></div>
@@ -1505,7 +1522,7 @@ function salvaSessione(){
   let rec;
   if(s.nuova){
     rec = { id: nuovoId(), quando: Date.now(), attivita:s.attivita, cond:s.cond,
-      suggPrima:s.suggPrima, suggDurante:s.suggDurante,
+      suggPrima:s.suggPrima, suggDurante:s.suggDurante, correzione:s.correzione || 0,
       presiPrima:Math.round(prima*10)/10, presiDurante:Math.round(durante*10)/10,
       glicPrima: glicPrima !== null ? Math.round(glicPrima) : null,
       glicDopo:null, esito:null, nota:null };
@@ -1797,7 +1814,7 @@ document.addEventListener('click', e => {
 
   if(a==='tab'){
     /* Rientrando in Sport si riparte sempre dal menu di scelta dell'attività. */
-    if(p1 === 'sport' && S.tab !== 'sport') S.sport.attivita = null;
+    if(p1 === 'sport' && S.tab !== 'sport'){ S.sport.attivita = null; S.sport.glic = ''; }
     S.paramSport = null; S.sessioneAperta = null;
     S.tab = p1;
   }
@@ -1826,9 +1843,12 @@ document.addEventListener('click', e => {
   else if(a==='param') S.paramSport = p1;
   else if(a==='chiudiParam') S.paramSport = null;
   else if(a==='regSport'){
+    /* Si parte da quanto impostato nella pagina: condizione, glicemia
+       dichiarata e quantità già corrette di conseguenza. */
     const r = calcolaSport(S.sport);
     S.sessioneAperta = { nuova:true, attivita:S.sport.attivita, cond:S.sport.cond,
-      suggPrima:r.prima, suggDurante:r.durante,
+      suggPrima:r.prima, suggDurante:r.durante, correzione:r.correzione,
+      glicPrima:String(S.sport.glic || ''),
       presiPrima:String(r.prima), presiDurante:String(r.durante), glicDopo:'' };
   }
   else if(a==='esitoSport'){
@@ -1971,6 +1991,17 @@ document.addEventListener('input', e => {
   else if(id === 'ss-durante' && S.sessioneAperta) S.sessioneAperta.presiDurante = e.target.value;
   else if(id === 'ss-glic' && S.sessioneAperta) S.sessioneAperta.glicDopo = e.target.value;
   else if(id === 'ss-glicprima' && S.sessioneAperta) S.sessioneAperta.glicPrima = e.target.value;
+  else if(id === 'sp-glic'){
+    /* La proposta si aggiorna dal vivo, senza ridisegnare la pagina
+       (il campo perderebbe il focus mentre si scrive). */
+    S.sport.glic = e.target.value;
+    const r = calcolaSport(S.sport);
+    const n = document.getElementById('r-prima');
+    if(n) n.innerHTML = `${r.prima}<span style="font-size:17px;font-weight:700"> g</span>`;
+    const c = document.getElementById('r-primaSotto');
+    if(c) c.textContent = (r.prima === 0 ? 'niente prima di partire' : 'prima, senza bolo')
+      + (r.correzione ? ` · ${r.correzione > 0 ? '+' : ''}${r.correzione} g glicemia` : '');
+  }
   else if(id.startsWith('pt-') && S.paramSport){
     /* Cella della tabella parametri: si salva subito, senza ridisegnare
        (il ridisegno farebbe perdere il focus mentre si scrive). */
