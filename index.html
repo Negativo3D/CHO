@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.45';
+const VERSIONE = '2026-09-06.46';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3348,6 +3348,22 @@ if(!leggi().muesli2){
     if(agg){ FOODS[i] = agg; scrivi({ alimenti: FOODS }); }
   }
   scrivi({ muesli2: true });
+}
+
+/* Una tantum: piatto pronto "Colazione yogurt e muesli" — un
+   vasetto di yogurt magro (125 g) e due cucchiai di muesli (2x11 g).
+   Gli alimenti vengono cercati per nome, cosi' il piatto nasce con
+   gli id giusti su ogni dispositivo. */
+if(!leggi().piattoColazione1){
+  const mu = FOODS.find(f => norm(f.n).includes('muesli'));
+  const yo = FOODS.find(f => norm(f.n) === norm('Yogurt magro bianco'));
+  if(mu && yo && !PIATTI.some(p => norm(p.n) === norm('Colazione yogurt e muesli'))){
+    const pl = sanificaPiatto({ n: 'Colazione yogurt e muesli', e: '🥣',
+      ing: [ { alimento: yo.id, modo: 'pezzi', pezzi: 1, gPezzo: 125 },
+             { alimento: mu.id, modo: 'pezzi', pezzi: 2, gPezzo: 11 } ] });
+    if(pl){ PIATTI.push(pl); scrivi({ piatti: PIATTI }); }
+  }
+  scrivi({ piattoColazione1: true });
 }
 
 /* Una tantum: i piatti delle ricette si riallineano con la nuova
