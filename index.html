@@ -568,7 +568,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.5';
+const VERSIONE = '2026-09-06.6';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -2925,6 +2925,45 @@ if(!leggi().ricetteAlimenti1){
   const creati = RICETTE.reduce((t, r) => t + creaAlimentiRicetta(r), 0);
   if(creati) RICETTE.forEach(sincronizzaPiattoRicetta);
   scrivi({ ricetteAlimenti1: true });
+}
+
+/* Una tantum: valori nutrizionali per 100 g degli alimenti creati
+   dalla ricetta delle lasagne (valori indicativi da tabelle di
+   composizione, da verificare sull'etichetta dei propri prodotti).
+   Si completano solo quelli ancora segnati "da completare", così le
+   modifiche fatte a mano non vengono toccate. */
+if(!leggi().alimentiLasagne1){
+  const VAL = {
+    "Lasagne all'uovo secche": { e:'🍝', cho:70,  f:4,   p:13,  ig:'medio', cat:'Primi e patate' },
+    'Scamorza (provola)':      { e:'🧀', cho:1,   f:25,  p:25,  ig:'basso', cat:'Latte e derivati' },
+    'Formaggio grattugiato':   { e:'🧀', cho:1,   f:28,  p:33,  ig:'basso', cat:'Latte e derivati' },
+    'Passata di pomodoro':     { e:'🍅', cho:4,   f:0.4, p:1.3, ig:'basso', cat:'Verdura e legumi' },
+    'Funghi champignon':       { e:'🍄', cho:1,   f:0.3, p:3,   ig:'basso', cat:'Verdura e legumi' },
+    'Zucchine':                { e:'🥒', cho:2,   f:0.2, p:1.3, ig:'basso', cat:'Verdura e legumi' },
+    'Spinaci':                 { e:'🥬', cho:2,   f:0.4, p:3,   ig:'basso', cat:'Verdura e legumi' },
+    'Cipolle rosse':           { e:'🧅', cho:6,   f:0.1, p:1,   ig:'basso', cat:'Verdura e legumi' },
+    'Carote':                  { e:'🥕', cho:7,   f:0.2, p:1,   ig:'basso', cat:'Verdura e legumi' },
+    'Farina 00':               { e:'🌾', cho:73,  f:1,   p:11,  ig:'alto',  cat:'Pane e cereali' },
+    'Burro':                   { e:'🧈', cho:1,   f:83,  p:1,   ig:'basso', cat:'Latte e derivati' },
+    'Melanzane':               { e:'🍆', cho:2.6, f:0.4, p:1.1, ig:'basso', cat:'Verdura e legumi' }
+  };
+  let toccati = 0;
+  for(const [nome, v] of Object.entries(VAL)){
+    const i = FOODS.findIndex(f => norm(f.n) === norm(nome));
+    if(i >= 0){
+      if(FOODS[i].daCompletare){
+        FOODS[i] = sanificaAlimento({ ...FOODS[i], ...v, daCompletare: false });
+        toccati++;
+      }
+    } else if(nome === 'Melanzane'){
+      /* Nella ricetta le melanzane sono senza grammatura, quindi non
+         erano state create: si aggiungono qui, pronte all'uso. */
+      const nuovo = sanificaAlimento({ n: nome, ...v });
+      if(nuovo){ FOODS.push(nuovo); toccati++; }
+    }
+  }
+  if(toccati) scrivi({ alimenti: FOODS });
+  scrivi({ alimentiLasagne1: true });
 }
 
 disegna();
