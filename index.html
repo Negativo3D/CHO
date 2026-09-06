@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.29';
+const VERSIONE = '2026-09-06.30';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -743,7 +743,10 @@ function sanificaPiatto(o){
     foto: typeof o.foto === 'string' && o.foto.startsWith('data:image') ? o.foto : null,
     ing,
     ...(() => { const g = Math.round(+o.porzG); return g >= 10 && g <= 5000 ? { porzG: g } : {}; })(),
-    ...(() => { const p = Math.round(+o.perdita); return p >= 1 && p <= 60 ? { perdita: p } : {}; })(),
+    ...(() => { const p = Math.round(+o.perdita);
+      /* Negativa = il piatto aumenta di peso in cottura (es. noodles
+         e paste che assorbono acqua). */
+      return p !== 0 && p >= -300 && p <= 60 ? { perdita: p } : {}; })(),
     ...ondaCampi(o),
     ...(typeof o.daRicetta === 'string' && o.daRicetta ? { daRicetta: o.daRicetta } : {}),
     ...(Number.isInteger(o.mancanti) && o.mancanti > 0 ? { mancanti: o.mancanti } : {})
@@ -1631,7 +1634,8 @@ function stratoRicettaForm(){
           <input id="rf-perdita" class="campo" inputmode="numeric" placeholder="0" value="${esc(F.perdita ?? '')}"></div>
       </div>
       <div style="font-size:12px;color:var(--ink2);margin-bottom:12px">Con la perdita impostata, i grammi del piatto
-        si intendono pesati a cotto: i carboidrati totali restano gli stessi, spalmati sul peso cotto.</div>
+        si intendono pesati a cotto: i carboidrati totali restano gli stessi, spalmati sul peso cotto.
+        Un valore negativo (es. -25) indica un piatto che in cottura aumenta di peso, come i noodles che assorbono acqua.</div>
       ${ondaForm('rf-', F)}
       <div class="etich" style="font-size:14px;margin-bottom:8px">Ingredienti</div>
       ${F.sezioni.map((sez,s) => `
@@ -1777,7 +1781,8 @@ function stratoPiattoUso(){
             : `<span class="emg" style="width:56px;height:56px;background:var(--wave-soft);color:var(--wave)">${ico('cloche',28)}</span>`}
           <div style="min-width:0"><div style="font-weight:700;font-size:19px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(pl.n)}</div>
           <div style="font-size:12px;color:var(--ink2)">${ing.length} ingredient${ing.length===1?'e':'i'} ·
-            ${peso > 0 ? gr1(t.cho/peso*100) : 0} g CHO per 100 g${perdita ? ` a cotto (−${perdita}% in cottura)` : ''}</div></div>
+            ${peso > 0 ? gr1(t.cho/peso*100) : 0} g CHO per 100 g${perdita
+              ? ` a cotto (${perdita > 0 ? '−' + perdita : '+' + (-perdita)}% in cottura)` : ''}</div></div>
         </div>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiPiatto">${ico('chiudi',20)}</button>
       </div>
@@ -3297,6 +3302,60 @@ function importaRicettario(chiave, alimenti, ricette){
   if(nuove) scrivi({ ricette: RICETTE, piatti: PIATTI });
   scrivi({ [chiave]: true });
 }
+
+/* ---------- ricettario coreano ----------
+   Ricette tradizionali sudcoreane, tradotte in italiano; dosi da
+   만개의 레시피 (10000recipe.com), valori nutrizionali indicativi per
+   100 g da tabelle di composizione ed etichette tipiche. */
+importaRicettario('kr1Japchae',
+  [
+    { n:'Spaghetti di patata dolce (dangmyeon)', e:'🍜', cho:86, f:0.1, p:0.2, ig:'alto',  cat:'Primi e patate' },
+    { n:'Manzo per straccetti',                  e:'🥩', cho:0,  f:5,   p:21,  ig:'basso', cat:'Altro' },
+    { n:'Cipolla dorata',                        e:'🧅', cho:6,  f:0.1, p:1,   ig:'basso', cat:'Verdura e legumi' },
+    { n:'Funghi shiitake freschi',               e:'🍄', cho:4,  f:0.5, p:2.2, ig:'basso', cat:'Verdura e legumi' },
+    { n:'Salsa di soia',                         e:'🫙', cho:6,  f:0,   p:8,   ig:'basso', cat:'Altro' },
+    { n:'Zucchero',                              e:'🍬', cho:100,f:0,   p:0,   ig:'alto',  cat:'Zuccheri rapidi' },
+    { n:'Olio di sesamo',                        e:'🫗', cho:0,  f:100, p:0,   ig:'basso', cat:'Altro' },
+    { n:'Semi di sesamo',                        e:'🫘', cho:11, f:50,  p:18,  ig:'basso', cat:'Altro' },
+    { n:'Aglio',                                 e:'🧄', cho:9,  f:0.5, p:6,   ig:'basso', cat:'Verdura e legumi' },
+    { n:'Olio di semi',                          e:'🫗', cho:0,  f:100, p:0,   ig:'basso', cat:'Altro' },
+    { n:'Pepe nero',                             e:'🧂', cho:38, f:3.3, p:10,  ig:'basso', cat:'Altro' }
+  ],
+  [{
+    n: 'Japchae (잡채) — noodles di patata dolce con verdure',
+    sezioni: [
+      { titolo: 'Per il japchae', voci: [
+        { n:'Spaghetti di patata dolce (dangmyeon)', q:'250', u:'g' },
+        { n:'Manzo per straccetti', q:'200', u:'g' },
+        { n:'Spinaci',              q:'200', u:'g' },
+        { n:'Cipolla dorata',       q:'150', u:'g' },
+        { n:'Carote',               q:'100', u:'g' },
+        { n:'Funghi shiitake freschi', q:'100', u:'g' } ] },
+      { titolo: 'Per il condimento', voci: [
+        { n:'Salsa di soia',   q:'5', u:'cm' },
+        { n:'Zucchero',        q:'2', u:'cm' },
+        { n:'Olio di sesamo',  q:'3', u:'cm' },
+        { n:'Semi di sesamo',  q:'1', u:'cm' },
+        { n:'Aglio',           q:'10', u:'g' },
+        { n:'Olio di semi',    u:'qb' },
+        { n:'Sale fino',       u:'qb' },
+        { n:'Pepe nero',       u:'qb' } ] }
+    ],
+    passi: [
+      { titolo: 'Preparazione degli ingredienti', passi: [
+        { t: 'Cuoci i dangmyeon in acqua bollente per 6-7 minuti, scolali, sciacquali sotto acqua fredda e accorciali con le forbici. Condiscili con un cucchiaio di salsa di soia e uno di olio di sesamo perché non si incollino.' },
+        { t: 'Sbollenta gli spinaci per 30 secondi, raffreddali in acqua fredda, strizzali bene e condiscili con un pizzico di sale e qualche goccia di olio di sesamo.' },
+        { t: 'Taglia a julienne cipolla, carote e funghi. Riduci il manzo a striscioline sottili e falle insaporire con un cucchiaio di salsa di soia, mezzo di zucchero, metà dell\'aglio tritato e una macinata di pepe.' } ] },
+      { titolo: 'In padella', passi: [
+        { t: 'Salta le verdure separatamente in poco olio di semi, salando appena: prima la cipolla, poi le carote, infine i funghi. Tienile da parte.' },
+        { t: 'Salta il manzo marinato a fuoco vivo finché è appena cotto.' } ] },
+      { titolo: 'Assemblaggio', passi: [
+        { t: 'In una ciotola grande unisci noodles, verdure saltate, spinaci e manzo con la salsa di soia, lo zucchero e l\'olio di sesamo rimasti e il resto dell\'aglio; mescola a lungo, meglio se con le mani.' },
+        { t: 'Completa con i semi di sesamo e servi tiepido o a temperatura ambiente.' } ] }
+    ],
+    cottura: [],
+    porzG: 350, perdita: -25
+  }]);
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
    ancora grassi e proteine se li ritrova salvati a zero. Si completano
