@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.18';
+const VERSIONE = '2026-09-06.19';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -783,8 +783,11 @@ function sincronizzaPiattoRicetta(r){
   for(const sez of r.sezioni) for(const v of sez.voci){
     const u = v.u || 'g';
     if(u === 'qb') continue;             /* q.b.: irrilevante per i CHO */
-    const g = parseFloat(String(v.q).replace(',', '.'));
-    if(u !== 'g' || !(g > 0)){ mancanti++; continue; }
+    const q = parseFloat(String(v.q).replace(',', '.'));
+    /* I cucchiai valgono grammi indicativi: da minestra 15 g, da caffè
+       5 g. Il "n°" invece dipende dall'alimento e non si converte. */
+    const g = u === 'g' ? q : u === 'cm' ? q*15 : u === 'cc' ? q*5 : NaN;
+    if(!(g > 0)){ mancanti++; continue; }
     const c = trovaAlimento(v.n);
     if(c) ing.push({ alimento: c.id, modo:'g', g: Math.round(g*10)/10 });
     else mancanti++;
@@ -1769,8 +1772,9 @@ function stratoPiattoUso(){
         if(ric) for(const sez of ric.sezioni) for(const v of sez.voci){
           const u = v.u || 'g';
           if(u === 'qb') continue;
-          const g = parseFloat(String(v.q).replace(',', '.'));
-          if(u !== 'g' || !(g > 0)) senzaG.push(v.n);
+          const q = parseFloat(String(v.q).replace(',', '.'));
+          const g = u === 'g' ? q : u === 'cm' ? q*15 : u === 'cc' ? q*5 : NaN;
+          if(!(g > 0)) senzaG.push(v.n);
           else if(!trovaAlimento(v.n)) nonAbb.push(v.n);
         }
         const box = t => `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
@@ -3197,6 +3201,13 @@ if(!leggi().concentrato1){
     if(nuovo){ FOODS.push(nuovo); scrivi({ alimenti: FOODS }); }
   }
   scrivi({ concentrato1: true });
+}
+
+/* Una tantum: i piatti delle ricette si riallineano con la nuova
+   conversione dei cucchiai in grammi (minestra 15 g, caffè 5 g). */
+if(!leggi().cucchiai1){
+  RICETTE.forEach(sincronizzaPiattoRicetta);
+  scrivi({ cucchiai1: true });
 }
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
