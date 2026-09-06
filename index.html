@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.16';
+const VERSIONE = '2026-09-06.17';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1821,8 +1821,12 @@ function stratoPiattoUso(){
 function stratoScegliAlimento(){
   if(!S.rIngPicker || !S.rform) return '';
   const q = (S.rIngQ || '').trim();
-  const lista = (q ? FOODS.filter(f => norm(f.n).includes(norm(q))) : [...FOODS])
-    .sort((a,b) => a.n.localeCompare(b.n, 'it')).slice(0, 30);
+  const passa = q ? (f => norm(f.n).includes(norm(q))) : (() => true);
+  /* Anagrafica raggruppata per categoria, nell'ordine delle categorie
+     dell'app; la ricerca filtra dentro i gruppi. */
+  const gruppi = CATS.map(cat => [cat,
+    FOODS.filter(f => (f.cat || 'Altro') === cat && passa(f)).sort((a,b) => a.n.localeCompare(b.n, 'it'))
+  ]).filter(([, l]) => l.length);
   return `
   <div class="velo" data-a="ripChiudi">
     <div class="foglio" data-stop="1">
@@ -1833,14 +1837,16 @@ function stratoScegliAlimento(){
       <input id="rip-q" class="campo" placeholder="Cerca in anagrafica" value="${esc(S.rIngQ || '')}" style="margin-bottom:10px">
       <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">Solo alimenti già in anagrafica: se manca,
         crealo prima dalla home col + e poi torna alla ricetta.</p>
-      ${lista.map(f => `
+      ${gruppi.map(([cat, l]) => `
+        <div class="etich" style="margin:14px 0 6px">${CAT_EMOJI[cat] || ''} ${cat}</div>
+        ${l.map(f => `
         <button class="card riga" style="width:100%;text-align:left;padding:10px 12px" data-a="ripSet:${f.id}">
           ${f.foto ? `<img class="emt" src="${f.foto}" alt="" style="width:36px;height:36px;object-fit:cover">`
             : `<span class="emt" style="width:36px;height:36px;font-size:18px">${f.e}</span>`}
           <span style="flex:1;min-width:0"><span class="nome" style="display:block;font-size:14px">${esc(f.n)}</span>
           <span class="sotto">${f.cho} g CHO per 100 g</span></span>
-        </button>`).join('')}
-      ${!lista.length ? `<p style="font-size:13px;color:var(--ink2)">Nessun alimento con questo nome: crealo prima in anagrafica.</p>` : ''}
+        </button>`).join('')}`).join('')}
+      ${!gruppi.length ? `<p style="font-size:13px;color:var(--ink2)">Nessun alimento con questo nome: crealo prima in anagrafica.</p>` : ''}
     </div>
   </div>`;
 }
@@ -2694,7 +2700,15 @@ document.addEventListener('click', e => {
   }
   else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'', u:'g' }] }); }
   else if(a==='rSezDel'){ if(S.rform) S.rform.sezioni.splice(+p1, 1); }
-  else if(a==='rIngAdd'){ if(S.rform && S.rform.sezioni[+p1]) S.rform.sezioni[+p1].voci.push({ n:'', q:'', u:'g' }); }
+  else if(a==='rIngAdd'){
+    /* "+ ingrediente" apre subito il selettore dell'anagrafica sulla
+       nuova riga; se si chiude senza scegliere, la riga vuota sparisce. */
+    if(S.rform && S.rform.sezioni[+p1]){
+      S.rform.sezioni[+p1].voci.push({ n:'', q:'', u:'g' });
+      S.rIngPicker = { s:+p1, k: S.rform.sezioni[+p1].voci.length - 1, nuovo: true };
+      S.rIngQ = '';
+    }
+  }
   else if(a==='rIngDel'){
     if(S.rform && S.rform.sezioni[+p1]){
       S.rform.sezioni[+p1].voci.splice(+p2, 1);
@@ -2760,7 +2774,14 @@ document.addEventListener('click', e => {
   }
   else if(a==='ricSalva'){ salvaRicetta(); return; }
   else if(a==='rIngScegli'){ S.rIngPicker = { s:+p1, k:+p2 }; S.rIngQ = ''; }
-  else if(a==='ripChiudi'){ S.rIngPicker = null; }
+  else if(a==='ripChiudi'){
+    const p = S.rIngPicker;
+    if(p && p.nuovo && S.rform && S.rform.sezioni[p.s]){
+      const v = S.rform.sezioni[p.s].voci[p.k];
+      if(v && !v.n.trim()) S.rform.sezioni[p.s].voci.splice(p.k, 1);
+    }
+    S.rIngPicker = null;
+  }
   else if(a==='ripSet'){
     const f = cibo(p1);
     const v = S.rIngPicker && S.rform && S.rform.sezioni[S.rIngPicker.s]
