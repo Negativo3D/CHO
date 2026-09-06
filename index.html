@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.46';
+const VERSIONE = '2026-09-06.47';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1881,14 +1881,39 @@ function stratoPiattoUso(){
         <span>⚠️</span><span>Carboidrati ancora da completare in anagrafica per:
         <b>${dc.map(c => esc(c.n)).join(', ')}</b> — il totale del piatto è sottostimato.</span></div>` : ''; })()}
       <div style="background:var(--cho-soft);border-radius:24px;padding:20px;text-align:center;margin-bottom:16px">
-        <div class="num" style="font-size:54px;font-weight:800;color:var(--cho);line-height:1">${gr1(cho)}</div>
-        <div style="font-size:14px;font-weight:600;color:var(--cho);margin-top:4px">grammi di carboidrati</div>
+        <button data-a="usoDett" style="width:100%" aria-label="Dettaglio dei carboidrati per ingrediente">
+          <div class="num" style="font-size:54px;font-weight:800;color:var(--cho);line-height:1">${gr1(cho)}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--cho);margin-top:4px;display:flex;align-items:center;justify-content:center;gap:5px">
+            grammi di carboidrati ${ico(S.usoDett ? 'su' : 'giu', 14)}</div>
+        </button>
         <div style="font-size:12px;color:var(--ink2);margin-top:4px">da inserire nel microinfusore</div>
         <div class="num" style="font-size:13px;font-weight:600;color:var(--ink2);margin-top:10px;padding-top:10px;border-top:1px solid rgba(19,32,25,.08)">
           ${gr1(gf)} g grassi · ${gr1(gp)} g proteine · ${Math.round(cho*4 + gp*4 + gf*9)} kcal
           · ${b.tipo}${b.split ? ` ${b.split[0]}/${b.split[1]}%` : ''}${b.durata ? ` su ${b.durata}` : ''}</div>
         ${ondaHTML(pl.ondaPct, pl.ondaOre, cho)}
       </div>
+      ${S.usoDett ? (() => {
+        /* Da dove vengono i carboidrati: ogni ingrediente in
+           proporzione alla quantita' scelta. */
+        const fr = peso > 0 ? q / peso : 0;
+        const righe = pl.ing.map(i => ({ c: cibo(i.alimento), g: grIng(i) * fr }))
+          .filter(x => x.c)
+          .map(x => ({ ...x, cho: x.c.cho * x.g / 100 }))
+          .sort((a, b) => b.cho - a.cho);
+        return `
+        <div class="card" style="padding:14px 16px;margin:-6px 0 14px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:2px">Da dove vengono i ${gr1(cho)} g</div>
+          <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Per ${gr1(q)} g di piatto${perdita ? ' a cotto' : ''}; grammi degli ingredienti in proporzione.</div>
+          ${righe.map(x => `
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-top:1px dashed var(--line);font-size:13.5px">
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.c.n)}
+              <span class="num" style="color:var(--ink2);font-size:12px">· ${gr1(x.g)} g</span></span>
+            <b class="num" style="flex:none">${gr1(x.cho)} g</b>
+          </div>`).join('')}
+          <div style="display:flex;justify-content:space-between;padding:8px 0 0;border-top:1px solid var(--line);margin-top:2px;font-weight:800;font-size:14px">
+            <span>Totale</span><span class="num">${gr1(cho)} g</span>
+          </div>
+        </div>`; })() : ''}
       <div class="stepper">
         <button data-a="ug:-">${ico('meno')}</button>
         <div style="flex:1;text-align:center">
@@ -3006,11 +3031,13 @@ document.addEventListener('click', e => {
     const pl = PIATTI.find(x => x.id === p1);
     if(pl){
       S.uso = { id: pl.id };
+      S.usoDett = null;
       const pesoCotto = pl.ing.reduce((s,i) => s + grIng(i), 0) * (1 - (pl.perdita || 0)/100);
       S.usoG = Math.min(pl.porzG || 350, Math.round(pesoCotto*10)/10);
     }
   }
   else if(a==='chiudiPiatto'){ S.uso = null; S.pform = null; S.editPiattoId = null; S.pingQ = ''; }
+  else if(a==='usoDett') S.usoDett = !S.usoDett;
   else if(a==='ug'){
     const passo = S.usoG >= 100 ? 10 : S.usoG >= 25 ? 5 : S.usoG >= 5 ? 1 : 0.5;
     S.usoG = Math.round((p1==='+' ? S.usoG+passo : Math.max(0.5, S.usoG-passo))*10)/10;
