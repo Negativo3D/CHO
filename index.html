@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.43';
+const VERSIONE = '2026-09-06.44';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1572,18 +1572,16 @@ function vistaRicette(){
       </div>
       <div class="griglia">${l.map(cella).join('')}</div>`;
   } else {
+    /* Solo le bandiere, grandi: una la tocchi ed entri nelle ricette
+       di quel paese. */
     corpo = `<div class="griglia">${Object.entries(PAESI_RICETTE).map(([cod, [bandiera, nome]]) => {
       const l = RICETTE.filter(r => (r.paese || 'IT') === cod);
       if(!l.length) return '';
-      const conFoto = l.find(r => r.foto);
       return `
       <div class="cella">
-        <button class="apri" data-a="paeseApri:${cod}">
-          ${conFoto
-            ? `<img src="${conFoto.foto}" alt="" style="width:100%;height:92px;object-fit:cover;border-radius:16px;display:block">`
-            : `<span class="emg" style="background:var(--wave-soft);font-size:36px">${bandiera}</span>`}
-          <span class="nome2">${bandiera} ${nome}</span>
-          <span style="font-size:11px;color:var(--ink2)">${l.length} ricett${l.length === 1 ? 'a' : 'e'}</span>
+        <button class="apri" data-a="paeseApri:${cod}" aria-label="${nome}"
+          style="display:flex;align-items:center;justify-content:center;padding:22px 0">
+          <span style="font-size:68px;line-height:1">${bandiera}</span>
         </button>
       </div>`;
     }).join('')}</div>`;
