@@ -568,7 +568,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.9';
+const VERSIONE = '2026-09-06.10';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -894,7 +894,7 @@ if(!RICETTE.length && !leggi().ricettaBase){
     n: 'Lasagne vegetariane',
     sezioni: [
       { titolo: 'Per le lasagne', voci: [
-        { n:"Lasagne all'uovo secche", q:'270' }, { n:'Scamorza (provola)', q:'250' },
+        { n:"Lasagne fresche all'uovo", q:'270' }, { n:'Scamorza (provola)', q:'250' },
         { n:'Formaggio grattugiato', q:'120' } ] },
       { titolo: 'Per il sugo di verdure', voci: [
         { n:'Passata di pomodoro', q:'400' }, { n:'Funghi champignon', q:'300' },
@@ -2936,7 +2936,7 @@ if(!leggi().ricetteAlimenti1){
    modifiche fatte a mano non vengono toccate. */
 if(!leggi().alimentiLasagne1){
   const VAL = {
-    "Lasagne all'uovo secche": { e:'🍝', cho:70,  f:4,   p:13,  ig:'medio', cat:'Primi e patate' },
+    "Lasagne fresche all'uovo": { e:'🍝', cho:53, f:2.2, p:9.9, ig:'medio', cat:'Primi e patate' },
     'Scamorza (provola)':      { e:'🧀', cho:1,   f:25,  p:25,  ig:'basso', cat:'Latte e derivati' },
     'Formaggio grattugiato':   { e:'🧀', cho:1,   f:28,  p:33,  ig:'basso', cat:'Latte e derivati' },
     'Passata di pomodoro':     { e:'🍅', cho:4,   f:0.4, p:1.3, ig:'basso', cat:'Verdura e legumi' },
@@ -2983,6 +2983,25 @@ if(!leggi().alimentiBase1){
   }
   if(toccati) scrivi({ alimenti: FOODS });
   scrivi({ alimentiBase1: true });
+}
+
+/* Una tantum: nelle lasagne l'ingrediente vero è la pasta fresca
+   all'uovo, non la secca. Si rinomina l'alimento tenendo lo stesso id
+   (così il piatto resta collegato), coi valori dell'etichetta
+   (53 CHO · 2,2 grassi · 9,9 proteine per 100 g), e si aggiorna il
+   nome anche nella ricetta. */
+if(!leggi().lasagneFresche1){
+  const i = FOODS.findIndex(f => norm(f.n) === norm("Lasagne all'uovo secche"));
+  if(i >= 0){
+    FOODS[i] = sanificaAlimento({ ...FOODS[i], n: "Lasagne fresche all'uovo",
+      e: '🍝', cho: 53, f: 2.2, p: 9.9, ig: 'medio', cat: 'Primi e patate', daCompletare: false });
+    scrivi({ alimenti: FOODS });
+  }
+  let toccaRicette = false;
+  for(const r of RICETTE) for(const sez of r.sezioni) for(const v of sez.voci)
+    if(norm(v.n) === norm("Lasagne all'uovo secche")){ v.n = "Lasagne fresche all'uovo"; toccaRicette = true; }
+  if(toccaRicette){ scrivi({ ricette: RICETTE }); RICETTE.forEach(sincronizzaPiattoRicetta); }
+  scrivi({ lasagneFresche1: true });
 }
 
 disegna();
