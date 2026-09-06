@@ -568,7 +568,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.6';
+const VERSIONE = '2026-09-06.7';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -2964,6 +2964,23 @@ if(!leggi().alimentiLasagne1){
   }
   if(toccati) scrivi({ alimenti: FOODS });
   scrivi({ alimentiLasagne1: true });
+}
+
+/* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
+   ancora grassi e proteine se li ritrova salvati a zero. Si completano
+   con i valori della base attuale, riconoscendoli per nome e solo se
+   entrambi sono a zero: i carboidrati e le modifiche manuali restano. */
+if(!leggi().alimentiBase1){
+  let toccati = 0;
+  for(const b of ALIMENTI_BASE){
+    const i = FOODS.findIndex(f => norm(f.n) === norm(b.n));
+    if(i >= 0 && FOODS[i].f === 0 && FOODS[i].p === 0){
+      FOODS[i] = sanificaAlimento({ ...FOODS[i], f: b.f, p: b.p, ig: FOODS[i].ig || b.ig });
+      toccati++;
+    }
+  }
+  if(toccati) scrivi({ alimenti: FOODS });
+  scrivi({ alimentiBase1: true });
 }
 
 disegna();
