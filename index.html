@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.17';
+const VERSIONE = '2026-09-06.18';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1761,21 +1761,29 @@ function stratoPiattoUso(){
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiPiatto">${ico('chiudi',20)}</button>
       </div>
       ${(() => {
-        /* Avviso con i nomi: quali voci della ricetta non sono contate
-           (senza grammatura in grammi o senza abbinamento). */
+        /* Avvisi con i nomi e con la causa distinta: quantità in grammi
+           mancante oppure alimento non in anagrafica. */
         if(!pl.mancanti) return '';
         const ric = pl.daRicetta ? RICETTE.find(r => r.id === pl.daRicetta) : null;
-        const nomi = [];
+        const senzaG = [], nonAbb = [];
         if(ric) for(const sez of ric.sezioni) for(const v of sez.voci){
           const u = v.u || 'g';
           if(u === 'qb') continue;
           const g = parseFloat(String(v.q).replace(',', '.'));
-          if(u !== 'g' || !(g > 0) || !trovaAlimento(v.n)) nomi.push(v.n);
+          if(u !== 'g' || !(g > 0)) senzaG.push(v.n);
+          else if(!trovaAlimento(v.n)) nonAbb.push(v.n);
         }
-        return `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
-        <span>⚠️</span><span>Dalla ricetta non ${nomi.length === 1 ? 'è contata la voce' : 'sono contate le voci'}:
-        <b>${nomi.length ? nomi.map(esc).join(', ') : pl.mancanti}</b> (senza grammatura in grammi
-        o senza abbinamento in anagrafica).</span></div>`;
+        const box = t => `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
+          <span>⚠️</span><span>${t}</span></div>`;
+        let h = '';
+        if(senzaG.length) h += box(`<b>${senzaG.map(esc).join(', ')}</b>: manca la quantità in grammi, quindi
+          non ${senzaG.length === 1 ? 'entra' : 'entrano'} nel conteggio. Aprila dalla matita della ricetta e
+          scrivi i grammi nella casella accanto al nome.`);
+        if(nonAbb.length) h += box(`<b>${nonAbb.map(esc).join(', ')}</b>: non in anagrafica alimenti, quindi
+          i carboidrati non sono contati.`);
+        if(!h) h = box(`${pl.mancanti} ingredient${pl.mancanti === 1 ? 'e' : 'i'} della ricetta non
+          ${pl.mancanti === 1 ? 'è contato' : 'sono contati'}: riapri e risalva la ricetta per riallineare.`);
+        return h;
       })()}
       ${(() => { const dc = pl.ing.map(i => cibo(i.alimento)).filter(c => c && c.daCompletare);
         return dc.length ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
@@ -2784,10 +2792,15 @@ document.addEventListener('click', e => {
   }
   else if(a==='ripSet'){
     const f = cibo(p1);
-    const v = S.rIngPicker && S.rform && S.rform.sezioni[S.rIngPicker.s]
-      && S.rform.sezioni[S.rIngPicker.s].voci[S.rIngPicker.k];
+    const p = S.rIngPicker;
+    const v = p && S.rform && S.rform.sezioni[p.s] && S.rform.sezioni[p.s].voci[p.k];
     if(f && v) v.n = f.n;
     S.rIngPicker = null;
+    disegna();
+    /* Cursore dritto sulla quantità: senza grammi la voce non conta. */
+    const q = v ? document.getElementById(`ri-${p.s}-${p.k}-q`) : null;
+    if(q) q.focus();
+    return;
   }
   else if(a==='ricFoto'){ fotoRicetta(); return; }
   else if(a==='ricFotoX'){ if(S.rform) S.rform.foto = null; }
