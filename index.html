@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.12';
+const VERSIONE = '2026-09-06.13';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -753,14 +753,11 @@ function sanificaPiatto(o){
    le voci in grammi vengono abbinate per nome agli alimenti, così i
    carboidrati arrivano dal database; le voci non abbinabili vengono
    contate come "mancanti" e segnalate nel piatto. */
+/* Vincolo rigido: un ingrediente di ricetta è l'alimento in anagrafica
+   con lo stesso identico nome, nessuna regola elastica. */
 function trovaAlimento(nome){
   const nn = norm(nome);
-  const esatto = FOODS.find(f => norm(f.n) === nn);
-  if(esatto) return esatto;
-  /* Contenimento per parole intere, non per sottostringa: "Melanzane"
-     non deve abbinarsi a "Mela". */
-  const sp = s => ' ' + s + ' ';
-  return FOODS.find(f => sp(nn).includes(sp(norm(f.n))) || sp(norm(f.n)).includes(sp(nn)));
+  return FOODS.find(f => norm(f.n) === nn);
 }
 
 /* Ogni ingrediente in grammi delle ricette deve stare in anagrafica:
@@ -1606,9 +1603,6 @@ function stratoRicettaForm(){
       </div>
       <div style="margin-bottom:12px"><div class="etich">Nome</div>
         <input id="rf-n" class="campo" placeholder="Es. Lasagne vegetariane" value="${esc(F.n)}"></div>
-      <datalist id="lista-alimenti">
-        ${[...FOODS].sort((a,b) => a.n.localeCompare(b.n, 'it')).map(f => `<option value="${esc(f.n)}">`).join('')}
-      </datalist>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
         ${F.foto ? `<img src="${esc(F.foto)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:16px;flex:none">` : ''}
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2);display:flex;
@@ -1629,8 +1623,9 @@ function stratoRicettaForm(){
         <div class="rigaIng" style="display:flex;gap:6px;margin-bottom:6px;align-items:stretch;border-radius:14px">
           <button class="card manico" data-drag="${s}:${k}" aria-label="Trascina per riordinare"
             style="padding:0 8px;color:var(--ink2);touch-action:none;cursor:grab">${ico('grip',16)}</button>
-          <input id="ri-${s}-${k}-n" class="campo" placeholder="Ingrediente" value="${esc(v.n)}"
-            list="lista-alimenti" autocomplete="off" style="flex:1;min-width:0;padding:10px 12px">
+          <button class="campo" data-a="rIngScegli:${s}:${k}" style="flex:1;min-width:0;padding:10px 12px;
+            text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${v.n ? '' : ';color:var(--ink2)'}">${
+            v.n ? esc(v.n) : 'Scegli alimento…'}</button>
           ${v.u === 'qb' ? '' : `
           <input id="ri-${s}-${k}-q" class="campo" placeholder="…" value="${esc(v.q)}"
             style="width:46px;padding:10px 4px;text-align:center">`}
@@ -1699,17 +1694,23 @@ function salvaRicetta(){
   const F = S.rform; if(!F) return;
   if(!F.n.trim()){ alert('Dai un nome alla ricetta.'); return; }
   const dati = sanificaRicetta({ id: S.editRicettaId || undefined, n:F.n, foto:F.foto, sezioni:F.sezioni, passi:F.passi, cottura:F.cottura });
+  /* Vincolo rigido: ogni ingrediente deve già esistere in anagrafica
+     con lo stesso identico nome. */
+  const fuori = [...new Set(dati.sezioni.flatMap(sz => sz.voci).map(v => v.n)
+    .filter(n => n.trim() && !trovaAlimento(n)))];
+  if(fuori.length){
+    alert(`Questi ingredienti non sono in anagrafica: ${fuori.join(', ')}. Creali prima come alimenti singoli (dalla home, col +), poi salva la ricetta.`);
+    return;
+  }
   if(S.editRicettaId){
     const i = RICETTE.findIndex(x => x.id === S.editRicettaId);
     if(i >= 0) RICETTE[i] = dati; else RICETTE.push(dati);
   } else RICETTE.push(dati);
   if(!scrivi({ ricette: RICETTE }))
     alert('Spazio sul telefono esaurito: prova a togliere la foto o a usarne una più piccola.');
-  const creati = creaAlimentiRicetta(dati);
   sincronizzaPiattoRicetta(dati);
-  S.rform = null; S.editRicettaId = null;
+  S.rform = null; S.editRicettaId = null; S.rIngPicker = null;
   disegna();
-  if(creati) alert(`Ho creato ${creati === 1 ? 'un nuovo alimento' : creati + ' nuovi alimenti'} in anagrafica dagli ingredienti della ricetta, segnat${creati === 1 ? 'o' : 'i'} "da completare": aprili e inserisci i carboidrati dall'etichetta, così i conti del piatto tornano.`);
 }
 function fotoRicetta(){ scegliFoto(d => { if(S.rform){ S.rform.foto = d; disegna(); } }); }
 
@@ -1795,9 +1796,40 @@ function stratoPiattoUso(){
   </div>`;
 }
 
+/* ---------- strato: scelta dell'ingrediente dall'anagrafica ----------
+   Gli ingredienti delle ricette si scelgono SOLO tra gli alimenti già
+   in anagrafica, senza testo libero: se manca, prima lo si crea come
+   alimento singolo dalla home. */
+function stratoScegliAlimento(){
+  if(!S.rIngPicker || !S.rform) return '';
+  const q = (S.rIngQ || '').trim();
+  const lista = (q ? FOODS.filter(f => norm(f.n).includes(norm(q))) : [...FOODS])
+    .sort((a,b) => a.n.localeCompare(b.n, 'it')).slice(0, 30);
+  return `
+  <div class="velo" data-a="ripChiudi">
+    <div class="foglio" data-stop="1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-weight:800;font-size:19px">Scegli l'alimento</div>
+        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="ripChiudi">${ico('chiudi',20)}</button>
+      </div>
+      <input id="rip-q" class="campo" placeholder="Cerca in anagrafica" value="${esc(S.rIngQ || '')}" style="margin-bottom:10px">
+      <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">Solo alimenti già in anagrafica: se manca,
+        crealo prima dalla home col + e poi torna alla ricetta.</p>
+      ${lista.map(f => `
+        <button class="card riga" style="width:100%;text-align:left;padding:10px 12px" data-a="ripSet:${f.id}">
+          ${f.foto ? `<img class="emt" src="${f.foto}" alt="" style="width:36px;height:36px;object-fit:cover">`
+            : `<span class="emt" style="width:36px;height:36px;font-size:18px">${f.e}</span>`}
+          <span style="flex:1;min-width:0"><span class="nome" style="display:block;font-size:14px">${esc(f.n)}</span>
+          <span class="sotto">${f.cho} g CHO per 100 g</span></span>
+        </button>`).join('')}
+      ${!lista.length ? `<p style="font-size:13px;color:var(--ink2)">Nessun alimento con questo nome: crealo prima in anagrafica.</p>` : ''}
+    </div>
+  </div>`;
+}
+
 function stratiHTML(){
   return (S.aperto ? stratoPorzione() : '') + stratoNuovo() + stratoPiattoUso() + stratoPiattoForm()
-    + (S.ricettaAperta ? stratoRicetta() : '') + stratoRicettaForm()
+    + (S.ricettaAperta ? stratoRicetta() : '') + stratoRicettaForm() + stratoScegliAlimento()
     + (S.paramSport ? stratoParametri() : '') + (S.sessioneAperta ? stratoSessione() : '')
     + (S.paramApp ? stratoParametriApp() : '')
     + (leggi().avvisoVisto ? '' : stratoAvviso());
@@ -2701,6 +2733,15 @@ document.addEventListener('click', e => {
     }
   }
   else if(a==='ricSalva'){ salvaRicetta(); return; }
+  else if(a==='rIngScegli'){ S.rIngPicker = { s:+p1, k:+p2 }; S.rIngQ = ''; }
+  else if(a==='ripChiudi'){ S.rIngPicker = null; }
+  else if(a==='ripSet'){
+    const f = cibo(p1);
+    const v = S.rIngPicker && S.rform && S.rform.sezioni[S.rIngPicker.s]
+      && S.rform.sezioni[S.rIngPicker.s].voci[S.rIngPicker.k];
+    if(f && v) v.n = f.n;
+    S.rIngPicker = null;
+  }
   else if(a==='ricFoto'){ fotoRicetta(); return; }
   else if(a==='ricFotoX'){ if(S.rform) S.rform.foto = null; }
   else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
@@ -2886,10 +2927,16 @@ document.addEventListener('input', e => {
     const sz = S.rform.sezioni[+id.slice(5)];
     if(sz) sz.titolo = e.target.value;
   }
+  else if(id === 'rip-q' && S.rIngPicker){
+    S.rIngQ = e.target.value;
+    document.getElementById('strati').innerHTML = stratiHTML();
+    const c = document.getElementById('rip-q');
+    if(c){ c.focus(); c.setSelectionRange(c.value.length, c.value.length); }
+  }
   else if(id.startsWith('ri-') && S.rform){
     const [, s, k, campo] = id.split('-');
     const v = S.rform.sezioni[+s] && S.rform.sezioni[+s].voci[+k];
-    if(v && (campo === 'n' || campo === 'q')) v[campo] = e.target.value;
+    if(v && campo === 'q') v.q = e.target.value;
   }
   else if(id.startsWith('rpsez-') && S.rform){
     const sz = S.rform.passi[+id.slice(6)];
@@ -3035,6 +3082,33 @@ if(!leggi().lasagneRitocchi1){
      fatti quando il confronto andava per sottostringa. */
   RICETTE.forEach(sincronizzaPiattoRicetta);
   scrivi({ lasagneRitocchi1: true });
+}
+
+/* Una tantum: da qui in poi gli ingredienti delle ricette sono
+   vincolati per nome esatto agli alimenti in anagrafica (niente più
+   regole elastiche né testo libero). Le voci che si abbinavano per
+   somiglianza prendono il nome esatto dell'alimento; quelle senza
+   nessun alimento vengono create col loro nome, così le ricette già
+   salvate restano valide e salvabili con la nuova regola. */
+if(!leggi().abbinamentoEsatto1){
+  const sp = s => ' ' + s + ' ';
+  let tocca = false;
+  for(const r of RICETTE) for(const sez of r.sezioni) for(const v of sez.voci){
+    if(!v.n.trim() || trovaAlimento(v.n)) continue;
+    const nn = norm(v.n);
+    const c = FOODS.find(f => sp(nn).includes(sp(norm(f.n))) || sp(norm(f.n)).includes(sp(nn)));
+    if(c) v.n = c.n;
+    else {
+      const g = parseFloat(String(v.q).replace(',', '.'));
+      const conta = (v.u || 'g') === 'g' && g > 0;
+      const nuovo = sanificaAlimento({ n: v.n, cho: 0, cat: 'Altro', daCompletare: conta });
+      if(nuovo) FOODS.push(nuovo);
+    }
+    tocca = true;
+  }
+  if(tocca) scrivi({ ricette: RICETTE, alimenti: FOODS });
+  RICETTE.forEach(sincronizzaPiattoRicetta);
+  scrivi({ abbinamentoEsatto1: true });
 }
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
