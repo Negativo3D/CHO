@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.27';
+const VERSIONE = '2026-09-06.28';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -2886,7 +2886,9 @@ document.addEventListener('click', e => {
     /* La x svuota la ricerca e lascia il focus nel campo, pronto per
        una nuova digitazione; si ridisegna solo la vista. */
     if(a==='pulisciQ') S.q = ''; else S.qr = '';
-    document.getElementById('vista').innerHTML = a==='pulisciQ' ? vistaAtlante() : vistaRicette();
+    const v = document.getElementById('vista');
+    v.classList.remove('anim');
+    v.innerHTML = a==='pulisciQ' ? vistaAtlante() : vistaRicette();
     const el = document.getElementById(a==='pulisciQ' ? 'q' : 'qr');
     if(el) el.focus();
     return;
@@ -3004,6 +3006,9 @@ document.addEventListener('input', e => {
   if(id === 'q'){
     S.q = e.target.value;
     const v = document.getElementById('vista');
+    /* Niente animazioni d'ingresso mentre si scrive: ripartirebbero a
+       ogni tasto con un effetto a scatti. */
+    v.classList.remove('anim');
     v.innerHTML = vistaAtlante();
     const q = document.getElementById('q');
     q.focus(); q.setSelectionRange(q.value.length, q.value.length);
@@ -3011,6 +3016,7 @@ document.addEventListener('input', e => {
   else if(id === 'qr'){
     S.qr = e.target.value;
     const v = document.getElementById('vista');
+    v.classList.remove('anim');
     v.innerHTML = vistaRicette();
     const el = document.getElementById('qr');
     if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
