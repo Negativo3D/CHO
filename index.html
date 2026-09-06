@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.31';
+const VERSIONE = '2026-09-06.32';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3393,6 +3393,48 @@ importaRicettario('kr2Bulgogi',
     ],
     cottura: [],
     porzG: 300, perdita: 20
+  }]);
+
+importaRicettario('kr3Pajeon',
+  [
+    { n:'Amido di mais (maizena)', e:'🌽', cho:87,  f:0.1, p:0.3,  ig:'alto',  cat:'Pane e cereali' },
+    { n:'Misto di mare (gamberi, calamari, cozze)', e:'🦐', cho:1.5, f:1.2, p:16, ig:'basso', cat:'Altro' },
+    { n:'Uova',                    e:'🥚', cho:1,   f:8.7, p:12.4, ig:'basso', cat:'Altro' },
+    { n:'Peperoncino fresco',      e:'🌶️', cho:4,   f:0.3, p:1.9,  ig:'basso', cat:'Verdura e legumi' },
+    { n:'Aceto di riso',           e:'🍶', cho:1,   f:0,   p:0,    ig:'basso', cat:'Altro' },
+    { n:'Acqua',                   e:'💧', cho:0,   f:0,   p:0,    ig:'basso', cat:'Bevande' }
+  ],
+  [{
+    n: 'Haemul pajeon (해물파전) — frittella di cipollotti e frutti di mare',
+    sezioni: [
+      { titolo: 'Per la pastella', voci: [
+        { n:'Farina 00',               q:'110', u:'g' },
+        { n:'Amido di mais (maizena)', q:'20',  u:'g' },
+        { n:'Acqua',                   q:'220', u:'g' },
+        { n:'Uova',                    q:'100', u:'g' },
+        { n:'Sale fino',               u:'qb' } ] },
+      { titolo: 'Per la farcia', voci: [
+        { n:'Cipollotto',                              q:'200', u:'g' },
+        { n:'Misto di mare (gamberi, calamari, cozze)', q:'200', u:'g' },
+        { n:'Peperoncino fresco', u:'qb' },
+        { n:'Olio di semi',       u:'qb' } ] },
+      { titolo: 'Per la salsa', voci: [
+        { n:'Salsa di soia',  q:'2', u:'cm' },
+        { n:'Aceto di riso',  q:'1', u:'cm' },
+        { n:'Semi di sesamo', u:'qb' } ] }
+    ],
+    passi: [
+      { titolo: 'Pastella e farcia', passi: [
+        { t: 'Mescola farina, maizena e un pizzico di sale con l\'acqua molto fredda fino ad avere una pastella liscia e fluida: più l\'acqua è fredda, più la frittella verrà croccante.' },
+        { t: 'Pulisci i cipollotti e tagliali a metà per il lungo, lunghi quanto la padella; taglia il misto di mare a pezzetti e asciugalo bene con carta da cucina.' } ] },
+      { titolo: 'In padella', passi: [
+        { t: 'Scalda abbondante olio di semi in una padella ampia, disponi i cipollotti paralleli a coprire il fondo, versa sopra la pastella, distribuisci i frutti di mare (e il peperoncino a rondelle) e versa infine le uova sbattute.' },
+        { t: 'Cuoci a fuoco medio-alto 3-4 minuti finché il fondo è ben dorato, gira con decisione aiutandoti con un piatto e cuoci altri 2-3 minuti premendo leggermente: fuori croccante, dentro morbida.' } ] },
+      { titolo: 'Salsa', passi: [
+        { t: 'Mescola salsa di soia e aceto di riso con qualche seme di sesamo: si serve a parte, per intingere i pezzi di frittella.' } ] }
+    ],
+    cottura: [],
+    porzG: 250, perdita: 15
   }]);
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
