@@ -479,13 +479,32 @@ function autoallinea(s, glicDopo){
 /* Promemoria: la sessione più recente senza esito, registrata da
    almeno un'ora, viene riproposta in Home e in Sport per inserire la
    glicemia dopo l'attività. */
-/* La registrazione avviene alla partenza dell'attività, quindi il
-   promemoria scade alla durata più mezz'ora da quel momento. Per la
-   corsa la durata si stima dalla distanza (~6 minuti al chilometro). */
+/* ---------- parametri generali dell'app ----------
+   A monte di tutto: la registrazione dell'attività coincide con
+   l'inserimento del basale Esercizio; l'attività parte dopo i minuti
+   "prima" e il promemoria della glicemia arriva i minuti "dopo" oltre
+   la fine. Entrambi modificabili dai parametri dell'app (default 30). */
+function appParam(){
+  const p = leggi().parametriApp || {};
+  const n = (v, d) => (typeof v === 'number' && isFinite(v) && v >= 0 && v <= 240) ? Math.round(v) : d;
+  return { preAttivita: n(p.preAttivita, 30), postAttivita: n(p.postAttivita, 30) };
+}
+function salvaAppParam(campo, val){
+  const p = leggi().parametriApp || {};
+  const n = parseFloat(String(val).replace(',', '.'));
+  if(isFinite(n)) p[campo] = n; else delete p[campo];
+  scrivi({ parametriApp: p });
+}
+
+/* La registrazione segna l'inserimento del basale Esercizio: da lì si
+   sommano i minuti fino alla partenza, la durata dell'attività (per la
+   corsa stimata dalla distanza, ~6 minuti al chilometro) e i minuti
+   dopo la fine; a quel punto scatta il promemoria della glicemia. */
 function scadenzaEsito(x){
   const a = ATTIVITA[x.attivita];
   const minuti = a && a.cond === 'Distanza' ? (x.cond || 10) * 6 : (x.cond || 60);
-  return x.quando + (minuti + 30) * 60000;
+  const P = appParam();
+  return x.quando + (P.preAttivita + minuti + P.postAttivita) * 60000;
 }
 function promemoriaEsito(){
   const p = sessioniSport().filter(x => x.glicDopo == null && Date.now() >= scadenzaEsito(x)).pop();
@@ -535,7 +554,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.1';
+const VERSIONE = '2026-09-06.2';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1274,7 +1293,12 @@ function vistaAtlante(){
       <div style="padding-right:60px">
         <div class="occhiello">CHO · Conta carboidrati</div>
         <div class="titolone" style="text-transform:capitalize">${dataOggi}</div>
-        <div style="font-size:11px;font-weight:600;opacity:.65;margin-top:8px">Versione ${VERSIONE}</div>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:8px">
+          <div style="font-size:11px;font-weight:600;opacity:.65">Versione ${VERSIONE}</div>
+          <button data-a="paramApp" aria-label="Parametri dell'app"
+            style="color:#fff;opacity:.65;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600">
+            ${ico('regola',13)} Parametri</button>
+        </div>
       </div>
     </div>`;
 
@@ -1654,6 +1678,7 @@ function stratiHTML(){
   return (S.aperto ? stratoPorzione() : '') + stratoNuovo() + stratoPiattoUso() + stratoPiattoForm()
     + (S.ricettaAperta ? stratoRicetta() : '') + stratoRicettaForm()
     + (S.paramSport ? stratoParametri() : '') + (S.sessioneAperta ? stratoSessione() : '')
+    + (S.paramApp ? stratoParametriApp() : '')
     + (leggi().avvisoVisto ? '' : stratoAvviso());
 }
 
@@ -1971,6 +1996,39 @@ function vistaSport(){
 
 /* ---------- strato: parametri dello sport ---------- */
 /* ---------- strato: registrazione attività ed esito ---------- */
+/* ---------- strato: parametri generali dell'app ----------
+   Raggiungibili dalla home, valgono per tutta l'app: per ora i tempi
+   dell'attività fisica che governano il promemoria della glicemia. */
+function stratoParametriApp(){
+  if(!S.paramApp) return '';
+  const P = appParam();
+  const campo = (id, lab, val) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="flex:1;font-size:13px;color:var(--ink2);font-weight:600">${lab}</div>
+      <input id="pa-${id}" class="campo" inputmode="numeric" value="${val}"
+        style="width:96px;padding:9px 10px;text-align:center;font-weight:600"></div>`;
+  return `
+  <div class="velo" data-a="chiudiParamApp">
+    <div class="foglio" data-stop="1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-weight:800;font-size:19px">Parametri dell'app</div>
+        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiParamApp">${ico('chiudi',20)}</button>
+      </div>
+      <div style="font-weight:700;margin:12px 0 2px">Tempi dell'attività fisica</div>
+      <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">La registrazione dell'attività segna il momento in
+        cui inserisci il basale Esercizio. Da lì si contano i minuti fino alla partenza, poi la durata
+        dell'attività, poi i minuti dopo la fine: a quel punto arriva il promemoria
+        "Rileva la glicemia post attività fisica".</p>
+      ${campo('preAttivita', 'Minuti dalla registrazione alla partenza', P.preAttivita)}
+      ${campo('postAttivita', 'Minuti dopo la fine per il promemoria', P.postAttivita)}
+      <p style="font-size:12px;color:var(--ink2);margin:10px 0 0">Il promemoria compare come banner nell'app e, se hai
+        dato il permesso alle notifiche, anche come notifica con l'app in secondo piano. Ad app completamente
+        chiusa la notifica arriva alla prima riapertura.</p>
+      <button class="primario" style="margin-top:12px" data-a="chiudiParamApp">Fatto</button>
+    </div>
+  </div>`;
+}
+
 function stratoSessione(){
   const s = S.sessioneAperta; if(!s) return '';
   const a = ATTIVITA[s.attivita] || {};
@@ -1987,7 +2045,13 @@ function stratoSessione(){
       <p style="font-size:13px;color:var(--ink2)">${a.nome}${s.cond != null ? ' · ' + etichettaDi(a.opzioni || [], s.cond) : ''}
         — ${s.bolo ? `glicemia alta: bolo correttivo${s.boloU != null ? ' da ' + String(s.boloU).replace('.', ',') + ' U' : ''}, niente CHO`
                    : `suggeriti ${s.suggPrima} g prima`}${s.anticipo ? ` · basale Esercizio da ${s.anticipo} min prima` : ''}.
-        L'orario di registrazione vale come partenza dell'attività.</p>
+        ${(() => { const P = appParam();
+          if(!s.nuova) return "L'orario di registrazione segna l'inserimento del basale Esercizio.";
+          const min = a.cond === 'Distanza' ? (s.cond || 10) * 6 : (s.cond || 60);
+          const ora = new Date(Date.now() + (P.preAttivita + min + P.postAttivita)*60000)
+            .toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
+          return `La registrazione segna l'inserimento del basale Esercizio: partenza tra ${P.preAttivita} min,
+            promemoria glicemia verso le ${ora}.`; })()}</p>
       <div style="margin-bottom:12px;max-width:200px"><div class="etich">CHO presi prima (g)</div>
         <input id="ss-prima" class="campo" inputmode="decimal" value="${esc(String(s.presiPrima))}"></div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -1998,8 +2062,8 @@ function stratoSessione(){
           <input id="ss-glic" class="campo" inputmode="numeric" placeholder="Te la ricordo io"
             value="${esc(String(s.glicDopo ?? ''))}"></div>
       </div>
-      <p style="font-size:12px;color:var(--ink2)">Salva pure senza la glicemia dopo: te la ricordo io allo scadere
-        dell'attività più mezz'ora. Con l'esito i parametri si aggiustano da soli: sotto 70 aumento i CHO,
+      <p style="font-size:12px;color:var(--ink2)">Salva pure senza la glicemia dopo: te la ricordo io alla scadenza
+        (i tempi si regolano dai parametri dell'app, in home). Con l'esito i parametri si aggiustano da soli: sotto 70 aumento i CHO,
         tra 70 e 180 confermo quanto hai preso, sopra 180 li riduco.</p>
       <button class="primario" style="background:var(--sport)" data-a="salvaSessione">Salva</button>
     </div>
@@ -2068,8 +2132,8 @@ function controllaPromemoria(){
   salvaSessioni(arr);
   const a = ATTIVITA[daAvvisare[daAvvisare.length-1].attivita] || {};
   if('Notification' in window && Notification.permission === 'granted' && swReg){
-    swReg.showNotification("Com'è andata l'attività?", {
-      body: `Inserisci la glicemia dopo ${a.nome ? a.nome.toLowerCase() : "l'attività"}: serve a tarare i parametri.`,
+    swReg.showNotification('Rileva la glicemia post attività fisica', {
+      body: `${a.nome ? a.nome + ' finito' : 'Attività finita'} da un po': inserisci la glicemia, serve a tarare i parametri.`,
       icon: 'icona-192.png', badge: 'icona-192.png', tag: 'cho-esito'
     }).catch(() => {});
   }
@@ -2079,6 +2143,9 @@ function controllaPromemoria(){
 }
 setInterval(controllaPromemoria, 60 * 1000);
 document.addEventListener('visibilitychange', () => { if(!document.hidden) controllaPromemoria(); });
+/* Anche subito all'avvio: se il promemoria è scaduto ad app chiusa,
+   la notifica parte alla prima riapertura. */
+setTimeout(controllaPromemoria, 3000);
 
 function stratoParametri(){
   const id = S.paramSport; if(!id || !ATTIVITA[id]) return '';
@@ -2485,6 +2552,8 @@ document.addEventListener('click', e => {
   }
   else if(a==='param') S.paramSport = p1;
   else if(a==='chiudiParam') S.paramSport = null;
+  else if(a==='paramApp') S.paramApp = true;
+  else if(a==='chiudiParamApp') S.paramApp = null;
   else if(a==='regSport'){
     /* Si parte da quanto impostato nella pagina: condizione, glicemia
        dichiarata e quantità già corrette di conseguenza. */
@@ -2667,6 +2736,7 @@ document.addEventListener('input', e => {
     if(box && att) box.outerHTML = boxPrima(calcolaSport(S.sport), att);
   }
   else if(id.startsWith('pg-')) salvaGlicParam(id.slice(3), e.target.value);
+  else if(id.startsWith('pa-')) salvaAppParam(id.slice(3), e.target.value);
   else if(id.startsWith('pt-') && S.paramSport){
     /* Cella della tabella parametri: si salva subito, senza ridisegnare
        (il ridisegno farebbe perdere il focus mentre si scrive). */
