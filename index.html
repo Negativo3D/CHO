@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.23';
+const VERSIONE = '2026-09-06.25';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -2058,7 +2058,8 @@ function vistaPeso(){
   const ultimo = PESO[PESO.length-1], prec = PESO[PESO.length-2];
   const delta = ultimo && prec ? Math.round((ultimo.kg - prec.kg)*10)/10 : null;
   const hero = `
-    <button class="chip" data-a="tab:sport" style="margin:10px 0 2px">‹ Attività fisica</button>
+    <button class="chip" data-a="tab:sport" aria-label="Torna all'attività fisica"
+      style="margin:10px 0 2px;display:inline-flex;align-items:center;gap:6px">${ico('chiudi',14)} Attività fisica</button>
     <div class="hero blu">
       <div class="occhiello">Registro del peso</div>
       ${ultimo ? `
@@ -2175,14 +2176,15 @@ function vistaSport(){
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)">
         <span style="width:44px;height:44px;border-radius:14px;background:var(--sport-soft);display:flex;
           align-items:center;justify-content:center;font-size:25px;line-height:1;flex:none">${att.icona}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:800;font-size:18px;letter-spacing:-.3px">${att.nome}</div>
+        <div style="min-width:0">
+          <div style="font-weight:800;font-size:18px;letter-spacing:-.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${att.nome}</div>
           <div style="font-size:12px;color:var(--ink2)">${att.sotto}</div>
         </div>
-        <button class="chip" data-a="att:" aria-label="Chiudi"
-          style="--c:var(--sport);display:flex;align-items:center">${ico('chiudi',15)}</button>
         <button class="chip" data-a="param:${s.attivita}" aria-label="Parametri ${att.nome}"
-          style="--c:var(--sport);display:flex;align-items:center;gap:5px">${ico('regola',15)}</button>
+          style="--c:var(--sport);display:flex;align-items:center;gap:5px;flex:none">${ico('regola',15)}</button>
+        <div style="flex:1"></div>
+        <button class="chip" data-a="att:" aria-label="Chiudi"
+          style="--c:var(--sport);display:flex;align-items:center;flex:none">${ico('chiudi',15)}</button>
       </div>
       ${G(att.cond, att.opzioni, 'cond')}
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
