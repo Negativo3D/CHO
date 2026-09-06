@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.42';
+const VERSIONE = '2026-09-06.43';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -771,7 +771,7 @@ function trovaAlimento(nome){
 function creaAlimentiRicetta(r){
   let creati = 0;
   for(const sez of r.sezioni) for(const v of sez.voci){
-    if((v.u || 'g') !== 'g') continue;
+    if(v.ua === 'qb') continue;
     const g = parseFloat(String(v.q).replace(',', '.'));
     if(!(g > 0) || !v.n.trim() || trovaAlimento(v.n)) continue;
     const nuovo = sanificaAlimento({ n: v.n, cho: 0, cat: 'Altro', daCompletare: true });
@@ -785,12 +785,8 @@ function sincronizzaPiattoRicetta(r){
   const ing = [];
   let mancanti = 0;
   for(const sez of r.sezioni) for(const v of sez.voci){
-    const u = v.u || 'g';
-    if(u === 'qb') continue;             /* q.b.: irrilevante per i CHO */
-    const q = parseFloat(String(v.q).replace(',', '.'));
-    /* I cucchiai valgono grammi indicativi: da minestra 15 g, da caffè
-       5 g. Il "n°" invece dipende dall'alimento e non si converte. */
-    const g = u === 'g' ? q : u === 'cm' ? q*15 : u === 'cc' ? q*5 : NaN;
+    if(v.ua === 'qb') continue;          /* q.b.: irrilevante per i CHO */
+    const g = parseFloat(String(v.q).replace(',', '.'));
     if(!(g > 0)){ mancanti++; continue; }
     const c = trovaAlimento(v.n);
     if(c) ing.push({ alimento: c.id, modo:'g', g: Math.round(g*10)/10 });
@@ -830,11 +826,25 @@ function sanificaRicetta(o){
     titolo: s && typeof s.titolo === 'string' ? s.titolo.trim() : '',
     voci: s && Array.isArray(s.voci) ? s.voci.map(v => {
       if(!v) return null;
-      let q = typeof v.q === 'string' ? v.q.trim() : '';
-      let u = ['g','qb','cm','cc','n'].includes(v.u) ? v.u : null;
-      /* Migrazione: 'q.b.' scritto nella quantità diventa l'unità q.b. */
-      if(!u){ if(/^q\.? ?b\.?$/i.test(q)){ u = 'qb'; q = ''; } else u = 'g'; }
-      return { n: typeof v.n === 'string' ? v.n.trim() : '', q, u };
+      let q = v.q != null ? String(v.q).trim() : '';
+      let ua = ['qb','cm','cc','n'].includes(v.ua) ? v.ua : '';
+      let qa = v.qa != null ? String(v.qa).trim() : '';
+      /* Migrazione dal vecchio modello a unità primaria: i grammi
+         diventano l'unità di conto, i cucchiai un'indicazione
+         alternativa (1 cucchiaio ~15 g, 1 cucchiaino ~5 g). */
+      if(v.ua === undefined && v.u !== undefined){
+        const u = ['g','qb','cm','cc','n'].includes(v.u) ? v.u : 'g';
+        if(u === 'qb'){ ua = 'qb'; q = ''; }
+        else if(u === 'cm' || u === 'cc'){
+          const n2 = parseFloat(q.replace(',', '.'));
+          ua = u; qa = q;
+          q = n2 > 0 ? String(Math.round(n2 * (u === 'cm' ? 15 : 5))) : '';
+        }
+        else if(u === 'n'){ ua = 'n'; qa = q; q = ''; }
+      }
+      if(!ua && /^q\.? ?b\.?$/i.test(q)){ ua = 'qb'; q = ''; }
+      if(ua === 'qb'){ q = ''; qa = ''; }
+      return { n: typeof v.n === 'string' ? v.n.trim() : '', q, ua, qa };
     }).filter(v => v && v.n) : []
   })).filter(s => s.voci.length || s.titolo) : null;
   /* Ogni passaggio può avere una foto; i vecchi passi a stringa migrano. */
@@ -892,13 +902,13 @@ function etichettaUnita(u){
 }
 function qtaVoceHTML(v){
   const q = esc(String(v.q || '').trim());
-  const u = v.u || 'g';
-  if(u === 'qb') return 'q.b.';
-  if(!q) return '';
-  if(u === 'g') return /^\d+([.,]\d+)?$/.test(q) ? q + ' g' : q;
-  if(u === 'cm' || u === 'cc') return `${q} ${etichettaUnita(u)}`;
-  if(u === 'n') return 'n° ' + q;
-  return q;
+  const qa = String(v.qa || '').trim();
+  if(v.ua === 'qb') return 'q.b.';
+  const alt = v.ua && qa
+    ? (v.ua === 'n' ? 'n° ' + esc(qa) : `${esc(qa)} ${etichettaUnita(v.ua)}`) : '';
+  if(q && alt) return `${q} g · ${alt}`;
+  if(q) return q + ' g';
+  return alt;
 }
 
 /* Testo e foto del taglio delle verdure per la ricetta di partenza. */
@@ -1707,17 +1717,20 @@ function stratoRicettaForm(){
           <button class="campo" data-a="rIngScegli:${s}:${k}" style="flex:1;min-width:0;padding:10px 12px;
             text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${v.n ? '' : ';color:var(--ink2)'}">${
             v.n ? esc(v.n) : 'Scegli alimento…'}</button>
-          ${v.u === 'qb' ? '' : `
-          <input id="ri-${s}-${k}-q" class="campo" placeholder="…" value="${esc(v.q)}"
+          ${v.ua === 'qb' ? '' : `
+          <input id="ri-${s}-${k}-q" class="campo" placeholder="g" value="${esc(v.q)}"
             style="width:46px;padding:10px 4px;text-align:center">`}
-          <button class="card" data-a="rUnitaApri:${s}:${k}" aria-label="Unità di misura"
-            style="width:${v.u === 'qb' ? '58' : '46'}px;flex:none;display:flex;align-items:center;justify-content:center;
-            font-weight:600;font-size:13px;color:var(--wave)">${etichettaUnita(v.u)}</button>
+          ${v.ua && v.ua !== 'qb' ? `
+          <input id="ri-${s}-${k}-a" class="campo" placeholder="…" value="${esc(v.qa)}"
+            style="width:36px;padding:10px 3px;text-align:center">` : ''}
+          <button class="card" data-a="rUnitaApri:${s}:${k}" aria-label="Unità alternativa"
+            style="width:${v.ua === 'qb' ? '58' : '46'}px;flex:none;display:flex;align-items:center;justify-content:center;
+            font-weight:600;font-size:13px;color:var(--wave)">${v.ua ? etichettaUnita(v.ua) : 'g'}</button>
           <button class="card" style="padding:0 10px;color:var(--ink2)" data-a="rIngDel:${s}:${k}">${ico('chiudi',14)}</button>
         </div>
         ${S.rformUnita === s + ':' + k ? `
         <div style="display:flex;gap:6px;margin:-2px 0 10px 40px;align-items:center">
-          ${UNITA_RICETTA.map(u => `<button class="chip ${v.u === u ? 'on' : ''}"
+          ${UNITA_RICETTA.map(u => `<button class="chip ${(v.ua || 'g') === u ? 'on' : ''}"
             style="--c:var(--wave);padding:8px 12px;display:flex;align-items:center"
             data-a="rUnitaSet:${s}:${k}:${u}">${etichettaUnita(u)}</button>`).join('')}
         </div>` : ''}`).join('')}
@@ -1848,10 +1861,8 @@ function stratoPiattoUso(){
         const ric = pl.daRicetta ? RICETTE.find(r => r.id === pl.daRicetta) : null;
         const senzaG = [], nonAbb = [];
         if(ric) for(const sez of ric.sezioni) for(const v of sez.voci){
-          const u = v.u || 'g';
-          if(u === 'qb') continue;
-          const q = parseFloat(String(v.q).replace(',', '.'));
-          const g = u === 'g' ? q : u === 'cm' ? q*15 : u === 'cc' ? q*5 : NaN;
+          if(v.ua === 'qb') continue;
+          const g = parseFloat(String(v.q).replace(',', '.'));
           if(!(g > 0)) senzaG.push(v.n);
           else if(!trovaAlimento(v.n)) nonAbb.push(v.n);
         }
@@ -2790,18 +2801,18 @@ document.addEventListener('click', e => {
   }
   else if(a==='gset') S.gr = +p1;
   else if(a==='ricNuova'){
-    S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
+    S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', ua:'', qa:'' }] }],
       passi:[{ titolo:'', passi:[{ t:'', foto:null }] }], cottura:[],
       paese:'IT', porzG:'', perdita:'', ondaPct:'100', ondaOre:'' };
     S.editRicettaId = null;
   }
-  else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'', u:'g' }] }); }
+  else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'', ua:'', qa:'' }] }); }
   else if(a==='rSezDel'){ if(S.rform) S.rform.sezioni.splice(+p1, 1); }
   else if(a==='rIngAdd'){
     /* "+ ingrediente" apre subito il selettore dell'anagrafica sulla
        nuova riga; se si chiude senza scegliere, la riga vuota sparisce. */
     if(S.rform && S.rform.sezioni[+p1]){
-      S.rform.sezioni[+p1].voci.push({ n:'', q:'', u:'g' });
+      S.rform.sezioni[+p1].voci.push({ n:'', q:'', ua:'', qa:'' });
       S.rIngPicker = { s:+p1, k: S.rform.sezioni[+p1].voci.length - 1, nuovo: true };
       S.rIngQ = '';
     }
@@ -2809,15 +2820,16 @@ document.addEventListener('click', e => {
   else if(a==='rIngDel'){
     if(S.rform && S.rform.sezioni[+p1]){
       S.rform.sezioni[+p1].voci.splice(+p2, 1);
-      if(!S.rform.sezioni[+p1].voci.length) S.rform.sezioni[+p1].voci.push({ n:'', q:'', u:'g' });
+      if(!S.rform.sezioni[+p1].voci.length) S.rform.sezioni[+p1].voci.push({ n:'', q:'', ua:'', qa:'' });
     }
   }
   else if(a==='rUnitaApri') S.rformUnita = S.rformUnita === p1 + ':' + p2 ? null : p1 + ':' + p2;
   else if(a==='rUnitaSet'){
     const v = S.rform && S.rform.sezioni[+p1] && S.rform.sezioni[+p1].voci[+p2];
     if(v && UNITA_RICETTA.includes(p3)){
-      v.u = p3;
-      if(v.u === 'qb') v.q = '';
+      if(p3 === 'g'){ v.ua = ''; v.qa = ''; }
+      else if(p3 === 'qb'){ v.ua = 'qb'; v.q = ''; v.qa = ''; }
+      else v.ua = p3;
     }
     S.rformUnita = null;
   }
@@ -2847,8 +2859,8 @@ document.addEventListener('click', e => {
     if(r){
       S.rform = { n:r.n, foto:r.foto, paese: r.paese || 'IT',
         sezioni: r.sezioni.length
-          ? r.sezioni.map(sz => ({ titolo:sz.titolo, voci: sz.voci.length ? sz.voci.map(v => ({...v})) : [{ n:'', q:'' }] }))
-          : [{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
+          ? r.sezioni.map(sz => ({ titolo:sz.titolo, voci: sz.voci.length ? sz.voci.map(v => ({...v})) : [{ n:'', q:'', ua:'', qa:'' }] }))
+          : [{ titolo:'', voci:[{ n:'', q:'', ua:'', qa:'' }] }],
         passi: r.passi.length
           ? r.passi.map(sz => ({ titolo: sz.titolo, passi: sz.passi.length ? sz.passi.map(x => ({...x})) : [{ t:'', foto:null }] }))
           : [{ titolo:'', passi:[{ t:'', foto:null }] }],
@@ -3101,6 +3113,7 @@ document.addEventListener('input', e => {
     const [, s, k, campo] = id.split('-');
     const v = S.rform.sezioni[+s] && S.rform.sezioni[+s].voci[+k];
     if(v && campo === 'q') v.q = e.target.value;
+    else if(v && campo === 'a') v.qa = e.target.value;
   }
   else if(id.startsWith('rpsez-') && S.rform){
     const sz = S.rform.passi[+id.slice(6)];
@@ -3241,7 +3254,7 @@ if(!leggi().lasagneRitocchi1){
   let toccaRicette = false;
   for(const r of RICETTE) for(const sez of r.sezioni) for(const v of sez.voci){
     const g = parseFloat(String(v.q).replace(',', '.'));
-    if((v.u || 'g') === 'g' && !(g > 0) && norm(v.n).includes('melanzan')){ v.q = '200'; toccaRicette = true; }
+    if(v.ua !== 'qb' && !(g > 0) && norm(v.n).includes('melanzan')){ v.q = '200'; toccaRicette = true; }
   }
   if(toccaRicette) scrivi({ ricette: RICETTE });
   /* Riabbinamento comunque: ripara anche eventuali abbinamenti storti
@@ -3266,7 +3279,7 @@ if(!leggi().abbinamentoEsatto1){
     if(c) v.n = c.n;
     else {
       const g = parseFloat(String(v.q).replace(',', '.'));
-      const conta = (v.u || 'g') === 'g' && g > 0;
+      const conta = v.ua !== 'qb' && g > 0;
       const nuovo = sanificaAlimento({ n: v.n, cho: 0, cat: 'Altro', daCompletare: conta });
       if(nuovo) FOODS.push(nuovo);
     }
