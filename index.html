@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.11';
+const VERSIONE = '2026-09-06.12';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -754,8 +754,13 @@ function sanificaPiatto(o){
    carboidrati arrivano dal database; le voci non abbinabili vengono
    contate come "mancanti" e segnalate nel piatto. */
 function trovaAlimento(nome){
-  return FOODS.find(f => norm(f.n) === norm(nome))
-    || FOODS.find(f => norm(nome).includes(norm(f.n)) || norm(f.n).includes(norm(nome)));
+  const nn = norm(nome);
+  const esatto = FOODS.find(f => norm(f.n) === nn);
+  if(esatto) return esatto;
+  /* Contenimento per parole intere, non per sottostringa: "Melanzane"
+     non deve abbinarsi a "Mela". */
+  const sp = s => ' ' + s + ' ';
+  return FOODS.find(f => sp(nn).includes(sp(norm(f.n))) || sp(norm(f.n)).includes(sp(nn)));
 }
 
 /* Ogni ingrediente in grammi delle ricette deve stare in anagrafica:
@@ -902,7 +907,7 @@ if(!RICETTE.length && !leggi().ricettaBase){
         { n:'Formaggio grattugiato', q:'120' } ] },
       { titolo: 'Per il sugo di verdure', voci: [
         { n:'Passata di pomodoro', q:'400' }, { n:'Funghi champignon', q:'300' },
-        { n:'Melanzane', q:'' }, { n:'Zucchine', q:'220' }, { n:'Spinaci', q:'200' },
+        { n:'Melanzane', q:'200' }, { n:'Zucchine', q:'220' }, { n:'Spinaci', q:'200' },
         { n:'Cipolle rosse', q:'200' }, { n:'Carote', q:'180' },
         { n:"Olio extravergine d'oliva", q:'q.b.' }, { n:'Sale fino', q:'q.b.' } ] },
       { titolo: 'Per la besciamella', voci: [
@@ -1741,13 +1746,27 @@ function stratoPiattoUso(){
         </div>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiPiatto">${ico('chiudi',20)}</button>
       </div>
-      ${pl.mancanti ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
-        <span>⚠️</span><span>Piatto creato dalla ricetta: ${pl.mancanti} ingredient${pl.mancanti === 1 ? 'e non è' : 'i non sono'}
-        nell'anagrafica alimenti, quindi i suoi carboidrati non sono contati.</span></div>` : ''}
-      ${(() => { const dc = pl.ing.filter(i => (cibo(i.alimento) || {}).daCompletare).length;
-        return dc ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
-        <span>⚠️</span><span>${dc === 1 ? 'Un ingrediente ha' : dc + ' ingredienti hanno'} i carboidrati ancora
-        da completare in anagrafica: il totale del piatto è sottostimato.</span></div>` : ''; })()}
+      ${(() => {
+        /* Avviso con i nomi: quali voci della ricetta non sono contate
+           (senza grammatura in grammi o senza abbinamento). */
+        if(!pl.mancanti) return '';
+        const ric = pl.daRicetta ? RICETTE.find(r => r.id === pl.daRicetta) : null;
+        const nomi = [];
+        if(ric) for(const sez of ric.sezioni) for(const v of sez.voci){
+          const u = v.u || 'g';
+          if(u === 'qb') continue;
+          const g = parseFloat(String(v.q).replace(',', '.'));
+          if(u !== 'g' || !(g > 0) || !trovaAlimento(v.n)) nomi.push(v.n);
+        }
+        return `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
+        <span>⚠️</span><span>Dalla ricetta non ${nomi.length === 1 ? 'è contata la voce' : 'sono contate le voci'}:
+        <b>${nomi.length ? nomi.map(esc).join(', ') : pl.mancanti}</b> (senza grammatura in grammi
+        o senza abbinamento in anagrafica).</span></div>`;
+      })()}
+      ${(() => { const dc = pl.ing.map(i => cibo(i.alimento)).filter(c => c && c.daCompletare);
+        return dc.length ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
+        <span>⚠️</span><span>Carboidrati ancora da completare in anagrafica per:
+        <b>${dc.map(c => esc(c.n)).join(', ')}</b> — il totale del piatto è sottostimato.</span></div>` : ''; })()}
       <div style="background:var(--cho-soft);border-radius:24px;padding:20px;text-align:center;margin-bottom:16px">
         <div class="num" style="font-size:54px;font-weight:800;color:var(--cho);line-height:1">${gr1(cho)}</div>
         <div style="font-size:14px;font-weight:600;color:var(--cho);margin-top:4px">grammi di carboidrati</div>
@@ -2949,8 +2968,7 @@ if(!leggi().ricetteAlimenti1){
    composizione, da verificare sull'etichetta dei propri prodotti).
    Si completano solo quelli ancora segnati "da completare", così le
    modifiche fatte a mano non vengono toccate. */
-if(!leggi().alimentiLasagne1){
-  const VAL = {
+const VALORI_LASAGNE = {
     "Lasagne fresche all'uovo": { e:'🍝', cho:53, f:2.2, p:9.9, ig:'medio', cat:'Primi e patate' },
     'Scamorza (provola)':      { e:'🧀', cho:1,   f:25,  p:25,  ig:'basso', cat:'Latte e derivati' },
     'Formaggio grattugiato':   { e:'🧀', cho:1,   f:28,  p:33,  ig:'basso', cat:'Latte e derivati' },
@@ -2963,9 +2981,10 @@ if(!leggi().alimentiLasagne1){
     'Farina 00':               { e:'🌾', cho:73,  f:1,   p:11,  ig:'alto',  cat:'Pane e cereali' },
     'Burro':                   { e:'🧈', cho:1,   f:83,  p:1,   ig:'basso', cat:'Latte e derivati' },
     'Melanzane':               { e:'🍆', cho:2.6, f:0.4, p:1.1, ig:'basso', cat:'Verdura e legumi' }
-  };
+};
+if(!leggi().alimentiLasagne1){
   let toccati = 0;
-  for(const [nome, v] of Object.entries(VAL)){
+  for(const [nome, v] of Object.entries(VALORI_LASAGNE)){
     const i = FOODS.findIndex(f => norm(f.n) === norm(nome));
     if(i >= 0){
       if(FOODS[i].daCompletare){
@@ -2973,14 +2992,49 @@ if(!leggi().alimentiLasagne1){
         toccati++;
       }
     } else if(nome === 'Melanzane'){
-      /* Nella ricetta le melanzane sono senza grammatura, quindi non
-         erano state create: si aggiungono qui, pronte all'uso. */
       const nuovo = sanificaAlimento({ n: nome, ...v });
       if(nuovo){ FOODS.push(nuovo); toccati++; }
     }
   }
   if(toccati) scrivi({ alimenti: FOODS });
   scrivi({ alimentiLasagne1: true });
+}
+
+/* Una tantum, seconda passata: sui dispositivi dove la ricetta era
+   stata seminata con nomi un po' diversi, gli alimenti creati erano
+   rimasti "da completare" (il completamento andava per nome esatto).
+   Qui si riconoscono per parola chiave e si completano; alle
+   melanzane rimaste senza grammatura in ricetta si danno 200 g. */
+if(!leggi().lasagneRitocchi1){
+  const PAROLE = [
+    ['lasagn', "Lasagne fresche all'uovo"], ['scamorza', 'Scamorza (provola)'], ['provola', 'Scamorza (provola)'],
+    ['grattugiat', 'Formaggio grattugiato'], ['parmigiano', 'Formaggio grattugiato'], ['grana', 'Formaggio grattugiato'],
+    ['passata', 'Passata di pomodoro'], ['pomodor', 'Passata di pomodoro'],
+    ['fungh', 'Funghi champignon'], ['champignon', 'Funghi champignon'],
+    ['zucchin', 'Zucchine'], ['spinac', 'Spinaci'], ['cipoll', 'Cipolle rosse'], ['carot', 'Carote'],
+    ['farina', 'Farina 00'], ['burro', 'Burro'], ['melanzan', 'Melanzane']
+  ];
+  let toccati = 0;
+  for(let i = 0; i < FOODS.length; i++){
+    if(!FOODS[i].daCompletare) continue;
+    const nf = norm(FOODS[i].n);
+    const hit = PAROLE.find(([p]) => nf.includes(p));
+    if(hit){
+      FOODS[i] = sanificaAlimento({ ...FOODS[i], ...VALORI_LASAGNE[hit[1]], daCompletare: false });
+      toccati++;
+    }
+  }
+  if(toccati) scrivi({ alimenti: FOODS });
+  let toccaRicette = false;
+  for(const r of RICETTE) for(const sez of r.sezioni) for(const v of sez.voci){
+    const g = parseFloat(String(v.q).replace(',', '.'));
+    if((v.u || 'g') === 'g' && !(g > 0) && norm(v.n).includes('melanzan')){ v.q = '200'; toccaRicette = true; }
+  }
+  if(toccaRicette) scrivi({ ricette: RICETTE });
+  /* Riabbinamento comunque: ripara anche eventuali abbinamenti storti
+     fatti quando il confronto andava per sottostringa. */
+  RICETTE.forEach(sincronizzaPiattoRicetta);
+  scrivi({ lasagneRitocchi1: true });
 }
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
