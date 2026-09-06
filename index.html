@@ -212,6 +212,19 @@
     transition:opacity .5s ease, visibility .5s ease
   }
   #splash.via{opacity:0;visibility:hidden;pointer-events:none}
+  #blocco{
+    position:fixed;inset:0;z-index:90;
+    background:linear-gradient(140deg,#16B47E 0%,#0E8A61 40%,#0A5C41 85%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:32px
+  }
+  #blocco input{
+    width:min(280px,100%);padding:14px 16px;border-radius:16px;border:none;outline:none;
+    font:inherit;font-size:17px;text-align:center;background:#fff;color:var(--ink)
+  }
+  #blocco button{
+    width:min(280px,100%);padding:14px 16px;border-radius:16px;border:none;cursor:pointer;
+    font:inherit;font-size:16px;font-weight:700;background:#0A3D2C;color:#fff
+  }
   .s-piatto{
     position:relative;width:150px;height:150px;border-radius:50%;background:#fff;
     display:flex;align-items:center;justify-content:center;
@@ -555,7 +568,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.3';
+const VERSIONE = '2026-09-06.4';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -565,6 +578,52 @@ function scrivi(patch){
 }
 
 function nuovoId(){ return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+/* ---------- accesso con password ----------
+   Protezione locale: la password non viene salvata in chiaro ma come
+   impronta (SHA-256 con sale). Blocca l'apertura dell'app su questo
+   dispositivo; i dati restano comunque nel browser. */
+async function hashPw(pw, sale){
+  const dati = new TextEncoder().encode(sale + '|' + pw);
+  if(crypto && crypto.subtle){
+    const h = await crypto.subtle.digest('SHA-256', dati);
+    return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  /* Ripiego (FNV-1a) per i contesti senza WebCrypto. */
+  let x = 2166136261;
+  for(const b of dati){ x ^= b; x = Math.imul(x, 16777619) >>> 0; }
+  return 'f' + x.toString(16);
+}
+
+async function pwAttiva(){
+  const nuova = ((S.pw && S.pw.nuova) || '').trim();
+  if(nuova.length < 4){ alert('Scegli una password di almeno 4 caratteri.'); return; }
+  const sale = nuovoId() + Math.random().toString(36).slice(2);
+  scrivi({ accesso: { sale, hash: await hashPw(nuova, sale) } });
+  S.pw = { vecchia:'', nuova:'' };
+  disegna();
+  alert("Password attivata: ti verrà chiesta a ogni apertura dell'app su questo dispositivo.");
+}
+
+async function pwCambiaTogli(togli){
+  const acc = leggi().accesso; if(!acc) return;
+  const vecchia = (S.pw && S.pw.vecchia) || '';
+  if(await hashPw(vecchia, acc.sale) !== acc.hash){ alert('La password attuale non è giusta.'); return; }
+  if(togli){
+    scrivi({ accesso: null });
+    S.pw = { vecchia:'', nuova:'' };
+    disegna();
+    alert('Password rimossa: l’app si apre di nuovo senza chiederla.');
+    return;
+  }
+  const nuova = ((S.pw && S.pw.nuova) || '').trim();
+  if(nuova.length < 4){ alert('Scegli una nuova password di almeno 4 caratteri.'); return; }
+  const sale = nuovoId() + Math.random().toString(36).slice(2);
+  scrivi({ accesso: { sale, hash: await hashPw(nuova, sale) } });
+  S.pw = { vecchia:'', nuova:'' };
+  disegna();
+  alert('Password cambiata.');
+}
 
 function sanificaAlimento(o){
   if(!o || typeof o !== 'object' || Array.isArray(o)) return null;
@@ -2038,6 +2097,29 @@ function stratoParametriApp(){
       <p style="font-size:12px;color:var(--ink2);margin:10px 0 0">Il promemoria compare come banner nell'app e, se hai
         dato il permesso alle notifiche, anche come notifica con l'app in secondo piano. Ad app completamente
         chiusa la notifica arriva alla prima riapertura.</p>
+      ${(() => {
+        const acc = leggi().accesso;
+        const campoPw = (id, lab) => `
+          <div style="margin-bottom:8px"><div class="etich">${lab}</div>
+            <input id="${id}" type="password" class="campo" autocomplete="off"
+              value="${esc((S.pw && S.pw[id.slice(3)]) || '')}"></div>`;
+        return `
+        <div style="font-weight:700;margin:18px 0 2px">Accesso con password</div>
+        <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">${acc
+          ? "La password è attiva: viene chiesta a ogni apertura dell'app su questo dispositivo."
+          : "Con la password attiva, l'app chiede di sbloccarla a ogni apertura su questo dispositivo."}
+          Se la dimentichi si rientra solo cancellando i dati del sito dal browser (perdendo l'archivio),
+          quindi conviene esportare i dati ogni tanto.</p>
+        ${acc ? `
+          ${campoPw('pw-vecchia', 'Password attuale')}
+          ${campoPw('pw-nuova', 'Nuova password (per il cambio)')}
+          <div style="display:flex;gap:8px">
+            <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2)" data-a="pwCambia">Cambia password</button>
+            <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--hypo)" data-a="pwTogli">Togli la password</button>
+          </div>` : `
+          ${campoPw('pw-nuova', 'Password (almeno 4 caratteri)')}
+          <button class="card" style="width:100%;padding:12px;font-weight:600;color:var(--cho)" data-a="pwAttiva">Attiva la password</button>`}`;
+      })()}
       <button class="primario" style="margin-top:12px" data-a="chiudiParamApp">Fatto</button>
     </div>
   </div>`;
@@ -2566,8 +2648,11 @@ document.addEventListener('click', e => {
   }
   else if(a==='param') S.paramSport = p1;
   else if(a==='chiudiParam') S.paramSport = null;
-  else if(a==='paramApp') S.paramApp = true;
-  else if(a==='chiudiParamApp') S.paramApp = null;
+  else if(a==='paramApp'){ S.paramApp = true; S.pw = { vecchia:'', nuova:'' }; }
+  else if(a==='chiudiParamApp'){ S.paramApp = null; S.pw = null; }
+  else if(a==='pwAttiva'){ pwAttiva(); return; }
+  else if(a==='pwCambia'){ pwCambiaTogli(false); return; }
+  else if(a==='pwTogli'){ pwCambiaTogli(true); return; }
   else if(a==='avviaSport'){
     /* Registra subito con quanto impostato nella pagina: condizione,
        glicemia dichiarata e CHO suggeriti. Nessun altro passaggio:
@@ -2759,6 +2844,7 @@ document.addEventListener('input', e => {
   }
   else if(id.startsWith('pg-')) salvaGlicParam(id.slice(3), e.target.value);
   else if(id.startsWith('pa-')) salvaAppParam(id.slice(3), e.target.value);
+  else if((id === 'pw-vecchia' || id === 'pw-nuova') && S.pw) S.pw[id.slice(3)] = e.target.value;
   else if(id.startsWith('pt-') && S.paramSport){
     /* Cella della tabella parametri: si salva subito, senza ridisegnare
        (il ridisegno farebbe perdere il focus mentre si scrive). */
@@ -2798,6 +2884,31 @@ if(!leggi().ricettePiatti1){
 }
 
 disegna();
+
+/* ---------- blocco all'avvio ----------
+   Se la password è attiva, un velo pieno copre l'app finché non viene
+   inserita quella giusta. Lo splash gli sta sopra e poi si dissolve. */
+(function(){
+  const acc = leggi().accesso;
+  if(!acc || !acc.hash) return;
+  const b = document.createElement('div');
+  b.id = 'blocco';
+  b.innerHTML = `
+    <div style="font-size:44px;line-height:1">🔒</div>
+    <div style="color:#fff;font-weight:800;font-size:24px;letter-spacing:-.5px">CHO</div>
+    <div style="color:#CFEBDD;font-size:13px;margin-bottom:6px">Inserisci la password per entrare</div>
+    <input id="pw-accesso" type="password" autocomplete="current-password" aria-label="Password">
+    <button id="pw-entra">Entra</button>
+    <div id="pw-msg" style="color:#FFD9D2;font-size:13px;font-weight:600;min-height:18px"></div>`;
+  document.body.appendChild(b);
+  const inp = b.querySelector('#pw-accesso'), msg = b.querySelector('#pw-msg');
+  const prova = async () => {
+    if(await hashPw(inp.value, acc.sale) === acc.hash) b.remove();
+    else{ msg.textContent = 'Password sbagliata, riprova.'; inp.value = ''; inp.focus(); }
+  };
+  b.querySelector('#pw-entra').addEventListener('click', prova);
+  inp.addEventListener('keydown', e => { if(e.key === 'Enter') prova(); });
+})();
 
 /* ---------- splash di avvio ----------
    La schermata è già visibile dal primo istante (è HTML statico prima
