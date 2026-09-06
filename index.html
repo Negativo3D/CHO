@@ -568,7 +568,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.8';
+const VERSIONE = '2026-09-06.9';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1713,7 +1713,10 @@ function stratoPiattoUso(){
   const ing = pl.ing;
   const t = totaliPiatto(ing);
   const peso = Math.round(ing.reduce((s,i) => s + grIng(i), 0)*10)/10;
-  const q = S.usoG > 0 ? S.usoG : peso;
+  /* La porzione di riferimento è 350 g (o l'intero piatto se pesa
+     meno); il piatto intero resta come scorciatoia a parte. */
+  const porzG = Math.min(350, peso);
+  const q = S.usoG > 0 ? S.usoG : porzG;
   const fr = peso > 0 ? q / peso : 0;
   const cho = t.cho*fr, gf = t.f*fr, gp = t.p*fr;
   const b = calcolaBolo(cho, gf, gp, 'medio');
@@ -1756,7 +1759,8 @@ function stratoPiattoUso(){
         </div>
         <button data-a="ug:+">${ico('piu')}</button>
       </div>
-      <div class="chips-wrap">${[['1 porzione', peso], ['100 g', 100]].map(([l,v]) => chip(l, q===v, 'ugset:'+v)).join('')}</div>
+      <div class="chips-wrap">${[['1 porzione', porzG], ...(peso > porzG ? [['Tutto il piatto', peso]] : []), ['100 g', 100]]
+        .map(([l,v]) => chip(l, q===v, 'ugset:'+v)).join('')}</div>
       <button class="primario" data-a="chiudiPiatto">Fatto</button>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2)" data-a="modificaPiatto:${pl.id}">Modifica</button>
@@ -2762,7 +2766,7 @@ document.addEventListener('click', e => {
     const pl = PIATTI.find(x => x.id === p1);
     if(pl){
       S.uso = { id: pl.id };
-      S.usoG = Math.round(pl.ing.reduce((s,i) => s + grIng(i), 0)*10)/10;
+      S.usoG = Math.min(350, Math.round(pl.ing.reduce((s,i) => s + grIng(i), 0)*10)/10);
     }
   }
   else if(a==='chiudiPiatto'){ S.uso = null; S.pform = null; S.editPiattoId = null; S.pingQ = ''; }
