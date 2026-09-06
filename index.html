@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.36';
+const VERSIONE = '2026-09-06.37';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -820,6 +820,9 @@ let PIATTI = (leggi().piatti || []).map(sanificaPiatto).filter(Boolean);
    nome + quantità, più il procedimento a passaggi numerati. Campi
    aggiungibili, modificabili ed eliminabili dal modulo. Indipendenti
    dal conteggio dei carboidrati. */
+/* Paesi del ricettario: bandierina e nome per i raggruppamenti. */
+const PAESI_RICETTE = { IT: ['🇮🇹', 'Italia'], KR: ['🇰🇷', 'Corea del Sud'] };
+
 function sanificaRicetta(o){
   if(!o || typeof o !== 'object' || Array.isArray(o)) return null;
   if(typeof o.n !== 'string' || !o.n.trim()) return null;
@@ -868,6 +871,7 @@ function sanificaRicetta(o){
     id: typeof o.id === 'string' && o.id ? o.id : nuovoId(),
     n: o.n.trim(),
     foto: typeof o.foto === 'string' && (o.foto.startsWith('data:image') || o.foto.startsWith('https://')) ? o.foto : null,
+    paese: PAESI_RICETTE[o.paese] ? o.paese : 'IT',
     sezioni: sezioni || [],
     passi: passi || [],
     cottura
@@ -1514,7 +1518,7 @@ function vistaRicette(){
         ingredienti e procedimento. Le compilerai e perfezionerai un po' alla volta.</p>
     </div>`;
 
-  const celle = lista.map((r,i) => {
+  const cella = (r,i) => {
     const nIng = r.sezioni.reduce((t,s) => t + s.voci.length, 0);
     return `
     <div class="cella" style="animation-delay:${Math.min(i,8)*45}ms">
@@ -1525,8 +1529,22 @@ function vistaRicette(){
         <span class="nome2">${esc(r.n)}</span>
         <span style="font-size:11px;color:var(--ink2)">${nIng ? `${nIng} ingredient${nIng === 1 ? 'e' : 'i'}` : 'da completare'}</span>
       </button>
+      <span style="position:absolute;top:10px;right:10px;font-size:15px;line-height:1;background:rgba(255,255,255,.85);
+        border-radius:999px;padding:3px 6px">${(PAESI_RICETTE[r.paese] || PAESI_RICETTE.IT)[0]}</span>
     </div>`;
-  }).join('');
+  };
+
+  /* Ricette raggruppate per paese, con bandierina e nome. */
+  const gruppi = Object.entries(PAESI_RICETTE)
+    .map(([cod, [bandiera, nome]]) => [bandiera, nome, lista.filter(r => (r.paese || 'IT') === cod)])
+    .filter(([,, l]) => l.length)
+    .map(([bandiera, nome, l]) => `
+      <div style="display:flex;align-items:center;gap:8px;margin:14px 2px 8px">
+        <span style="font-size:20px;line-height:1">${bandiera}</span>
+        <span style="font-weight:800;font-size:16px;letter-spacing:-.2px">${nome}</span>
+        <span style="font-size:12px;color:var(--ink2)">· ${l.length} ricett${l.length === 1 ? 'a' : 'e'}</span>
+      </div>
+      <div class="griglia">${l.map(cella).join('')}</div>`).join('');
 
   return `
     ${hero}
@@ -1534,8 +1552,7 @@ function vistaRicette(){
       <input id="qr" placeholder="Cerca una ricetta" value="${esc(S.qr)}">
       ${S.qr ? `<button class="pulisci" data-a="pulisciQr" aria-label="Pulisci la ricerca">${ico('chiudi',16)}</button>` : ''}
     </div>
-    ${celle ? `<div class="griglia">${celle}</div>`
-      : `<div style="text-align:center;padding:48px 0;color:var(--ink2)">Nessuna ricetta con questo nome.</div>`}`;
+    ${gruppi || `<div style="text-align:center;padding:48px 0;color:var(--ink2)">Nessuna ricetta con questo nome.</div>`}`;
 }
 
 /* ---------- strato: lettura di una ricetta (stile ricettario) ---------- */
@@ -1618,6 +1635,11 @@ function stratoRicettaForm(){
       </div>
       <div style="margin-bottom:12px"><div class="etich">Nome</div>
         <input id="rf-n" class="campo" placeholder="Es. Lasagne vegetariane" value="${esc(F.n)}"></div>
+      <div class="etich">Paese</div>
+      <div class="chips-wrap" style="margin-bottom:12px">
+        ${Object.entries(PAESI_RICETTE).map(([cod,[fl,nome]]) =>
+          chip(fl + ' ' + nome, (F.paese || 'IT') === cod, 'rfPaese:' + cod, 'var(--wave)')).join('')}
+      </div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
         ${F.foto ? `<img src="${esc(F.foto)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:16px;flex:none">` : ''}
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2);display:flex;
@@ -1719,7 +1741,7 @@ function gruppoPassi(g){
 function salvaRicetta(){
   const F = S.rform; if(!F) return;
   if(!F.n.trim()){ alert('Dai un nome alla ricetta.'); return; }
-  const dati = sanificaRicetta({ id: S.editRicettaId || undefined, n:F.n, foto:F.foto, sezioni:F.sezioni, passi:F.passi, cottura:F.cottura });
+  const dati = sanificaRicetta({ id: S.editRicettaId || undefined, n:F.n, foto:F.foto, paese:F.paese, sezioni:F.sezioni, passi:F.passi, cottura:F.cottura });
   /* Vincolo rigido: ogni ingrediente deve già esistere in anagrafica
      con lo stesso identico nome. */
   const fuori = [...new Set(dati.sezioni.flatMap(sz => sz.voci).map(v => v.n)
@@ -2737,7 +2759,7 @@ document.addEventListener('click', e => {
   else if(a==='ricNuova'){
     S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
       passi:[{ titolo:'', passi:[{ t:'', foto:null }] }], cottura:[],
-      porzG:'', perdita:'', ondaPct:'100', ondaOre:'' };
+      paese:'IT', porzG:'', perdita:'', ondaPct:'100', ondaOre:'' };
     S.editRicettaId = null;
   }
   else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'', u:'g' }] }); }
@@ -2790,7 +2812,7 @@ document.addEventListener('click', e => {
   else if(a==='ricModifica'){
     const r = RICETTE.find(x => x.id === p1);
     if(r){
-      S.rform = { n:r.n, foto:r.foto,
+      S.rform = { n:r.n, foto:r.foto, paese: r.paese || 'IT',
         sezioni: r.sezioni.length
           ? r.sezioni.map(sz => ({ titolo:sz.titolo, voci: sz.voci.length ? sz.voci.map(v => ({...v})) : [{ n:'', q:'' }] }))
           : [{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
@@ -2839,6 +2861,7 @@ document.addEventListener('click', e => {
   }
   else if(a==='ricFoto'){ fotoRicetta(); return; }
   else if(a==='ricFotoX'){ if(S.rform) S.rform.foto = null; }
+  else if(a==='rfPaese'){ if(S.rform) S.rform.paese = p1; }
   else if(a==='sp'){ S.sport[p1] = isNaN(+p2) ? p2 : +p2; }
   else if(a==='att'){
     /* Si riparte senza condizione né glicemia: la proposta arriva solo
@@ -3358,6 +3381,7 @@ importaRicettario('kr1Japchae',
   ],
   [{
     n: 'Japchae (잡채) — noodles di patata dolce con verdure',
+    paese: 'KR',
     foto: FOTO_JAP_FINITO,
     sezioni: [
       { titolo: 'Per il japchae', voci: [
@@ -3397,6 +3421,18 @@ if(!leggi().japchaeFoto3){
   scrivi({ japchaeFoto3: true });
 }
 
+/* Una tantum: le ricette coreane gia' salvate ricevono il paese KR
+   (le altre restano Italia). */
+if(!leggi().paesiRicette1){
+  let tocca = false;
+  for(const r of RICETTE){
+    const kr = ['japchae','bulgogi','pajeon','muchim','tteokbokki','hotteok'].some(k => norm(r.n).includes(k));
+    if(kr && r.paese !== 'KR'){ r.paese = 'KR'; tocca = true; }
+  }
+  if(tocca) scrivi({ ricette: RICETTE });
+  scrivi({ paesiRicette1: true });
+}
+
 importaRicettario('kr2Bulgogi',
   [
     { n:'Pera',       e:'🍐', cho:10, f:0.1, p:0.3, ig:'basso', cat:'Frutta' },
@@ -3404,6 +3440,7 @@ importaRicettario('kr2Bulgogi',
   ],
   [{
     n: 'Bulgogi (불고기) — manzo marinato alla coreana',
+    paese: 'KR',
     sezioni: [
       { titolo: 'Per il bulgogi', voci: [
         { n:'Manzo per straccetti',    q:'600', u:'g' },
@@ -3446,6 +3483,7 @@ importaRicettario('kr3Pajeon',
   ],
   [{
     n: 'Haemul pajeon (해물파전) — frittella di cipollotti e frutti di mare',
+    paese: 'KR',
     sezioni: [
       { titolo: 'Per la pastella', voci: [
         { n:'Farina 00',               q:'110', u:'g' },
@@ -3492,6 +3530,7 @@ importaRicettario('kr4Trio',
   ],
   [{
     n: 'Oi muchim (오이무침) — cetrioli piccanti al sesamo',
+    paese: 'KR',
     sezioni: [
       { titolo: 'Per i cetrioli', voci: [
         { n:'Cetrioli',       q:'400', u:'g' },
@@ -3517,6 +3556,7 @@ importaRicettario('kr4Trio',
   },
   {
     n: 'Tteokbokki (떡볶이) — gnocchi di riso piccanti',
+    paese: 'KR',
     sezioni: [
       { titolo: 'Per il tteokbokki', voci: [
         { n:'Gnocchi di riso coreani (tteok)', q:'500', u:'g' },
@@ -3543,6 +3583,7 @@ importaRicettario('kr4Trio',
   },
   {
     n: 'Hotteok (호떡) — pancake dolci ripieni',
+    paese: 'KR',
     sezioni: [
       { titolo: 'Per l\'impasto', voci: [
         { n:'Farina 00',              q:'300', u:'g' },
