@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.19';
+const VERSIONE = '2026-09-06.20';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1419,6 +1419,9 @@ function vistaAtlante(){
 
   const cellePiatti = piattiVis.map((pl,i) => {
     const t = totaliPiatto(pl.ing);
+    /* Come per gli alimenti: CHO per 100 g, non il totale del piatto. */
+    const peso = pl.ing.reduce((s,x) => s + grIng(x), 0);
+    const cho100 = peso > 0 ? gr1(t.cho/peso*100) : 0;
     return `
     <div class="cella" style="animation-delay:${Math.min(i,8)*45}ms">
       <button class="apri" data-a="apriPiatto:${pl.id}">
@@ -1426,8 +1429,8 @@ function vistaAtlante(){
           ? `<img src="${pl.foto}" alt="" style="width:100%;height:92px;object-fit:cover;border-radius:16px;display:block">`
           : `<span class="emg" style="background:var(--wave-soft);color:var(--wave)">${ico('cloche',27)}</span>`}
         <span class="nome2">${esc(pl.n)}</span>
-        <span class="chopill num" style="background:linear-gradient(135deg,#C97B1F,#A85B0C)">${gr1(t.cho)} g</span>
-        <span style="font-size:11px;color:var(--ink2)"> CHO</span>
+        <span class="chopill num" style="background:linear-gradient(135deg,#C97B1F,#A85B0C)">${cho100} g</span>
+        <span style="font-size:11px;color:var(--ink2)"> per 100 g</span>
       </button>
       <span style="position:absolute;top:10px;right:10px;background:var(--wave-soft);color:var(--wave);
         font-size:10px;font-weight:700;letter-spacing:.5px;padding:3px 8px;border-radius:999px">PIATTO</span>
