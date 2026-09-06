@@ -568,7 +568,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.4';
+const VERSIONE = '2026-09-06.5';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -643,6 +643,7 @@ function sanificaAlimento(o){
     ig: ['basso','medio','alto'].includes(o.ig) ? o.ig : 'medio',
     foto: typeof o.foto === 'string' && (o.foto.startsWith('data:image') || o.foto.startsWith('https://')) ? o.foto : null,
     ...(o.alcol === true ? {alcol:true} : {}),
+    ...(o.daCompletare === true ? {daCompletare:true} : {}),
     ...ondaCampi(o),
     porz
   };
@@ -748,6 +749,27 @@ function sanificaPiatto(o){
    le voci in grammi vengono abbinate per nome agli alimenti, così i
    carboidrati arrivano dal database; le voci non abbinabili vengono
    contate come "mancanti" e segnalate nel piatto. */
+function trovaAlimento(nome){
+  return FOODS.find(f => norm(f.n) === norm(nome))
+    || FOODS.find(f => norm(nome).includes(norm(f.n)) || norm(f.n).includes(norm(nome)));
+}
+
+/* Ogni ingrediente in grammi delle ricette deve stare in anagrafica:
+   quelli mai visti vengono creati subito, con carboidrati a zero e il
+   segno "da completare", da sistemare poi coi valori dell'etichetta. */
+function creaAlimentiRicetta(r){
+  let creati = 0;
+  for(const sez of r.sezioni) for(const v of sez.voci){
+    if((v.u || 'g') !== 'g') continue;
+    const g = parseFloat(String(v.q).replace(',', '.'));
+    if(!(g > 0) || !v.n.trim() || trovaAlimento(v.n)) continue;
+    const nuovo = sanificaAlimento({ n: v.n, cho: 0, cat: 'Altro', daCompletare: true });
+    if(nuovo){ FOODS.push(nuovo); creati++; }
+  }
+  if(creati) scrivi({ alimenti: FOODS });
+  return creati;
+}
+
 function sincronizzaPiattoRicetta(r){
   const ing = [];
   let mancanti = 0;
@@ -756,8 +778,7 @@ function sincronizzaPiattoRicetta(r){
     if(u === 'qb') continue;             /* q.b.: irrilevante per i CHO */
     const g = parseFloat(String(v.q).replace(',', '.'));
     if(u !== 'g' || !(g > 0)){ mancanti++; continue; }
-    const c = FOODS.find(f => norm(f.n) === norm(v.n))
-      || FOODS.find(f => norm(v.n).includes(norm(f.n)) || norm(f.n).includes(norm(v.n)));
+    const c = trovaAlimento(v.n);
     if(c) ing.push({ alimento: c.id, modo:'g', g: Math.round(g*10)/10 });
     else mancanti++;
   }
@@ -1407,8 +1428,10 @@ function vistaAtlante(){
       <button class="apri" data-a="apri:${f.id}">
         ${f.foto ? `<img class="emg" src="${f.foto}" alt="" style="object-fit:cover">` : `<span class="emg">${f.e}</span>`}
         <span class="nome2">${esc(f.n)}</span>
-        <span class="chopill num">${f.cho} g</span>
-        <span style="font-size:11px;color:var(--ink2)"> per 100 g</span>
+        ${f.daCompletare
+          ? `<span class="chopill" style="background:linear-gradient(135deg,#C97B1F,#A85B0C)">da completare</span>`
+          : `<span class="chopill num">${f.cho} g</span>
+        <span style="font-size:11px;color:var(--ink2)"> per 100 g</span>`}
       </button>
       <button class="stella ${S.preferiti.includes(f.id)?'on':''}" data-a="fav:${f.id}">
         ${ico('stella',20,S.preferiti.includes(f.id))}
@@ -1572,6 +1595,9 @@ function stratoRicettaForm(){
       </div>
       <div style="margin-bottom:12px"><div class="etich">Nome</div>
         <input id="rf-n" class="campo" placeholder="Es. Lasagne vegetariane" value="${esc(F.n)}"></div>
+      <datalist id="lista-alimenti">
+        ${[...FOODS].sort((a,b) => a.n.localeCompare(b.n, 'it')).map(f => `<option value="${esc(f.n)}">`).join('')}
+      </datalist>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
         ${F.foto ? `<img src="${esc(F.foto)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:16px;flex:none">` : ''}
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2);display:flex;
@@ -1593,7 +1619,7 @@ function stratoRicettaForm(){
           <button class="card manico" data-drag="${s}:${k}" aria-label="Trascina per riordinare"
             style="padding:0 8px;color:var(--ink2);touch-action:none;cursor:grab">${ico('grip',16)}</button>
           <input id="ri-${s}-${k}-n" class="campo" placeholder="Ingrediente" value="${esc(v.n)}"
-            style="flex:1;min-width:0;padding:10px 12px">
+            list="lista-alimenti" autocomplete="off" style="flex:1;min-width:0;padding:10px 12px">
           ${v.u === 'qb' ? '' : `
           <input id="ri-${s}-${k}-q" class="campo" placeholder="…" value="${esc(v.q)}"
             style="width:46px;padding:10px 4px;text-align:center">`}
@@ -1668,9 +1694,11 @@ function salvaRicetta(){
   } else RICETTE.push(dati);
   if(!scrivi({ ricette: RICETTE }))
     alert('Spazio sul telefono esaurito: prova a togliere la foto o a usarne una più piccola.');
+  const creati = creaAlimentiRicetta(dati);
   sincronizzaPiattoRicetta(dati);
   S.rform = null; S.editRicettaId = null;
   disegna();
+  if(creati) alert(`Ho creato ${creati === 1 ? 'un nuovo alimento' : creati + ' nuovi alimenti'} in anagrafica dagli ingredienti della ricetta, segnat${creati === 1 ? 'o' : 'i'} "da completare": aprili e inserisci i carboidrati dall'etichetta, così i conti del piatto tornano.`);
 }
 function fotoRicetta(){ scegliFoto(d => { if(S.rform){ S.rform.foto = d; disegna(); } }); }
 
@@ -1725,6 +1753,10 @@ function stratoPiattoUso(){
       ${pl.mancanti ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
         <span>⚠️</span><span>Piatto creato dalla ricetta: ${pl.mancanti} ingredient${pl.mancanti === 1 ? 'e non è' : 'i non sono'}
         nell'anagrafica alimenti, quindi i suoi carboidrati non sono contati.</span></div>` : ''}
+      ${(() => { const dc = pl.ing.filter(i => (cibo(i.alimento) || {}).daCompletare).length;
+        return dc ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
+        <span>⚠️</span><span>${dc === 1 ? 'Un ingrediente ha' : dc + ' ingredienti hanno'} i carboidrati ancora
+        da completare in anagrafica: il totale del piatto è sottostimato.</span></div>` : ''; })()}
       ${righe}
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2)" data-a="modificaPiatto:${pl.id}">Modifica</button>
@@ -2313,6 +2345,9 @@ function stratoPorzione(){
         </div>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudi">${ico('chiudi',20)}</button>
       </div>
+      ${f.daCompletare ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
+        <span>⚠️</span><span>Alimento creato da una ricetta: i carboidrati sono ancora a zero. Tocca Modifica e
+        inserisci i valori dell'etichetta.</span></div>` : ''}
       <div style="background:var(--cho-soft);border-radius:24px;padding:20px;text-align:center;margin-bottom:16px">
         <div class="num" style="font-size:54px;font-weight:800;color:var(--cho);line-height:1">${cho}</div>
         <div style="font-size:14px;font-weight:600;color:var(--cho);margin-top:4px">grammi di carboidrati</div>
@@ -2881,6 +2916,15 @@ document.addEventListener('input', e => {
 if(!leggi().ricettePiatti1){
   RICETTE.forEach(sincronizzaPiattoRicetta);
   scrivi({ ricettePiatti1: true });
+}
+
+/* Una tantum: gli ingredienti in grammi delle ricette già salvate che
+   mancano dall'anagrafica vengono creati "da completare" e i piatti
+   collegati riabbinati, così nulla resta fuori anagrafica. */
+if(!leggi().ricetteAlimenti1){
+  const creati = RICETTE.reduce((t, r) => t + creaAlimentiRicetta(r), 0);
+  if(creati) RICETTE.forEach(sincronizzaPiattoRicetta);
+  scrivi({ ricetteAlimenti1: true });
 }
 
 disegna();
