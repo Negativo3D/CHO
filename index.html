@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.14';
+const VERSIONE = '2026-09-06.15';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1613,6 +1613,10 @@ function stratoRicettaForm(){
         ${F.foto ? `<button class="card" style="padding:12px;font-weight:600;color:var(--hypo)" data-a="ricFotoX">Togli</button>` : ''}
       </div>
 
+      <div class="etich" style="font-size:14px;margin-bottom:8px">Piatto in anagrafica</div>
+      <div style="margin-bottom:12px;max-width:200px"><div class="etich">Porzione tipica in grammi</div>
+        <input id="rf-porzG" class="campo" inputmode="numeric" placeholder="350" value="${esc(F.porzG ?? '')}"></div>
+      ${ondaForm('rf-', F)}
       <div class="etich" style="font-size:14px;margin-bottom:8px">Ingredienti</div>
       ${F.sezioni.map((sez,s) => `
       <div class="card" style="padding:12px;margin-bottom:10px">
@@ -1711,6 +1715,13 @@ function salvaRicetta(){
   if(!scrivi({ ricette: RICETTE }))
     alert('Spazio sul telefono esaurito: prova a togliere la foto o a usarne una più piccola.');
   sincronizzaPiattoRicetta(dati);
+  /* Porzione tipica e onda quadra del piatto si regolano dal modulo
+     della ricetta: applicate qui al piatto generato. */
+  const iPl = PIATTI.findIndex(x => x.daRicetta === dati.id);
+  if(iPl >= 0){
+    const agg = sanificaPiatto({ ...PIATTI[iPl], porzG: F.porzG, ondaPct: F.ondaPct, ondaOre: F.ondaOre });
+    if(agg){ PIATTI[iPl] = agg; scrivi({ piatti: PIATTI }); }
+  }
   S.rform = null; S.editRicettaId = null; S.rIngPicker = null;
   disegna();
 }
@@ -1790,10 +1801,15 @@ function stratoPiattoUso(){
       <div class="chips-wrap">${[['1 porzione', porzG], ...(peso > porzG ? [['Tutto il piatto', peso]] : []), ['100 g', 100]]
         .map(([l,v]) => chip(l, q===v, 'ugset:'+v)).join('')}</div>
       <button class="primario" data-a="chiudiPiatto">Fatto</button>
+      ${pl.daRicetta ? `
+      <button class="card" style="width:100%;padding:12px;font-weight:600;color:var(--wave);margin-top:10px;display:flex;
+        align-items:center;justify-content:center;gap:8px" data-a="usoRicetta:${pl.daRicetta}">${ico('libro',18)} Apri la ricetta</button>
+      <p style="font-size:12px;color:var(--ink2);text-align:center;margin:8px 0 0">Questo piatto nasce da una ricetta:
+        si modifica e si elimina solo dal ricettario.</p>` : `
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--ink2)" data-a="modificaPiatto:${pl.id}">Modifica</button>
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--hypo)" data-a="eliminaPiatto:${pl.id}">Elimina</button>
-      </div>
+      </div>`}
     </div>
   </div>`;
 }
@@ -2672,7 +2688,8 @@ document.addEventListener('click', e => {
   else if(a==='gset') S.gr = +p1;
   else if(a==='ricNuova'){
     S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
-      passi:[{ titolo:'', passi:[{ t:'', foto:null }] }], cottura:[] };
+      passi:[{ titolo:'', passi:[{ t:'', foto:null }] }], cottura:[],
+      porzG:'', ondaPct:'100', ondaOre:'' };
     S.editRicettaId = null;
   }
   else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'', u:'g' }] }); }
@@ -2710,6 +2727,7 @@ document.addEventListener('click', e => {
   }
   else if(a==='rPassoFotoX'){ const l = gruppoPassi(p1); if(l && l[+p2]) l[+p2].foto = null; }
   else if(a==='ricApri'){ S.ricettaAperta = p1; S.ricettaEspansi = {}; }
+  else if(a==='usoRicetta'){ S.uso = null; S.ricettaAperta = p1; S.ricettaEspansi = {}; }
   else if(a==='ricEsp'){ S.ricettaEspansi = S.ricettaEspansi || {}; S.ricettaEspansi[p1] = !S.ricettaEspansi[p1]; }
   else if(a==='ricChiudi') S.ricettaAperta = null;
   else if(a==='ricAnnulla'){ S.rform = null; S.editRicettaId = null; }
@@ -2723,7 +2741,11 @@ document.addEventListener('click', e => {
         passi: r.passi.length
           ? r.passi.map(sz => ({ titolo: sz.titolo, passi: sz.passi.length ? sz.passi.map(x => ({...x})) : [{ t:'', foto:null }] }))
           : [{ titolo:'', passi:[{ t:'', foto:null }] }],
-        cottura: r.cottura.map(x => ({...x})) };
+        cottura: r.cottura.map(x => ({...x})),
+        ...(() => { const pl = PIATTI.find(x => x.daRicetta === r.id) || {};
+          return { porzG: pl.porzG ? String(pl.porzG) : '',
+            ondaPct: String(pl.ondaPct || 100),
+            ondaOre: pl.ondaOre ? String(pl.ondaOre).replace('.', ',') : '' }; })() };
       S.editRicettaId = p1; S.ricettaAperta = null;
     }
   }
@@ -2928,6 +2950,8 @@ document.addEventListener('input', e => {
     if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   }
   else if(id === 'rf-n' && S.rform) S.rform.n = e.target.value;
+  else if((id === 'rf-porzG' || id === 'rf-ondaPct' || id === 'rf-ondaOre') && S.rform)
+    S.rform[id.slice(3)] = e.target.value;
   else if(id.startsWith('rsez-') && S.rform){
     const sz = S.rform.sezioni[+id.slice(5)];
     if(sz) sz.titolo = e.target.value;
