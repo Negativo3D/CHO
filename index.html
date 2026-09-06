@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.20';
+const VERSIONE = '2026-09-06.21';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -743,6 +743,7 @@ function sanificaPiatto(o){
     foto: typeof o.foto === 'string' && o.foto.startsWith('data:image') ? o.foto : null,
     ing,
     ...(() => { const g = Math.round(+o.porzG); return g >= 10 && g <= 5000 ? { porzG: g } : {}; })(),
+    ...(() => { const p = Math.round(+o.perdita); return p >= 1 && p <= 60 ? { perdita: p } : {}; })(),
     ...ondaCampi(o),
     ...(typeof o.daRicetta === 'string' && o.daRicetta ? { daRicetta: o.daRicetta } : {}),
     ...(Number.isInteger(o.mancanti) && o.mancanti > 0 ? { mancanti: o.mancanti } : {})
@@ -800,6 +801,7 @@ function sincronizzaPiattoRicetta(r){
   const dati = sanificaPiatto({ id: i >= 0 ? PIATTI[i].id : undefined,
     n: r.n, foto: r.foto, ing, daRicetta: r.id, mancanti,
     porzG: i >= 0 ? PIATTI[i].porzG : undefined,
+    perdita: i >= 0 ? PIATTI[i].perdita : undefined,
     ondaPct: i >= 0 ? PIATTI[i].ondaPct : undefined,
     ondaOre: i >= 0 ? PIATTI[i].ondaOre : undefined });
   if(!dati) return;
@@ -1419,8 +1421,9 @@ function vistaAtlante(){
 
   const cellePiatti = piattiVis.map((pl,i) => {
     const t = totaliPiatto(pl.ing);
-    /* Come per gli alimenti: CHO per 100 g, non il totale del piatto. */
-    const peso = pl.ing.reduce((s,x) => s + grIng(x), 0);
+    /* Come per gli alimenti: CHO per 100 g (a cotto, se il piatto ha
+       la perdita di cottura), non il totale del piatto. */
+    const peso = pl.ing.reduce((s,x) => s + grIng(x), 0) * (1 - (pl.perdita || 0)/100);
     const cho100 = peso > 0 ? gr1(t.cho/peso*100) : 0;
     return `
     <div class="cella" style="animation-delay:${Math.min(i,8)*45}ms">
@@ -1620,8 +1623,14 @@ function stratoRicettaForm(){
       </div>
 
       <div class="etich" style="font-size:14px;margin-bottom:8px">Piatto in anagrafica</div>
-      <div style="margin-bottom:12px;max-width:200px"><div class="etich">Porzione tipica in grammi</div>
-        <input id="rf-porzG" class="campo" inputmode="numeric" placeholder="350" value="${esc(F.porzG ?? '')}"></div>
+      <div style="display:flex;gap:8px;margin-bottom:4px">
+        <div style="flex:1;min-width:0"><div class="etich">Porzione tipica (g)</div>
+          <input id="rf-porzG" class="campo" inputmode="numeric" placeholder="350" value="${esc(F.porzG ?? '')}"></div>
+        <div style="flex:1;min-width:0"><div class="etich">Perdita in cottura (%)</div>
+          <input id="rf-perdita" class="campo" inputmode="numeric" placeholder="0" value="${esc(F.perdita ?? '')}"></div>
+      </div>
+      <div style="font-size:12px;color:var(--ink2);margin-bottom:12px">Con la perdita impostata, i grammi del piatto
+        si intendono pesati a cotto: i carboidrati totali restano gli stessi, spalmati sul peso cotto.</div>
       ${ondaForm('rf-', F)}
       <div class="etich" style="font-size:14px;margin-bottom:8px">Ingredienti</div>
       ${F.sezioni.map((sez,s) => `
@@ -1725,7 +1734,7 @@ function salvaRicetta(){
      della ricetta: applicate qui al piatto generato. */
   const iPl = PIATTI.findIndex(x => x.daRicetta === dati.id);
   if(iPl >= 0){
-    const agg = sanificaPiatto({ ...PIATTI[iPl], porzG: F.porzG, ondaPct: F.ondaPct, ondaOre: F.ondaOre });
+    const agg = sanificaPiatto({ ...PIATTI[iPl], porzG: F.porzG, perdita: F.perdita, ondaPct: F.ondaPct, ondaOre: F.ondaOre });
     if(agg){ PIATTI[iPl] = agg; scrivi({ piatti: PIATTI }); }
   }
   S.rform = null; S.editRicettaId = null; S.rIngPicker = null;
@@ -1743,7 +1752,12 @@ function stratoPiattoUso(){
      composizione ("1 porzione" = il piatto intero come composto). */
   const ing = pl.ing;
   const t = totaliPiatto(ing);
-  const peso = Math.round(ing.reduce((s,i) => s + grIng(i), 0)*10)/10;
+  /* Con la perdita di peso in cottura impostata, i grammi che si
+     scelgono sono quelli pesati A COTTO: i carboidrati totali restano
+     gli stessi ma si spalmano sul peso cotto. */
+  const perdita = pl.perdita || 0;
+  const pesoCrudo = ing.reduce((s,i) => s + grIng(i), 0);
+  const peso = Math.round(pesoCrudo * (1 - perdita/100) * 10)/10;
   /* La porzione di riferimento è quella del piatto (default 350 g, o
      l'intero piatto se pesa meno); il tutto resta come scorciatoia. */
   const porzG = Math.min(pl.porzG || 350, peso);
@@ -1762,7 +1776,7 @@ function stratoPiattoUso(){
             : `<span class="emg" style="width:56px;height:56px;background:var(--wave-soft);color:var(--wave)">${ico('cloche',28)}</span>`}
           <div style="min-width:0"><div style="font-weight:700;font-size:19px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(pl.n)}</div>
           <div style="font-size:12px;color:var(--ink2)">${ing.length} ingredient${ing.length===1?'e':'i'} ·
-            ${peso > 0 ? gr1(t.cho/peso*100) : 0} g CHO per 100 g</div></div>
+            ${peso > 0 ? gr1(t.cho/peso*100) : 0} g CHO per 100 g${perdita ? ` a cotto (−${perdita}% in cottura)` : ''}</div></div>
         </div>
         <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiPiatto">${ico('chiudi',20)}</button>
       </div>
@@ -1809,7 +1823,7 @@ function stratoPiattoUso(){
         <button data-a="ug:-">${ico('meno')}</button>
         <div style="flex:1;text-align:center">
           <div class="num" style="font-size:28px;font-weight:700">${gr1(q)} g</div>
-          <div style="font-size:12px;color:var(--ink2)">quantità</div>
+          <div style="font-size:12px;color:var(--ink2)">quantità${perdita ? ' a cotto' : ''}</div>
         </div>
         <button data-a="ug:+">${ico('piu')}</button>
       </div>
@@ -1878,7 +1892,7 @@ function salvaPiatto(){
   const F = S.pform; if(!F) return;
   if(!F.n.trim()){ alert('Dai un nome al piatto.'); return; }
   const dati = sanificaPiatto({ id: S.editPiattoId || undefined, n:F.n, e:F.e, foto:F.foto, ing:F.ing,
-    porzG: F.porzG, ondaPct: F.ondaPct, ondaOre: F.ondaOre,
+    porzG: F.porzG, perdita: F.perdita, ondaPct: F.ondaPct, ondaOre: F.ondaOre,
     daRicetta: F.daRicetta, mancanti: F.mancanti });
   if(!dati){ alert('Aggiungi almeno un ingrediente con una quantità valida.'); return; }
   const nuovi = [...PIATTI];
@@ -1960,8 +1974,12 @@ function stratoPiattoForm(){
           <span style="color:var(--cho);font-weight:700">＋</span>
         </button>`).join('')}
       ${q && !risultati.length ? `<p style="font-size:13px;color:var(--ink2)">Nessun alimento con questo nome nell'anagrafica.</p>` : ''}
-      <div style="margin-top:12px;max-width:200px"><div class="etich">Porzione tipica in grammi</div>
-        <input id="pf-porzG" class="campo" inputmode="numeric" placeholder="350" value="${esc(F.porzG ?? '')}"></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <div style="flex:1;min-width:0"><div class="etich">Porzione tipica (g)</div>
+          <input id="pf-porzG" class="campo" inputmode="numeric" placeholder="350" value="${esc(F.porzG ?? '')}"></div>
+        <div style="flex:1;min-width:0"><div class="etich">Perdita in cottura (%)</div>
+          <input id="pf-perdita" class="campo" inputmode="numeric" placeholder="0" value="${esc(F.perdita ?? '')}"></div>
+      </div>
       <div style="margin-top:12px">${ondaForm('pf-', F)}</div>
       <button class="primario" style="margin-top:12px" data-a="salvaPiatto">${S.editPiattoId ? 'Salva le modifiche' : 'Salva il piatto'}</button>
     </div>
@@ -2710,7 +2728,7 @@ document.addEventListener('click', e => {
   else if(a==='ricNuova'){
     S.rform = { n:'', foto:null, sezioni:[{ titolo:'', voci:[{ n:'', q:'', u:'g' }] }],
       passi:[{ titolo:'', passi:[{ t:'', foto:null }] }], cottura:[],
-      porzG:'', ondaPct:'100', ondaOre:'' };
+      porzG:'', perdita:'', ondaPct:'100', ondaOre:'' };
     S.editRicettaId = null;
   }
   else if(a==='rSezAdd'){ if(S.rform) S.rform.sezioni.push({ titolo:'', voci:[{ n:'', q:'', u:'g' }] }); }
@@ -2773,6 +2791,7 @@ document.addEventListener('click', e => {
         cottura: r.cottura.map(x => ({...x})),
         ...(() => { const pl = PIATTI.find(x => x.daRicetta === r.id) || {};
           return { porzG: pl.porzG ? String(pl.porzG) : '',
+            perdita: pl.perdita ? String(pl.perdita) : '',
             ondaPct: String(pl.ondaPct || 100),
             ondaOre: pl.ondaOre ? String(pl.ondaOre).replace('.', ',') : '' }; })() };
       S.editRicettaId = p1; S.ricettaAperta = null;
@@ -2902,13 +2921,14 @@ document.addEventListener('click', e => {
   else if(a==='nuovoPiatto'){
     if(!FOODS.length){ alert('Prima aggiungi qualche alimento alla tua anagrafica: i piatti si compongono da lì.'); return; }
     S.nuovo = null;
-    S.pform = { n:'', e:'', foto:null, ing:[], porzG:'', ondaPct:'100', ondaOre:'' }; S.editPiattoId = null; S.pingQ = '';
+    S.pform = { n:'', e:'', foto:null, ing:[], porzG:'', perdita:'', ondaPct:'100', ondaOre:'' }; S.editPiattoId = null; S.pingQ = '';
   }
   else if(a==='apriPiatto'){
     const pl = PIATTI.find(x => x.id === p1);
     if(pl){
       S.uso = { id: pl.id };
-      S.usoG = Math.min(pl.porzG || 350, Math.round(pl.ing.reduce((s,i) => s + grIng(i), 0)*10)/10);
+      const pesoCotto = pl.ing.reduce((s,i) => s + grIng(i), 0) * (1 - (pl.perdita || 0)/100);
+      S.usoG = Math.min(pl.porzG || 350, Math.round(pesoCotto*10)/10);
     }
   }
   else if(a==='chiudiPiatto'){ S.uso = null; S.pform = null; S.editPiattoId = null; S.pingQ = ''; }
@@ -2921,6 +2941,7 @@ document.addEventListener('click', e => {
     const pl = PIATTI.find(x => x.id === p1);
     if(pl){ S.pform = { n:pl.n, e:pl.e, foto:pl.foto, ing: pl.ing.map(i => ({...i})),
       porzG: pl.porzG ? String(pl.porzG) : '',
+      perdita: pl.perdita ? String(pl.perdita) : '',
       ondaPct: String(pl.ondaPct || 100), ondaOre: pl.ondaOre ? String(pl.ondaOre).replace('.', ',') : '',
       daRicetta: pl.daRicetta, mancanti: pl.mancanti }; S.editPiattoId = p1; S.uso = null; S.pingQ = ''; }
   }
@@ -2991,7 +3012,7 @@ document.addEventListener('input', e => {
     if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   }
   else if(id === 'rf-n' && S.rform) S.rform.n = e.target.value;
-  else if((id === 'rf-porzG' || id === 'rf-ondaPct' || id === 'rf-ondaOre') && S.rform)
+  else if((id === 'rf-porzG' || id === 'rf-perdita' || id === 'rf-ondaPct' || id === 'rf-ondaOre') && S.rform)
     S.rform[id.slice(3)] = e.target.value;
   else if(id.startsWith('rsez-') && S.rform){
     const sz = S.rform.sezioni[+id.slice(5)];
@@ -3044,6 +3065,7 @@ document.addEventListener('input', e => {
   else if(id === 'peso-kg') S.pesoKg = e.target.value;
   else if(id === 'pf-n' && S.pform) S.pform.n = e.target.value;
   else if(id === 'pf-porzG' && S.pform) S.pform.porzG = e.target.value;
+  else if(id === 'pf-perdita' && S.pform) S.pform.perdita = e.target.value;
   else if(id === 'pf-ondaPct' && S.pform) S.pform.ondaPct = e.target.value;
   else if(id === 'pf-ondaOre' && S.pform) S.pform.ondaOre = e.target.value;
   else if(id === 'pf-cerca' && S.pform){
@@ -3211,6 +3233,18 @@ if(!leggi().concentrato1){
 if(!leggi().cucchiai1){
   RICETTE.forEach(sincronizzaPiattoRicetta);
   scrivi({ cucchiai1: true });
+}
+
+/* Una tantum: perdita di peso in cottura del 10% per le lasagne
+   (valore indicativo suggerito; si affina pesando la teglia cotta e
+   correggendo la percentuale dal modulo della ricetta). */
+if(!leggi().perditaLasagne1){
+  const i = PIATTI.findIndex(pl => norm(pl.n).includes('lasagne'));
+  if(i >= 0 && !PIATTI[i].perdita){
+    const nuovo = sanificaPiatto({ ...PIATTI[i], perdita: 10 });
+    if(nuovo){ PIATTI[i] = nuovo; scrivi({ piatti: PIATTI }); }
+  }
+  scrivi({ perditaLasagne1: true });
 }
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
