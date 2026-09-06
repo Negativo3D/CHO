@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.32';
+const VERSIONE = '2026-09-06.33';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3435,6 +3435,101 @@ importaRicettario('kr3Pajeon',
     ],
     cottura: [],
     porzG: 250, perdita: 15
+  }]);
+
+importaRicettario('kr4Trio',
+  [
+    { n:'Cetrioli',                                e:'🥒', cho:1.8, f:0.1, p:0.7, ig:'basso', cat:'Verdura e legumi' },
+    { n:'Peperoncino coreano in polvere (gochugaru)', e:'🌶️', cho:22, f:12, p:12, ig:'basso', cat:'Altro' },
+    { n:'Gnocchi di riso coreani (tteok)',         e:'🍡', cho:52,  f:0.5, p:4,   ig:'alto',  cat:'Primi e patate' },
+    { n:'Pasta di peperoncino coreana (gochujang)', e:'🌶️', cho:46, f:2,   p:5,   ig:'medio', cat:'Altro' },
+    { n:'Fish cake coreano (eomuk)',               e:'🍥', cho:19,  f:3,   p:10,  ig:'medio', cat:'Altro' },
+    { n:'Cavolo cappuccio',                        e:'🥬', cho:2.5, f:0.1, p:1.3, ig:'basso', cat:'Verdura e legumi' },
+    { n:'Zucchero di canna',                       e:'🟫', cho:98,  f:0,   p:0,   ig:'alto',  cat:'Zuccheri rapidi' },
+    { n:'Lievito di birra secco',                  e:'🍞', cho:20,  f:5,   p:40,  ig:'basso', cat:'Altro' },
+    { n:'Cannella',                                e:'🪵', cho:27,  f:1,   p:4,   ig:'basso', cat:'Altro' },
+    { n:'Arachidi tostate',                        e:'🥜', cho:8.5, f:50,  p:26,  ig:'basso', cat:'Altro' }
+  ],
+  [{
+    n: 'Oi muchim (오이무침) — cetrioli piccanti al sesamo',
+    sezioni: [
+      { titolo: 'Per i cetrioli', voci: [
+        { n:'Cetrioli',       q:'400', u:'g' },
+        { n:'Cipolla dorata', q:'70',  u:'g' },
+        { n:'Sale fino',      u:'qb' } ] },
+      { titolo: 'Per il condimento', voci: [
+        { n:'Peperoncino coreano in polvere (gochugaru)', q:'2', u:'cm' },
+        { n:'Salsa di soia',  q:'2', u:'cm' },
+        { n:'Aceto di riso',  q:'2', u:'cm' },
+        { n:'Zucchero',       q:'1', u:'cm' },
+        { n:'Semi di sesamo', q:'1', u:'cm' },
+        { n:'Olio di sesamo', q:'1', u:'cc' },
+        { n:'Aglio',          q:'5', u:'g' } ] }
+    ],
+    passi: [
+      { titolo: 'Preparazione', passi: [
+        { t: 'Strofina i cetrioli con un po\' di sale, sciacquali e affettali a rondelle spesse mezzo centimetro; falli spurgare 10 minuti con una presa abbondante di sale, poi strizzali delicatamente. Affetta sottile la cipolla.' } ] },
+      { titolo: 'Condimento', passi: [
+        { t: 'Mescola gochugaru, salsa di soia, aceto, zucchero e aglio tritato; condisci cetrioli e cipolla, completa con olio e semi di sesamo e fai riposare in frigorifero una decina di minuti prima di servire.' } ] }
+    ],
+    cottura: [],
+    porzG: 100, perdita: 10
+  },
+  {
+    n: 'Tteokbokki (떡볶이) — gnocchi di riso piccanti',
+    sezioni: [
+      { titolo: 'Per il tteokbokki', voci: [
+        { n:'Gnocchi di riso coreani (tteok)', q:'500', u:'g' },
+        { n:'Fish cake coreano (eomuk)',       q:'200', u:'g' },
+        { n:'Cavolo cappuccio',                q:'70',  u:'g' },
+        { n:'Cipollotto',                      q:'50',  u:'g' },
+        { n:'Acqua',                           q:'400', u:'g' } ] },
+      { titolo: 'Per la salsa', voci: [
+        { n:'Pasta di peperoncino coreana (gochujang)',   q:'3', u:'cm' },
+        { n:'Peperoncino coreano in polvere (gochugaru)', q:'2', u:'cm' },
+        { n:'Zucchero',      q:'2', u:'cm' },
+        { n:'Salsa di soia', q:'2', u:'cm' },
+        { n:'Aglio',         q:'10', u:'g' } ] }
+    ],
+    passi: [
+      { titolo: 'Preparazione', passi: [
+        { t: 'Se i tteok sono confezionati e duri, ammollali in acqua tiepida 10-20 minuti. Taglia il fish cake a triangoli, il cavolo a pezzi grossolani e il cipollotto a tocchetti obliqui.' } ] },
+      { titolo: 'In pentola', passi: [
+        { t: 'Porta a bollore l\'acqua in una padella ampia e sciogli gochujang, gochugaru, zucchero, salsa di soia e aglio.' },
+        { t: 'Aggiungi tteok e cavolo e cuoci 5-6 minuti a fuoco medio-alto mescolando spesso perché non si attacchino; unisci il fish cake e prosegui finché la salsa si addensa e avvolge gli gnocchi, morbidi ed elastici. Finisci con il cipollotto.' } ] }
+    ],
+    cottura: [],
+    porzG: 300, perdita: 20
+  },
+  {
+    n: 'Hotteok (호떡) — pancake dolci ripieni',
+    sezioni: [
+      { titolo: 'Per l\'impasto', voci: [
+        { n:'Farina 00',              q:'300', u:'g' },
+        { n:'Acqua',                  q:'240', u:'g' },
+        { n:'Zucchero',               q:'2',   u:'cm' },
+        { n:'Lievito di birra secco', q:'3',   u:'g' },
+        { n:'Olio di semi',           q:'1',   u:'cm' },
+        { n:'Sale fino',              u:'qb' } ] },
+      { titolo: 'Per il ripieno', voci: [
+        { n:'Zucchero di canna',  q:'60', u:'g' },
+        { n:'Arachidi tostate',   q:'40', u:'g' },
+        { n:'Cannella',           q:'1',  u:'cc' },
+        { n:'Semi di sesamo',     u:'qb' } ] },
+      { titolo: 'Per la piastra', voci: [
+        { n:'Olio di semi', u:'qb' } ] }
+    ],
+    passi: [
+      { titolo: 'Impasto', passi: [
+        { t: 'Sciogli lievito e zucchero nell\'acqua tiepida; uniscila a farina e sale con l\'olio e impasta: deve restare morbido e un po\' appiccicoso. Copri e fai lievitare circa un\'ora, fino al raddoppio.' } ] },
+      { titolo: 'Ripieno e formatura', passi: [
+        { t: 'Trita le arachidi e mescolale con zucchero di canna, cannella e semi di sesamo.' },
+        { t: 'Con le mani unte d\'olio preleva una pallina d\'impasto (circa 8 pezzi), appiattiscila sul palmo, metti al centro un cucchiaio abbondante di ripieno e sigilla bene pizzicando i bordi.' } ] },
+      { titolo: 'In padella', passi: [
+        { t: 'Scalda un velo d\'olio a fuoco medio, appoggia la pallina con la chiusura verso il basso, dopo un minuto schiacciala con una paletta larga fino a un centimetro di spessore e dora 2-3 minuti per lato. Attenzione: il ripieno diventa caramello bollente.' } ] }
+    ],
+    cottura: [],
+    porzG: 80, perdita: 8
   }]);
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
