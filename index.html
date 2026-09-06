@@ -528,6 +528,7 @@ const IC = {
   piatti:'<path d="M4 15h16a8 8 0 0 1-16 0z"/><path d="M9 4c0 2 2 2.5 2 4.5M14 4c0 2 2 2.5 2 4.5"/>',
   peso:'<path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/>',
   sport:'<path d="M4 12h3l2-6 4 12 2-6h5"/>',
+  corri:'<circle cx="14" cy="4.5" r="2"/><path d="M13.2 8.2l-2.7 4.2 2.9 2.4-1.9 5.7"/><path d="M13.2 8.7l3.3 2.3 3.2-.8"/><path d="M12.4 8.4L9 9.6l-2 2.5"/><path d="M11.6 14.4l-5 5"/>',
   stella:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
   cestino:'<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
   meno:'<path d="M5 12h14"/>', piu:'<path d="M12 5v14M5 12h14"/>', chiudi:'<path d="M6 6l12 12M18 6L6 18"/>',
@@ -554,7 +555,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.2';
+const VERSIONE = '2026-09-06.3';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1970,8 +1971,6 @@ function vistaSport(){
         <button class="chip" data-a="att:" style="--c:var(--sport)">‹</button>
         <button class="chip" data-a="param:${s.attivita}" aria-label="Parametri ${att.nome}"
           style="--c:var(--sport);display:flex;align-items:center;gap:5px">${ico('regola',15)}</button>
-        <button class="chip on" data-a="regSport" aria-label="Registra questa attività"
-          style="--c:var(--sport);display:flex;align-items:center">${ico('piu',16)}</button>
       </div>
       ${G(att.cond, att.opzioni, 'cond')}
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -1991,7 +1990,22 @@ function vistaSport(){
         <div class="num" style="font-size:34px;font-weight:800;line-height:1;color:var(--ink2)">—</div>
         <div style="font-size:12px;color:var(--ink2);margin-top:5px">basale Esercizio</div>
       </div>`}
-    </div>`;
+    </div>
+    ${(() => {
+      /* Sotto il consiglio: "Avvia attività" registra subito, senza
+         altri passaggi; dopo l'avvio resta il riepilogo con l'orario
+         del promemoria, finché non arriva l'esito. */
+      const ora = t => new Date(t).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
+      const av = S.sportAvviata ? sessioniSport().find(x => x.id === S.sportAvviata && x.glicDopo == null) : null;
+      if(av && av.attivita === s.attivita) return `
+        <div class="box" style="margin:0 0 10px;padding:14px 16px;background:var(--sport-soft);color:var(--sport);box-shadow:none">
+          <div style="display:flex;align-items:center;gap:8px;font-weight:800;font-size:16px">${ico('corri',20)} Attività avviata alle ${ora(av.quando)}</div>
+          <div style="font-size:12px;margin-top:5px">Basale Esercizio inserito ora · promemoria glicemia verso le ${ora(scadenzaEsito(av))}.</div>
+        </div>`;
+      return `
+        <button class="primario" style="background:var(--sport);display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:10px"
+          data-a="avviaSport">${ico('corri',21)} Avvia attività</button>`;
+    })()}`;
 }
 
 /* ---------- strato: parametri dello sport ---------- */
@@ -2548,27 +2562,35 @@ document.addEventListener('click', e => {
     /* Si riparte senza condizione né glicemia: la proposta arriva solo
        quando entrambe sono compilate. */
     S.sport.attivita = p1 || null;
-    S.sport.cond = null; S.sport.glic = '';
+    S.sport.cond = null; S.sport.glic = ''; S.sportAvviata = null;
   }
   else if(a==='param') S.paramSport = p1;
   else if(a==='chiudiParam') S.paramSport = null;
   else if(a==='paramApp') S.paramApp = true;
   else if(a==='chiudiParamApp') S.paramApp = null;
-  else if(a==='regSport'){
-    /* Si parte da quanto impostato nella pagina: condizione, glicemia
-       dichiarata e quantità già corrette di conseguenza. */
+  else if(a==='avviaSport'){
+    /* Registra subito con quanto impostato nella pagina: condizione,
+       glicemia dichiarata e CHO suggeriti. Nessun altro passaggio:
+       l'esito arriverà col promemoria. */
     const att = ATTIVITA[S.sport.attivita] || ATTIVITA.nuoto;
     const r = calcolaSport(S.sport);
     if(!r.pronto){
       alert(`Prima scegli ${att.cond === 'Distanza' ? 'la distanza' : 'la durata'} e inserisci la glicemia.`);
       return;
     }
-    S.sessioneAperta = { nuova:true, attivita:S.sport.attivita, cond:S.sport.cond,
-      suggPrima:r.prima, correzione:r.correzione,
+    const arr = sessioniSport();
+    const rec = { id:nuovoId(), quando:Date.now(), attivita:S.sport.attivita, cond:S.sport.cond,
+      suggPrima:r.prima, correzione:r.correzione || 0,
       anticipo: r.basale ? r.basale.anticipo : 0,
-      bolo: r.bolo ? true : undefined, boloU: r.bolo ? r.bolo.unita : null,
-      glicPrima:String(S.sport.glic || ''),
-      presiPrima:String(r.prima), glicDopo:'' };
+      ...(r.bolo ? { bolo:true, boloU:r.bolo.unita } : {}),
+      presiPrima:r.prima, presiDurante:0,
+      glicPrima: Math.round(parseFloat(String(S.sport.glic).replace(',', '.'))),
+      glicDopo:null, esito:null, nota:null };
+    arr.push(rec);
+    salvaSessioni(arr);
+    S.sportAvviata = rec.id;
+    if('Notification' in window && Notification.permission === 'default')
+      Notification.requestPermission().catch(() => {});
   }
   else if(a==='esitoSport'){
     const x = sessioniSport().find(v => v.id === p1);
