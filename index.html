@@ -535,7 +535,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-05.30';
+const VERSIONE = '2026-09-06.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -564,8 +564,52 @@ function sanificaAlimento(o){
     ig: ['basso','medio','alto'].includes(o.ig) ? o.ig : 'medio',
     foto: typeof o.foto === 'string' && (o.foto.startsWith('data:image') || o.foto.startsWith('https://')) ? o.foto : null,
     ...(o.alcol === true ? {alcol:true} : {}),
+    ...ondaCampi(o),
     porz
   };
+}
+
+/* Onda quadra: percentuale del bolo da fare subito (default 100, cioè
+   niente onda) e ore su cui distribuire il resto. Salvata solo quando
+   diversa dal default, per alimenti e piatti. */
+function ondaCampi(o){
+  const pct = Math.round(+o.ondaPct);
+  if(!(pct >= 10 && pct < 100)) return {};
+  const ore = parseFloat(String(o.ondaOre ?? '').replace(',', '.'));
+  return { ondaPct: pct, ondaOre: (ore >= 0.5 && ore <= 12) ? Math.round(ore*2)/2 : 2 };
+}
+
+/* Riquadro della distribuzione: barra subito/esteso con i grammi. */
+function ondaHTML(pct, ore, cho){
+  pct = pct || 100;
+  if(pct >= 100) return `<div style="font-size:12px;color:var(--ink2);margin-top:8px">Bolo: tutto subito (100%)</div>`;
+  const est = 100 - pct;
+  return `
+  <div style="margin-top:10px">
+    <div style="display:flex;height:30px;border-radius:10px;overflow:hidden;border:1px solid #EBD5B4">
+      <div style="width:${pct}%;background:var(--wave);color:#fff;font-weight:700;font-size:12px;
+        display:flex;align-items:center;justify-content:center;white-space:nowrap">${pct}% subito</div>
+      <div style="width:${est}%;background:#F3DFBF;color:var(--wave);font-weight:700;font-size:12px;
+        display:flex;align-items:center;justify-content:center;white-space:nowrap">${est}%</div>
+    </div>
+    <div class="num" style="font-size:12px;color:var(--ink2);margin-top:5px">Onda quadra:
+      ${gr1(cho*pct/100)} g subito · ${gr1(cho*est/100)} g su ${String(ore).replace('.', ',')} h</div>
+  </div>`;
+}
+
+/* Campi dell'onda quadra nei moduli di modifica (alimento e piatto).
+   Il prefisso distingue gli id: 'fi-' per gli alimenti, 'pf-' per i
+   piatti, così ogni modulo aggiorna il proprio stato. */
+function ondaForm(prefisso, F){
+  return `
+  <div class="etich">Onda quadra (bolo dell'infusore)</div>
+  <div style="display:flex;gap:8px;margin-bottom:4px">
+    <div style="flex:1;min-width:0"><div class="etich" style="margin-bottom:4px">% subito</div>
+      <input id="${prefisso}ondaPct" class="campo" inputmode="numeric" placeholder="100" value="${esc(F.ondaPct ?? '100')}"></div>
+    <div style="flex:1;min-width:0"><div class="etich" style="margin-bottom:4px">Resto su quante ore</div>
+      <input id="${prefisso}ondaOre" class="campo" inputmode="decimal" placeholder="es. 2" value="${esc(F.ondaOre ?? '')}"></div>
+  </div>
+  <div style="font-size:12px;color:var(--ink2);margin-bottom:12px">Con 100% niente onda: tutto il bolo subito. Sotto il 100%, il resto viene distribuito sulle ore indicate.</div>`;
 }
 
 let FOODS = (leggi().alimenti || []).map(sanificaAlimento).filter(Boolean);
@@ -614,6 +658,7 @@ function sanificaPiatto(o){
     e: typeof o.e === 'string' && o.e.trim() ? Array.from(o.e.trim()).slice(0,3).join('') : '🍽️',
     foto: typeof o.foto === 'string' && o.foto.startsWith('data:image') ? o.foto : null,
     ing,
+    ...ondaCampi(o),
     ...(typeof o.daRicetta === 'string' && o.daRicetta ? { daRicetta: o.daRicetta } : {}),
     ...(Number.isInteger(o.mancanti) && o.mancanti > 0 ? { mancanti: o.mancanti } : {})
   };
@@ -643,7 +688,9 @@ function sincronizzaPiattoRicetta(r){
     return;
   }
   const dati = sanificaPiatto({ id: i >= 0 ? PIATTI[i].id : undefined,
-    n: r.n, foto: r.foto, ing, daRicetta: r.id, mancanti });
+    n: r.n, foto: r.foto, ing, daRicetta: r.id, mancanti,
+    ondaPct: i >= 0 ? PIATTI[i].ondaPct : undefined,
+    ondaOre: i >= 0 ? PIATTI[i].ondaOre : undefined });
   if(!dati) return;
   if(i >= 0) PIATTI[i] = dati; else PIATTI.push(dati);
   scrivi({ piatti: PIATTI });
@@ -999,7 +1046,7 @@ const FORMATI_BARCODE = ['ean_13','ean_8','upc_a','upc_e','code_128'];
 let flussoCamera = null, cicloScan = null, rilevatore = null, zxReader = null, zxPromise = null;
 
 function formVuoto(){
-  return { n:'', e:'', cho:'', f:'', p:'', ig:'medio', alcol:'no', cat:'Altro', porz:'', foto:null };
+  return { n:'', e:'', cho:'', f:'', p:'', ig:'medio', alcol:'no', cat:'Altro', porz:'', foto:null, ondaPct:'100', ondaOre:'' };
 }
 
 const EMOJI_CIBO = ['🍞','🥐','🥖','🍝','🍚','🥔','🍕','🥪','🍔','🍎','🍌','🍊','🍇','🍓','🍑','🥝','🥦','🥕','🍅','🫘','🥛','🧀','🥣','🥚','🍖','🐟','🍪','🍫','🍰','🍨','🍯','🍬','🥤','🧃','🍺','🍷'];
@@ -1188,6 +1235,7 @@ function salvaAlimento(){
     n: nome, e: F.e, cat: F.cat, foto: F.foto,
     cho: Math.round(cho*10)/10, f: num(F.f), p: num(F.p),
     ig: F.ig, alcol: F.alcol === 'si',
+    ondaPct: F.ondaPct, ondaOre: F.ondaOre,
     porz: porzG > 0 ? [["1 porzione", porzG], ["100 g", 100]] : [["100 g", 100]]
   });
   if(S.editId){
@@ -1588,6 +1636,7 @@ function stratoPiattoUso(){
         <div style="font-size:12px;color:var(--ink2);margin-top:4px">${gr1(t.f)} g grassi · ${gr1(t.p)} g proteine
           · ${Math.round(t.cho*4 + t.p*4 + t.f*9)} kcal
           · ${b.tipo}${b.split ? ` ${b.split[0]}/${b.split[1]}%` : ''}${b.durata ? ` su ${b.durata}` : ''}</div>
+        ${ondaHTML(pl.ondaPct, pl.ondaOre, t.cho)}
       </div>
       ${pl.mancanti ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
         <span>⚠️</span><span>Piatto creato dalla ricetta: ${pl.mancanti} ingredient${pl.mancanti === 1 ? 'e non è' : 'i non sono'}
@@ -1612,6 +1661,7 @@ function salvaPiatto(){
   const F = S.pform; if(!F) return;
   if(!F.n.trim()){ alert('Dai un nome al piatto.'); return; }
   const dati = sanificaPiatto({ id: S.editPiattoId || undefined, n:F.n, e:F.e, foto:F.foto, ing:F.ing,
+    ondaPct: F.ondaPct, ondaOre: F.ondaOre,
     daRicetta: F.daRicetta, mancanti: F.mancanti });
   if(!dati){ alert('Aggiungi almeno un ingrediente con una quantità valida.'); return; }
   const nuovi = [...PIATTI];
@@ -1693,6 +1743,7 @@ function stratoPiattoForm(){
           <span style="color:var(--cho);font-weight:700">＋</span>
         </button>`).join('')}
       ${q && !risultati.length ? `<p style="font-size:13px;color:var(--ink2)">Nessun alimento con questo nome nell'anagrafica.</p>` : ''}
+      <div style="margin-top:12px">${ondaForm('pf-', F)}</div>
       <button class="primario" style="margin-top:12px" data-a="salvaPiatto">${S.editPiattoId ? 'Salva le modifiche' : 'Salva il piatto'}</button>
     </div>
   </div>`;
@@ -2105,6 +2156,7 @@ function stratoPorzione(){
         <div style="font-size:12px;color:var(--ink2);margin-top:4px">da inserire nel microinfusore</div>
         <div class="num" style="font-size:13px;font-weight:600;color:var(--ink2);margin-top:10px;padding-top:10px;border-top:1px solid rgba(19,32,25,.08)">
           ${gr1(f.f*S.gr/100)} g grassi · ${gr1(f.p*S.gr/100)} g proteine · ${Math.round((f.cho*4 + f.p*4 + f.f*9)*S.gr/100)} kcal</div>
+        ${ondaHTML(f.ondaPct, f.ondaOre, f.cho*S.gr/100)}
       </div>
       <div class="stepper">
         <button data-a="g:-">${ico('meno')}</button>
@@ -2230,6 +2282,7 @@ function stratoNuovo(){
         ${CATS.map(c => chip(c, F.cat===c, `fset:cat:${c}`)).join('')}</div>
       <div style="margin-bottom:16px;max-width:200px"><div class="etich">Porzione tipica in grammi (facoltativa)</div>
         <input id="fi-porz" class="campo" inputmode="decimal" placeholder="es. 62,5" value="${esc(F.porz)}"></div>
+      ${ondaForm('fi-', F)}
       <button class="primario" data-a="salvaAlimento">${S.editId ? 'Salva le modifiche' : 'Aggiungi ai miei alimenti'}</button>
     </div>
   </div>`;
@@ -2472,6 +2525,7 @@ document.addEventListener('click', e => {
     if(f){
       S.form = { n:f.n, e:f.e, cho:String(f.cho), f:String(f.f), p:String(f.p),
         ig:f.ig, alcol:f.alcol ? 'si' : 'no', cat:f.cat || 'Altro', foto: f.foto || null,
+        ondaPct: String(f.ondaPct || 100), ondaOre: f.ondaOre ? String(f.ondaOre).replace('.', ',') : '',
         porz: f.porz[0][1] !== 100 ? String(f.porz[0][1]) : '' };
       S.editId = p1; S.nuovo = 'form'; S.aperto = null;
     }
@@ -2491,7 +2545,7 @@ document.addEventListener('click', e => {
   else if(a==='nuovoPiatto'){
     if(!FOODS.length){ alert('Prima aggiungi qualche alimento alla tua anagrafica: i piatti si compongono da lì.'); return; }
     S.nuovo = null;
-    S.pform = { n:'', e:'', foto:null, ing:[] }; S.editPiattoId = null; S.pingQ = '';
+    S.pform = { n:'', e:'', foto:null, ing:[], ondaPct:'100', ondaOre:'' }; S.editPiattoId = null; S.pingQ = '';
   }
   else if(a==='apriPiatto'){
     const pl = PIATTI.find(x => x.id === p1);
@@ -2511,6 +2565,7 @@ document.addEventListener('click', e => {
   else if(a==='modificaPiatto'){
     const pl = PIATTI.find(x => x.id === p1);
     if(pl){ S.pform = { n:pl.n, e:pl.e, foto:pl.foto, ing: pl.ing.map(i => ({...i})),
+      ondaPct: String(pl.ondaPct || 100), ondaOre: pl.ondaOre ? String(pl.ondaOre).replace('.', ',') : '',
       daRicetta: pl.daRicetta, mancanti: pl.mancanti }; S.editPiattoId = p1; S.uso = null; S.pingQ = ''; }
   }
   else if(a==='eliminaPiatto'){
@@ -2622,6 +2677,8 @@ document.addEventListener('input', e => {
   else if(id === 'peso-ora') S.pesoOra = e.target.value;
   else if(id === 'peso-kg') S.pesoKg = e.target.value;
   else if(id === 'pf-n' && S.pform) S.pform.n = e.target.value;
+  else if(id === 'pf-ondaPct' && S.pform) S.pform.ondaPct = e.target.value;
+  else if(id === 'pf-ondaOre' && S.pform) S.pform.ondaOre = e.target.value;
   else if(id === 'pf-cerca' && S.pform){
     S.pingQ = e.target.value;
     document.getElementById('strati').innerHTML = stratiHTML();
