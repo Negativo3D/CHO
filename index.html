@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.30';
+const VERSIONE = '2026-09-06.31';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3355,6 +3355,44 @@ importaRicettario('kr1Japchae',
     ],
     cottura: [],
     porzG: 350, perdita: -25
+  }]);
+
+importaRicettario('kr2Bulgogi',
+  [
+    { n:'Pera',       e:'🍐', cho:10, f:0.1, p:0.3, ig:'basso', cat:'Frutta' },
+    { n:'Cipollotto', e:'🧅', cho:5,  f:0.2, p:1.8, ig:'basso', cat:'Verdura e legumi' }
+  ],
+  [{
+    n: 'Bulgogi (불고기) — manzo marinato alla coreana',
+    sezioni: [
+      { titolo: 'Per il bulgogi', voci: [
+        { n:'Manzo per straccetti',    q:'600', u:'g' },
+        { n:'Cipolla dorata',          q:'150', u:'g' },
+        { n:'Pera',                    q:'100', u:'g' },
+        { n:'Carote',                  q:'80',  u:'g' },
+        { n:'Funghi shiitake freschi', q:'80',  u:'g' },
+        { n:'Cipollotto',              q:'50',  u:'g' } ] },
+      { titolo: 'Per la marinata', voci: [
+        { n:'Salsa di soia',  q:'5', u:'cm' },
+        { n:'Zucchero',       q:'2', u:'cm' },
+        { n:'Olio di sesamo', q:'1', u:'cm' },
+        { n:'Semi di sesamo', q:'1', u:'cm' },
+        { n:'Aglio',          q:'10', u:'g' },
+        { n:'Olio di semi',   u:'qb' },
+        { n:'Pepe nero',      u:'qb' } ] }
+    ],
+    passi: [
+      { titolo: 'Marinatura', passi: [
+        { t: 'Grattugia la pera e mescolala con la salsa di soia, lo zucchero, l\'aglio tritato, l\'olio di sesamo e una macinata di pepe: è la marinata che intenerisce e insaporisce la carne.' },
+        { t: 'Affetta il manzo sottilissimo (o usa fettine da carpaccio spesse un paio di millimetri), massaggialo con la marinata e lascialo riposare almeno 30 minuti, meglio qualche ora in frigorifero.' } ] },
+      { titolo: 'Verdure', passi: [
+        { t: 'Taglia la cipolla a fette, le carote a fiammifero, i funghi a lamelle e il cipollotto a tocchetti obliqui.' } ] },
+      { titolo: 'In padella', passi: [
+        { t: 'Scalda una padella ampia con un filo di olio di semi e cuoci il manzo marinato con cipolla, carote e funghi a fuoco vivo, mescolando, finché il liquido si restringe e la carne è lucida.' },
+        { t: 'Spegni, aggiungi il cipollotto e i semi di sesamo e servi caldo, classicamente con riso bianco a parte.' } ] }
+    ],
+    cottura: [],
+    porzG: 300, perdita: 20
   }]);
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
