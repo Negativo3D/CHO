@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-06.25';
+const VERSIONE = '2026-09-06.26';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -2085,7 +2085,7 @@ function vistaPeso(){
     <div class="card" style="padding:18px;margin-bottom:16px">
       <div class="etich" style="margin-bottom:10px">Nuova misurazione</div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <div style="flex:1.3;min-width:0"><div class="etich">Data</div><input id="peso-data" type="date" class="campo" style="min-width:0" value="${esc(S.pesoData)}"></div>
+        <div style="flex:1;min-width:0"><div class="etich">Data</div><input id="peso-data" type="date" class="campo" style="min-width:0" value="${esc(S.pesoData)}"></div>
         <div style="flex:1;min-width:0"><div class="etich">Ora</div><input id="peso-ora" type="time" class="campo" style="min-width:0" value="${esc(S.pesoOra)}"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-end">
