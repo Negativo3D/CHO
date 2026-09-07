@@ -158,7 +158,7 @@
   .chip.on{background:var(--c,var(--cho));border-color:var(--c,var(--cho));color:#fff;font-weight:600;
     box-shadow:0 4px 12px rgba(19,32,25,.16)}
   .chips-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-  .stella{padding:8px;color:#C3CCC5}
+  .stella{padding:8px;color:#9FAFA3}
   .stella.on{color:var(--wave)}
   .num{font-variant-numeric:tabular-nums}
 
@@ -572,7 +572,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-07.1';
+const VERSIONE = '2026-09-07.2';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1856,7 +1856,11 @@ function stratoPiattoUso(){
             ${peso > 0 ? gr1(t.cho/peso*100) : 0} g CHO per 100 g${perdita
               ? ` a cotto (${perdita > 0 ? '−' + perdita : '+' + (-perdita)}% in cottura)` : ''}</div></div>
         </div>
-        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiPiatto">${ico('chiudi',20)}</button>
+        <div style="display:flex;gap:6px;flex:none;align-items:center">
+          <button class="stella ${S.preferiti.includes(pl.id)?'on':''}" data-a="fav:${pl.id}"
+            aria-label="Preferito">${ico('stella',22,S.preferiti.includes(pl.id))}</button>
+          <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudiPiatto">${ico('chiudi',20)}</button>
+        </div>
       </div>
       ${(() => {
         /* Avvisi con i nomi e con la causa distinta: quantità in grammi
@@ -2567,7 +2571,11 @@ function stratoPorzione(){
           <div><div style="font-weight:700;font-size:19px">${esc(f.n)}</div>
           <div style="font-size:12px;color:var(--ink2)">${f.cho} g CHO · ${f.f} g grassi · ${f.p} g proteine per 100 g</div></div>
         </div>
-        <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudi">${ico('chiudi',20)}</button>
+        <div style="display:flex;gap:6px;flex:none;align-items:center">
+          <button class="stella ${S.preferiti.includes(f.id)?'on':''}" data-a="fav:${f.id}"
+            aria-label="Preferito">${ico('stella',22,S.preferiti.includes(f.id))}</button>
+          <button class="card" style="padding:8px;border-radius:999px;color:var(--ink2)" data-a="chiudi">${ico('chiudi',20)}</button>
+        </div>
       </div>
       ${f.daCompletare ? `<div class="avvisoBox" style="background:var(--wave-soft);color:var(--wave);margin-bottom:12px">
         <span>⚠️</span><span>Alimento creato da una ricetta: i carboidrati sono ancora a zero. Tocca Modifica e
