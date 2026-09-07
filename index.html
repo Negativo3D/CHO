@@ -162,6 +162,9 @@
   .campoPeso{font-size:28px;font-weight:700;width:120px;max-width:100%;text-align:center;background:none;
     border:none;border-bottom:2px dashed #9FAFA3;border-radius:0;padding:0 0 2px;color:inherit}
   .campoPeso:focus{outline:none;border-bottom-color:var(--cho)}
+  .campoPesoMini{width:52px;text-align:right;background:none;border:none;border-radius:0;padding:0 1px;
+    border-bottom:1.5px dashed #9FAFA3;font-size:inherit;color:inherit;font-weight:inherit}
+  .campoPesoMini:focus{outline:none;border-bottom-color:var(--wave)}
   .stella.on{color:var(--wave)}
   .num{font-variant-numeric:tabular-nums}
 
@@ -576,7 +579,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-07.5';
+const VERSIONE = '2026-09-07.6';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1624,11 +1627,20 @@ function stratoRicetta(){
     </button>
     ${esp[chiave] ? `<div style="padding:4px 0 10px">${contenuto}</div>` : ''}`;
 
-  const righeVoci = voci => voci.map((v,i) => `
+  /* I grammi sono un campo scrivibile: si tocca il numero, si scrive
+     e alla conferma la ricetta si salva e il piatto si riallinea. */
+  const righeVoci = (voci, si) => voci.map((v,i) => {
+    const alt = v.ua && v.ua !== 'qb' && String(v.qa || '').trim()
+      ? (v.ua === 'n' ? `n° ${esc(v.qa)}` : `${esc(v.qa)} ${etichettaUnita(v.ua)}`) : '';
+    return `
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;
       padding:3px 0;font-size:13.5px${i ? ';border-top:1px dashed var(--line)' : ''}">
-      <b>${esc(v.n)}</b><span class="num" style="color:var(--ink2);flex:none">${qtaVoceHTML(v)}</span>
-    </div>`).join('');
+      <b>${esc(v.n)}</b>
+      <span class="num" style="color:var(--ink2);flex:none">${v.ua === 'qb' ? 'q.b.'
+        : `<input id="rl-${si}-${i}" class="num campoPesoMini" inputmode="decimal"
+            value="${esc(String(v.q || ''))}" aria-label="Grammi di ${esc(v.n)}"> g${alt ? ` · ${alt}` : ''}`}</span>
+    </div>`;
+  }).join('');
 
   const sottoParte = (chiave, titolo, contenuto) => `
     <button style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -1639,7 +1651,7 @@ function stratoRicetta(){
     ${esp[chiave] ? `<div style="padding:2px 0 6px">${contenuto}</div>` : ''}`;
 
   const contenutoIng = r.sezioni.map((s,i) =>
-    sottoParte('sez' + i, s.titolo || 'Ingredienti', righeVoci(s.voci))).join('');
+    sottoParte('sez' + i, s.titolo || 'Ingredienti', righeVoci(s.voci, i))).join('');
 
   const passiHTML = lista => lista.map((x,k) => `
     <div style="display:flex;gap:11px;margin-top:12px">
@@ -3137,6 +3149,22 @@ function pesoScritto(v){
 }
 document.addEventListener('change', e => {
   if(e.target.id === 'gr-in' || e.target.id === 'ug-in') disegna();
+  else if(/^rl-\d+-\d+$/.test(e.target.id)){
+    /* Grammi di un ingrediente cambiati dalla scheda della ricetta:
+       si salva la ricetta e si riallinea il piatto in anagrafica. */
+    const [si, vi] = e.target.id.split('-').slice(1).map(Number);
+    const r = RICETTE.find(x => x.id === S.ricettaAperta);
+    const v = r && r.sezioni[si] && r.sezioni[si].voci[vi];
+    if(v){
+      const n = pesoScritto(e.target.value);
+      if(n != null && gr1(n) !== v.q){
+        v.q = gr1(n);
+        scrivi({ ricette: RICETTE });
+        sincronizzaPiattoRicetta(r);
+      }
+      disegna();
+    }
+  }
 });
 
 document.addEventListener('input', e => {
