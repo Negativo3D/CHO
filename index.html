@@ -579,7 +579,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-08.4';
+const VERSIONE = '2026-09-08.5';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3775,8 +3775,8 @@ const FOTO_PAJ_SERVITO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wB
 const PASSI_PAJEON = [
   { titolo: 'Pastella e farcia', passi: [
     { t: 'Mescola farina, maizena e un pizzico di sale con l\'acqua molto fredda fino ad avere una pastella liscia e fluida: più l\'acqua è fredda, più la frittella verrà croccante.', foto: FOTO_PAJ_PASTELLA },
-    { t: 'Pulisci i cipollotti e tagliali a metà per il lungo, lunghi quanto la padella; taglia il misto di mare a pezzetti e asciugalo bene con carta da cucina.', foto: FOTO_PAJ_CIPOLLA },
-    { t: 'Il pajeon è perfetto anche per svuotare il frigo: una cipolla piccola a tocchetti si unisce volentieri ai cipollotti…', foto: FOTO_PAJ_MARE },
+    { t: 'Pulisci i cipollotti e tagliali a metà per il lungo, lunghi quanto la padella; taglia il misto di mare a pezzetti e asciugalo bene con carta da cucina.', foto: FOTO_PAJ_MARE },
+    { t: 'Il pajeon è perfetto anche per svuotare il frigo: una cipolla piccola a tocchetti si unisce volentieri ai cipollotti…', foto: FOTO_PAJ_CIPOLLA },
     { t: '…e pure le verdure avanzate (qui melanzane e peperoncini già saltati) entrano nella farcia a pezzetti.', foto: FOTO_PAJ_AVANZI } ] },
   { titolo: 'In padella', passi: [
     { t: 'Scalda abbondante olio di semi in una padella o piastra ampia e disponi i cipollotti ben paralleli, a coprire tutto il fondo.', foto: FOTO_PAJ_CIPOLLOTTI },
@@ -3861,15 +3861,15 @@ if(!leggi().pajeonFoto3){
   scrivi({ pajeonFoto3: true });
 }
 
-/* Una tantum: foto dei passi 2 e 3 di "Pastella e farcia" invertite,
-   come chiesto dall'utente. */
-if(!leggi().pajeonFoto4){
+/* Una tantum: le foto dei passi 2 e 3 di "Pastella e farcia" tornano
+   all'ordine originale (lo scambio della .4 e' stato annullato). */
+if(!leggi().pajeonFoto5){
   const r = RICETTE.find(x => norm(x.n).includes('pajeon'));
   if(r){
     const dati = sanificaRicetta({ ...r, passi: PASSI_PAJEON });
     if(dati){ r.passi = dati.passi; scrivi({ ricette: RICETTE }); }
   }
-  scrivi({ pajeonFoto4: true });
+  scrivi({ pajeonFoto5: true });
 }
 
 importaRicettario('kr4Trio',
