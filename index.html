@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.15';
+const VERSIONE = '2026-09-12.16';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -671,21 +671,39 @@ function ondaCampi(o){
   return { ondaPct: pct, ondaOre: (ore >= 0.5 && ore <= 12) ? Math.round(ore*2)/2 : 2 };
 }
 
-/* Riquadro della distribuzione: barra subito/esteso con i grammi. */
+/* Riquadro della distribuzione: quando c'è l'onda quadra, la mostra
+   come pannello in evidenza con barra subito/esteso e i grammi grandi. */
 function ondaHTML(pct, ore, cho){
   pct = pct || 100;
   if(pct >= 100) return `<div style="font-size:12px;color:var(--ink2);margin-top:8px">Bolo: tutto subito (100%)</div>`;
   const est = 100 - pct;
+  const oreT = String(ore).replace('.', ',');
+  const glifo = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 15V9h6v6h6V9h6"/></svg>`;
   return `
-  <div style="margin-top:10px">
-    <div style="display:flex;height:30px;border-radius:10px;overflow:hidden;border:1px solid #EBD5B4">
-      <div style="width:${pct}%;background:var(--wave);color:#fff;font-weight:700;font-size:12px;
-        display:flex;align-items:center;justify-content:center;white-space:nowrap">${pct}% subito</div>
-      <div style="width:${est}%;background:#F3DFBF;color:var(--wave);font-weight:700;font-size:12px;
-        display:flex;align-items:center;justify-content:center;white-space:nowrap">${est}%</div>
+  <div style="margin-top:14px;background:#fff;border:1.5px solid var(--wave);border-radius:16px;
+    padding:12px 14px;text-align:left;box-shadow:0 2px 8px rgba(168,91,12,.12)">
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;color:var(--wave)">
+      <span style="width:24px;height:24px;border-radius:8px;background:var(--wave);color:#fff;flex:none;
+        display:inline-flex;align-items:center;justify-content:center">${glifo}</span>
+      <span style="font-size:11px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase">Bolo a onda quadra</span>
     </div>
-    <div class="num" style="font-size:12px;color:var(--ink2);margin-top:5px">Onda quadra:
-      ${gr1(cho*pct/100)} g subito · ${gr1(cho*est/100)} g su ${String(ore).replace('.', ',')} h</div>
+    <div style="display:flex;height:34px;border-radius:10px;overflow:hidden;border:1px solid #EBD5B4">
+      <div style="width:${pct}%;background:var(--wave);color:#fff;font-weight:800;font-size:12px;
+        display:flex;align-items:center;justify-content:center;white-space:nowrap">${pct}% subito</div>
+      <div style="width:${est}%;background:var(--wave-soft);color:var(--wave);font-weight:800;font-size:12px;
+        display:flex;align-items:center;justify-content:center;white-space:nowrap">${est}% esteso</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <div style="flex:1;background:var(--wave-soft);border-radius:12px;padding:9px 11px">
+        <div class="num" style="font-size:21px;font-weight:800;color:var(--wave);line-height:1">${gr1(cho*pct/100)} g</div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-top:4px">subito</div>
+      </div>
+      <div style="flex:1;background:var(--wave-soft);border-radius:12px;padding:9px 11px">
+        <div class="num" style="font-size:21px;font-weight:800;color:var(--wave);line-height:1">${gr1(cho*est/100)} g</div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-top:4px">esteso su ${oreT} h</div>
+      </div>
+    </div>
   </div>`;
 }
 
