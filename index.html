@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.7';
+const VERSIONE = '2026-09-12.8';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3709,18 +3709,18 @@ importaRicettario('kr1Japchae',
     foto: FOTO_JAP_FINITO,
     sezioni: [
       { titolo: 'Per il japchae', voci: [
-        { n:'Spaghetti di patata dolce (dangmyeon)', q:'250', u:'g' },
-        { n:'Manzo per straccetti', q:'200', u:'g' },
-        { n:'Spinaci',              q:'200', u:'g' },
-        { n:'Cipolla dorata',       q:'150', u:'g' },
-        { n:'Carote',               q:'100', u:'g' },
-        { n:'Funghi shiitake freschi', q:'100', u:'g' } ] },
+        { n:'Spaghetti di patata dolce (dangmyeon)', q:'200', u:'g' },
+        { n:'Manzo per straccetti', q:'160', u:'g' },
+        { n:'Spinaci',              q:'160', u:'g' },
+        { n:'Cipolla dorata',       q:'120', u:'g' },
+        { n:'Carote',               q:'80', u:'g' },
+        { n:'Funghi shiitake freschi', q:'80', u:'g' } ] },
       { titolo: 'Per il condimento', voci: [
-        { n:'Salsa di soia',   q:'5', u:'cm' },
-        { n:'Zucchero di canna', q:'2', u:'cm' },
-        { n:'Olio di sesamo tostato',  q:'3', u:'cm' },
-        { n:'Semi di sesamo',  q:'1', u:'cm' },
-        { n:'Aglio',           q:'10', u:'g' },
+        { n:'Salsa di soia',   q:'4', u:'cm' },
+        { n:'Zucchero di canna', q:'1.6', u:'cm' },
+        { n:'Olio di sesamo tostato',  q:'2.4', u:'cm' },
+        { n:'Semi di sesamo',  q:'0.8', u:'cm' },
+        { n:'Aglio',           q:'8', u:'g' },
         { n:'Olio di semi',    u:'qb' },
         { n:'Sale fino',       u:'qb' },
         { n:'Pepe nero',       u:'qb' } ] }
@@ -3821,6 +3821,32 @@ if(!leggi().japchaeZuccheroCanna){
     if(nuovo){ FOODS.push(nuovo); scrivi({ alimenti: FOODS }); }
   }
   scrivi({ japchaeZuccheroCanna: true });
+}
+
+/* Una tantum: porta i noodles del japchae a 200 g e rinormalizza in
+   proporzione tutti gli altri ingredienti (fattore = 200 / grammi
+   attuali dei noodles), mantenendo i rapporti della ricetta salvata. */
+if(!leggi().japchaeNoodles200){
+  const r = RICETTE.find(x => norm(x.n).includes('japchae'));
+  if(r){
+    let noodles = null;
+    for(const sz of r.sezioni) for(const v of sz.voci)
+      if(/dangmyeon|patata dolce|noodle/i.test(v.n)) noodles = v;
+    const g0 = noodles ? parseFloat(String(noodles.q).replace(',', '.')) : null;
+    if(g0 && g0 > 0 && Math.abs(g0 - 200) > 0.05){
+      const fatt = 200 / g0;
+      for(const sz of r.sezioni) for(const v of sz.voci){
+        if(v.ua === 'qb') continue;
+        const g = parseFloat(String(v.q).replace(',', '.'));
+        if(g > 0) v.q = gr1(Math.round(g * fatt * 10) / 10);
+        const qa = parseFloat(String(v.qa).replace(',', '.'));
+        if(isFinite(qa) && qa > 0) v.qa = gr1(Math.round(qa * fatt * 10) / 10);
+      }
+      scrivi({ ricette: RICETTE });
+      sincronizzaPiattoRicetta(r);
+    }
+  }
+  scrivi({ japchaeNoodles200: true });
 }
 
 /* Una tantum: aggiunge il controfiletto di manzo all'anagrafica alimenti
