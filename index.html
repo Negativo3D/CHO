@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.12';
+const VERSIONE = '2026-09-12.13';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3933,6 +3933,19 @@ if(!leggi().hotteokZuccheroOlio){
   scrivi({ hotteokZuccheroOlio: true });
 }
 
+/* Una tantum: nell'hotteok l'acqua dell'impasto passa da 240 a 210 g
+   (solo se è ancora al valore di default 240). */
+if(!leggi().hotteokAcqua210){
+  const r = RICETTE.find(x => norm(x.n).includes('hotteok'));
+  if(r){
+    let tocca = false;
+    for(const sz of r.sezioni) for(const v of sz.voci)
+      if(norm(v.n) === norm('Acqua') && parseFloat(String(v.q).replace(',', '.')) === 240){ v.q = '210'; tocca = true; }
+    if(tocca){ scrivi({ ricette: RICETTE }); sincronizzaPiattoRicetta(r); }
+  }
+  scrivi({ hotteokAcqua210: true });
+}
+
 /* Una tantum: aggiunge il controfiletto di manzo all'anagrafica alimenti
    (valori per 100 g; carboidrati a zero, come le altre carni). */
 if(!leggi().alimentoControfiletto){
@@ -4375,7 +4388,7 @@ importaRicettario('kr4Trio',
     sezioni: [
       { titolo: 'Per l\'impasto', voci: [
         { n:'Farina 00',              q:'300', u:'g' },
-        { n:'Acqua',                  q:'240', u:'g' },
+        { n:'Acqua',                  q:'210', u:'g' },
         { n:'Zucchero di canna',      q:'2',   u:'cm' },
         { n:'Lievito di birra secco', q:'3',   u:'g' },
         { n:'Olio di girasole',       q:'1',   u:'cm' },
