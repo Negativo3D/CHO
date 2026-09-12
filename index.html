@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.2';
+const VERSIONE = '2026-09-12.3';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3679,7 +3679,7 @@ const PASSI_JAPCHAE = [
   { titolo: 'In padella', passi: [
     { t: 'Taglia a julienne la cipolla e le carote.', foto: FOTO_JAP_JULIENNE },
     { t: 'Salta le verdure separatamente in poco olio di semi, salando appena: prima la cipolla, poi le carote, poi i funghi. Cuoci ogni verdura per conto suo e tienila da parte, senza mescolarle tra loro.', foto: FOTO_JAP_CIPOLLE_PADELLA },
-    { t: "In una padella ben calda salta le striscioline di manzo marinato in un giro d'olio di sesamo tostato, a fuoco vivo, finché sono appena cotte; poi tienile da parte, separate dalle verdure." },
+    { t: "In una padella ben calda salta le striscioline di manzo marinato in un giro d'olio di sesamo tostato, a fuoco vivace per tre o quattro minuti, finché sono appena cotte; poi tienile da parte, separate dalle verdure." },
     { t: 'Tieni ogni componente separato su un piatto: verdure e manzo si cuociono ognuno per conto proprio e si uniranno soltanto alla fine, come vuole la ricetta originale.', foto: FOTO_JAP_PIATTO_SEPARATI },
     { t: 'Lessa i dangmyeon ammollati per 2-3 minuti in acqua bollente insaporita con un giro di salsa di soia, poi scolali e accorciali con le forbici.', foto: FOTO_JAP_ACQUA },
     { t: 'Condisci subito i noodles con un cucchiaio di salsa di soia e uno di olio di sesamo tostato perché non si incollino.', foto: FOTO_JAP_NOODLES_CONDITI } ] },
@@ -3771,6 +3771,14 @@ if(!leggi().japchaeManzoTostato){
   if(r){ const dati = sanificaRicetta({ ...r, passi: PASSI_JAPCHAE }); if(dati){ r.passi = dati.passi; toccaR = true; } }
   if(toccaR) scrivi({ ricette: RICETTE });
   scrivi({ japchaeManzoTostato: true });
+}
+
+/* Una tantum: il passo del manzo del japchae specifica ora il tempo di
+   cottura (fuoco vivace, 3-4 minuti). Riapplica i passi aggiornati. */
+if(!leggi().japchaeManzoTempo){
+  const r = RICETTE.find(x => norm(x.n).includes('japchae'));
+  if(r){ const dati = sanificaRicetta({ ...r, passi: PASSI_JAPCHAE }); if(dati){ r.passi = dati.passi; scrivi({ ricette: RICETTE }); } }
+  scrivi({ japchaeManzoTempo: true });
 }
 
 
