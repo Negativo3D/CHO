@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.9';
+const VERSIONE = '2026-09-12.10';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3673,7 +3673,7 @@ const PASSI_JAPCHAE = [
   { titolo: 'Preparazione degli ingredienti', passi: [
     { t: 'Metti i dangmyeon in ammollo in acqua fredda per circa 40 minuti, finché diventano morbidi ed elastici: così poi cuoceranno in un attimo senza scuocere.', foto: FOTO_JAP_NOODLES },
     { t: 'Se usi shiitake secchi, come nella ricetta originale, mettili in ammollo in acqua tiepida per 30 minuti (30 g secchi equivalgono ai 100 g freschi della lista).', foto: FOTO_JAP_FUNGHI_AMMOLLO },
-    { t: 'Strizza i funghi e tagliali a lamelle: si cuoceranno insieme ai noodles, non in padella.', foto: FOTO_JAP_FUNGHI_CONDITI },
+    { t: 'Strizza i funghi e tagliali a lamelle: si cuoceranno insieme ai noodles, non in padella.', foto: null },
     { t: 'Sbollenta gli spinaci per 30 secondi, raffreddali in acqua fredda e strizzali bene.', foto: FOTO_JAP_SPINACI },
     { t: 'Condisci gli spinaci strizzati con un pizzico di sale, un po\' di aglio tritato, semi di sesamo e qualche goccia di olio di sesamo tostato.', foto: FOTO_JAP_SPINACI_CONDITI },
     { t: 'Riduci il manzo a striscioline sottili e fallo insaporire con un cucchiaio di salsa di soia, mezzo di zucchero di canna, metà dell\'aglio tritato e una macinata di pepe.', foto: FOTO_JAP_MANZO } ] },
@@ -3682,8 +3682,9 @@ const PASSI_JAPCHAE = [
     { t: 'Salta le verdure separatamente in poco olio di semi, salando appena: prima la cipolla, poi le carote. Cuoci ogni verdura per conto suo e tienila da parte, senza mescolarle tra loro.', foto: FOTO_JAP_CIPOLLE_PADELLA },
     { t: "In una padella ben calda salta le striscioline di manzo marinato in un giro d'olio di sesamo tostato, a fuoco vivace per tre o quattro minuti, finché sono appena cotte; poi tienile da parte, separate dalle verdure.", foto: FOTO_JAP_MANZO_SALTATO },
     { t: 'Tieni ogni componente separato su un piatto: verdure e manzo si cuociono ognuno per conto proprio e si uniranno soltanto alla fine, come vuole la ricetta originale.', foto: FOTO_JAP_PIATTO_SEPARATI },
-    { t: "Porta a bollore l'acqua con un giro di salsa di soia e cuoci i funghi a lamelle insieme ai dangmyeon ammollati, tenendo i funghi bagnati con l'acqua di cottura dei noodles: bastano 2-3 minuti. Scola noodles e funghi, accorcia i noodles con le forbici e condisci i funghi con un cucchiaino di salsa di soia e qualche goccia di olio di sesamo tostato.", foto: FOTO_JAP_ACQUA },
-    { t: 'Condisci subito i noodles con un cucchiaio di salsa di soia e uno di olio di sesamo tostato perché non si incollino.', foto: FOTO_JAP_NOODLES_CONDITI } ] },
+    { t: "Porta a bollore l'acqua con un giro di salsa di soia e lessa i dangmyeon ammollati per 2-3 minuti; nella stessa acqua, in parallelo, cuoci i funghi a lamelle tenendoli bagnati con l'acqua di cottura dei noodles.", foto: FOTO_JAP_ACQUA },
+    { t: 'Cottura dei funghi: scolali dall\'acqua dei noodles e condiscili con un cucchiaino di salsa di soia e qualche goccia di olio di sesamo tostato; tienili da parte con gli altri componenti.', foto: FOTO_JAP_FUNGHI_CONDITI },
+    { t: 'Scola i noodles, accorciali con le forbici e condiscili con un cucchiaio di salsa di soia e uno di olio di sesamo tostato perché non si incollino.', foto: FOTO_JAP_NOODLES_CONDITI } ] },
   { titolo: 'Assemblaggio', passi: [
     { t: 'Riunisci in padella (o in una ciotola grande) noodles, verdure saltate, spinaci e manzo con la salsa di soia, lo zucchero di canna e l\'olio di sesamo tostato rimasti e il resto dell\'aglio; mescola a lungo, meglio se con le mani.', foto: FOTO_JAP_MESCOLONE },
     { t: 'Completa con i semi di sesamo e servi tiepido o a temperatura ambiente.', foto: FOTO_JAP_FINITO } ] }
@@ -3870,6 +3871,23 @@ if(!leggi().japchaeFunghiNoodles){
     if(tocca) scrivi({ ricette: RICETTE });
   }
   scrivi({ japchaeFunghiNoodles: true });
+}
+
+/* Una tantum (fix): la sostituzione mirata precedente poteva togliere i
+   funghi dal salto in padella senza aggiungere il passo di cottura coi
+   noodles, facendo sparire la loro cottura. Se manca il passo distinto
+   di cottura dei funghi, riapplica la preparazione canonica (che ora
+   include un passo dedicato, chiaro e con foto). */
+if(!leggi().japchaeFunghiFix){
+  const r = RICETTE.find(x => norm(x.n).includes('japchae'));
+  if(r){
+    const ok = r.passi.some(sz => sz.passi.some(p => /Cottura dei funghi:/i.test(p.t)));
+    if(!ok){
+      const dati = sanificaRicetta({ ...r, passi: PASSI_JAPCHAE });
+      if(dati){ r.passi = dati.passi; scrivi({ ricette: RICETTE }); }
+    }
+  }
+  scrivi({ japchaeFunghiFix: true });
 }
 
 /* Una tantum: aggiunge il controfiletto di manzo all'anagrafica alimenti
