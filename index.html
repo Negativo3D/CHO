@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.14';
+const VERSIONE = '2026-09-12.15';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3979,6 +3979,17 @@ if(!leggi().alimentoControfiletto){
     if(nuovo){ FOODS.push(nuovo); scrivi({ alimenti: FOODS }); }
   }
   scrivi({ alimentoControfiletto: true });
+}
+
+/* Una tantum: aggiunge la birra all'anagrafica alimenti (bevanda
+   alcolica; valori indicativi per 100 ml di birra chiara, da verificare
+   sull'etichetta). Porzione standard: 1 bottiglia/lattina da 33 cl. */
+if(!leggi().alimentoBirra){
+  if(!FOODS.some(f => norm(f.n) === norm('Birra'))){
+    const nuovo = sanificaAlimento({ n:'Birra', e:'🍺', cho:3.5, f:0, p:0.5, ig:'alto', cat:'Bevande', alcol:true, porz:[['1 bottiglia (33 cl)', 330], ['100 g', 100]] });
+    if(nuovo){ FOODS.push(nuovo); scrivi({ alimenti: FOODS }); }
+  }
+  scrivi({ alimentoBirra: true });
 }
 
 
