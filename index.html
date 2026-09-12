@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.6';
+const VERSIONE = '2026-09-12.7';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3676,7 +3676,7 @@ const PASSI_JAPCHAE = [
     { t: 'Strizza i funghi, tagliali a lamelle e condiscili con un cucchiaino di salsa di soia e qualche goccia di olio di sesamo tostato.', foto: FOTO_JAP_FUNGHI_CONDITI },
     { t: 'Sbollenta gli spinaci per 30 secondi, raffreddali in acqua fredda e strizzali bene.', foto: FOTO_JAP_SPINACI },
     { t: 'Condisci gli spinaci strizzati con un pizzico di sale, un po\' di aglio tritato, semi di sesamo e qualche goccia di olio di sesamo tostato.', foto: FOTO_JAP_SPINACI_CONDITI },
-    { t: 'Riduci il manzo a striscioline sottili e fallo insaporire con un cucchiaio di salsa di soia, mezzo di zucchero, metà dell\'aglio tritato e una macinata di pepe.', foto: FOTO_JAP_MANZO } ] },
+    { t: 'Riduci il manzo a striscioline sottili e fallo insaporire con un cucchiaio di salsa di soia, mezzo di zucchero di canna, metà dell\'aglio tritato e una macinata di pepe.', foto: FOTO_JAP_MANZO } ] },
   { titolo: 'In padella', passi: [
     { t: 'Taglia a julienne la cipolla e le carote.', foto: FOTO_JAP_JULIENNE },
     { t: 'Salta le verdure separatamente in poco olio di semi, salando appena: prima la cipolla, poi le carote, poi i funghi. Cuoci ogni verdura per conto suo e tienila da parte, senza mescolarle tra loro.', foto: FOTO_JAP_CIPOLLE_PADELLA },
@@ -3685,7 +3685,7 @@ const PASSI_JAPCHAE = [
     { t: 'Lessa i dangmyeon ammollati per 2-3 minuti in acqua bollente insaporita con un giro di salsa di soia, poi scolali e accorciali con le forbici.', foto: FOTO_JAP_ACQUA },
     { t: 'Condisci subito i noodles con un cucchiaio di salsa di soia e uno di olio di sesamo tostato perché non si incollino.', foto: FOTO_JAP_NOODLES_CONDITI } ] },
   { titolo: 'Assemblaggio', passi: [
-    { t: 'Riunisci in padella (o in una ciotola grande) noodles, verdure saltate, spinaci e manzo con la salsa di soia, lo zucchero e l\'olio di sesamo tostato rimasti e il resto dell\'aglio; mescola a lungo, meglio se con le mani.', foto: FOTO_JAP_MESCOLONE },
+    { t: 'Riunisci in padella (o in una ciotola grande) noodles, verdure saltate, spinaci e manzo con la salsa di soia, lo zucchero di canna e l\'olio di sesamo tostato rimasti e il resto dell\'aglio; mescola a lungo, meglio se con le mani.', foto: FOTO_JAP_MESCOLONE },
     { t: 'Completa con i semi di sesamo e servi tiepido o a temperatura ambiente.', foto: FOTO_JAP_FINITO } ] }
 ];
 
@@ -3717,7 +3717,7 @@ importaRicettario('kr1Japchae',
         { n:'Funghi shiitake freschi', q:'100', u:'g' } ] },
       { titolo: 'Per il condimento', voci: [
         { n:'Salsa di soia',   q:'5', u:'cm' },
-        { n:'Zucchero',        q:'2', u:'cm' },
+        { n:'Zucchero di canna', q:'2', u:'cm' },
         { n:'Olio di sesamo tostato',  q:'3', u:'cm' },
         { n:'Semi di sesamo',  q:'1', u:'cm' },
         { n:'Aglio',           q:'10', u:'g' },
@@ -3799,6 +3799,28 @@ if(!leggi().japchaeSpinaci){
     if(!haSpinaci){ const dati = sanificaRicetta({ ...r, passi: PASSI_JAPCHAE }); if(dati){ r.passi = dati.passi; scrivi({ ricette: RICETTE }); } }
   }
   scrivi({ japchaeSpinaci: true });
+}
+
+/* Una tantum: nel japchae lo zucchero diventa zucchero di canna. Cambio
+   mirato (voce + menzioni nei passi), senza toccare il resto della
+   preparazione né le altre ricette che usano lo zucchero bianco. */
+if(!leggi().japchaeZuccheroCanna){
+  const r = RICETTE.find(x => norm(x.n).includes('japchae'));
+  if(r){
+    let tocca = false;
+    for(const sz of r.sezioni) for(const v of sz.voci)
+      if(norm(v.n) === norm('Zucchero')){ v.n = 'Zucchero di canna'; tocca = true; }
+    for(const sz of r.passi) for(const p of sz.passi){
+      const nuovo = p.t.replace(/\bzucchero\b(?! di canna)/gi, m => m + ' di canna');
+      if(nuovo !== p.t){ p.t = nuovo; tocca = true; }
+    }
+    if(tocca) scrivi({ ricette: RICETTE });
+  }
+  if(!FOODS.some(f => norm(f.n) === norm('Zucchero di canna'))){
+    const nuovo = sanificaAlimento({ n:'Zucchero di canna', e:'🟫', cho:98, f:0, p:0, ig:'alto', cat:'Zuccheri rapidi' });
+    if(nuovo){ FOODS.push(nuovo); scrivi({ alimenti: FOODS }); }
+  }
+  scrivi({ japchaeZuccheroCanna: true });
 }
 
 /* Una tantum: aggiunge il controfiletto di manzo all'anagrafica alimenti
