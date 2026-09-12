@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.5';
+const VERSIONE = '2026-09-12.6';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3799,6 +3799,16 @@ if(!leggi().japchaeSpinaci){
     if(!haSpinaci){ const dati = sanificaRicetta({ ...r, passi: PASSI_JAPCHAE }); if(dati){ r.passi = dati.passi; scrivi({ ricette: RICETTE }); } }
   }
   scrivi({ japchaeSpinaci: true });
+}
+
+/* Una tantum: aggiunge il controfiletto di manzo all'anagrafica alimenti
+   (valori per 100 g; carboidrati a zero, come le altre carni). */
+if(!leggi().alimentoControfiletto){
+  if(!FOODS.some(f => norm(f.n) === norm('Controfiletto di manzo'))){
+    const nuovo = sanificaAlimento({ n:'Controfiletto di manzo', e:'🥩', cho:0, f:8, p:21, ig:'basso', cat:'Altro' });
+    if(nuovo){ FOODS.push(nuovo); scrivi({ alimenti: FOODS }); }
+  }
+  scrivi({ alimentoControfiletto: true });
 }
 
 
