@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.11';
+const VERSIONE = '2026-09-12.12';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3905,6 +3905,34 @@ if(!leggi().japchaeFunghiSalto){
   scrivi({ japchaeFunghiSalto: true });
 }
 
+/* Una tantum: nell'hotteok lo zucchero (impasto) diventa zucchero di
+   canna e l'olio di semi diventa olio di girasole. Cambio mirato alla
+   sola ricetta hotteok; le altre ricette non vengono toccate. */
+if(!leggi().hotteokZuccheroOlio){
+  const r = RICETTE.find(x => norm(x.n).includes('hotteok'));
+  if(r){
+    let tocca = false;
+    for(const sz of r.sezioni) for(const v of sz.voci){
+      if(norm(v.n) === norm('Zucchero')){ v.n = 'Zucchero di canna'; tocca = true; }
+      if(norm(v.n) === norm('Olio di semi')){ v.n = 'Olio di girasole'; tocca = true; }
+    }
+    for(const sz of r.passi) for(const p of sz.passi){
+      const nuovo = p.t.replace(/\bzucchero\b(?! di canna)/gi, m => m + ' di canna');
+      if(nuovo !== p.t){ p.t = nuovo; tocca = true; }
+    }
+    if(tocca){ scrivi({ ricette: RICETTE }); sincronizzaPiattoRicetta(r); }
+  }
+  if(!FOODS.some(f => norm(f.n) === norm('Olio di girasole'))){
+    const nuovo = sanificaAlimento({ n:'Olio di girasole', e:'🌻', cho:0, f:100, p:0, ig:'basso', cat:'Altro' });
+    if(nuovo){ FOODS.push(nuovo); scrivi({ alimenti: FOODS }); }
+  }
+  if(!FOODS.some(f => norm(f.n) === norm('Zucchero di canna'))){
+    const nuovo = sanificaAlimento({ n:'Zucchero di canna', e:'🟫', cho:98, f:0, p:0, ig:'alto', cat:'Zuccheri rapidi' });
+    if(nuovo){ FOODS.push(nuovo); scrivi({ alimenti: FOODS }); }
+  }
+  scrivi({ hotteokZuccheroOlio: true });
+}
+
 /* Una tantum: aggiunge il controfiletto di manzo all'anagrafica alimenti
    (valori per 100 g; carboidrati a zero, come le altre carni). */
 if(!leggi().alimentoControfiletto){
@@ -4151,9 +4179,9 @@ const FOTO_HOT_APERTO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBD
 
 const PASSI_HOTTEOK = [
   { titolo: 'Impasto', passi: [
-    { t: 'Prepara gli ingredienti: farina, acqua tiepida, zucchero, lievito e sale (nel video, misurati in bicchieri di carta).', foto: FOTO_HOT_INGREDIENTI },
-    { t: 'Sciogli il lievito con lo zucchero nell\'acqua tiepida e lascialo attivare qualche minuto.', foto: FOTO_HOT_LIEVITO },
-    { t: 'Versa zucchero e sale nella farina.', foto: FOTO_HOT_FARINA },
+    { t: 'Prepara gli ingredienti: farina, acqua tiepida, zucchero di canna, lievito e sale (nel video, misurati in bicchieri di carta).', foto: FOTO_HOT_INGREDIENTI },
+    { t: 'Sciogli il lievito con lo zucchero di canna nell\'acqua tiepida e lascialo attivare qualche minuto.', foto: FOTO_HOT_LIEVITO },
+    { t: 'Versa zucchero di canna e sale nella farina.', foto: FOTO_HOT_FARINA },
     { t: 'Unisci l\'acqua col lievito alla farina, insieme all\'olio.', foto: FOTO_HOT_ACQUA },
     { t: 'Impasta: deve restare morbido e un po\' appiccicoso.', foto: FOTO_HOT_IMPASTO },
     { t: 'Copri con la pellicola e fai lievitare circa un\'ora.', foto: FOTO_HOT_COPERTO },
@@ -4170,7 +4198,7 @@ const PASSI_HOTTEOK = [
     { t: 'Sono pronti quando sono ben dorati da entrambi i lati. Attenzione: il ripieno diventa caramello bollente.', foto: FOTO_HOT_FINITO } ] },
   { titolo: 'Serviti caldi', passi: [
     { t: 'Impiattali appena fatti, ancora caldi e croccanti.', foto: FOTO_HOT_TAGLIERE },
-    { t: 'Dentro il cuore di zucchero, arachidi e semi diventa uno sciroppo caramellato e filante: mordili con cautela.', foto: FOTO_HOT_APERTO } ] }
+    { t: 'Dentro il cuore di zucchero di canna, arachidi e semi diventa uno sciroppo caramellato e filante: mordili con cautela.', foto: FOTO_HOT_APERTO } ] }
 ];
 
 /* Una tantum: foto per l'oi muchim gia' salvato — copertina (che
@@ -4288,7 +4316,8 @@ importaRicettario('kr4Trio',
     { n:'Zucchero di canna',                       e:'🟫', cho:98,  f:0,   p:0,   ig:'alto',  cat:'Zuccheri rapidi' },
     { n:'Lievito di birra secco',                  e:'🍞', cho:20,  f:5,   p:40,  ig:'basso', cat:'Altro' },
     { n:'Cannella',                                e:'🪵', cho:27,  f:1,   p:4,   ig:'basso', cat:'Altro' },
-    { n:'Arachidi tostate',                        e:'🥜', cho:8.5, f:50,  p:26,  ig:'basso', cat:'Altro' }
+    { n:'Arachidi tostate',                        e:'🥜', cho:8.5, f:50,  p:26,  ig:'basso', cat:'Altro' },
+    { n:'Olio di girasole',                        e:'🌻', cho:0,   f:100, p:0,   ig:'basso', cat:'Altro' }
   ],
   [{
     n: 'Oi muchim (오이무침) — cetrioli piccanti al sesamo',
@@ -4347,9 +4376,9 @@ importaRicettario('kr4Trio',
       { titolo: 'Per l\'impasto', voci: [
         { n:'Farina 00',              q:'300', u:'g' },
         { n:'Acqua',                  q:'240', u:'g' },
-        { n:'Zucchero',               q:'2',   u:'cm' },
+        { n:'Zucchero di canna',      q:'2',   u:'cm' },
         { n:'Lievito di birra secco', q:'3',   u:'g' },
-        { n:'Olio di semi',           q:'1',   u:'cm' },
+        { n:'Olio di girasole',       q:'1',   u:'cm' },
         { n:'Sale fino',              u:'qb' } ] },
       { titolo: 'Per il ripieno', voci: [
         { n:'Zucchero di canna',  q:'60', u:'g' },
@@ -4357,7 +4386,7 @@ importaRicettario('kr4Trio',
         { n:'Cannella',           q:'1',  u:'cc' },
         { n:'Semi di sesamo',     u:'qb' } ] },
       { titolo: 'Per la piastra', voci: [
-        { n:'Olio di semi', u:'qb' } ] }
+        { n:'Olio di girasole', u:'qb' } ] }
     ],
     passi: PASSI_HOTTEOK,
     cottura: [],
