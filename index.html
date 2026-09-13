@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-13.2';
+const VERSIONE = '2026-09-13.3';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -853,7 +853,7 @@ function sanificaRicetta(o){
     voci: s && Array.isArray(s.voci) ? s.voci.map(v => {
       if(!v) return null;
       let q = v.q != null ? String(v.q).trim() : '';
-      let ua = ['qb','cm','cc','n'].includes(v.ua) ? v.ua : '';
+      let ua = ['qb','cm','cn','cc','n'].includes(v.ua) ? v.ua : '';
       let qa = v.qa != null ? String(v.qa).trim() : '';
       /* Migrazione dal vecchio modello a unità primaria: i grammi
          diventano l'unità di conto, i cucchiai un'indicazione
@@ -918,13 +918,21 @@ let RICETTE = (leggi().ricette || []).map(sanificaRicetta).filter(Boolean);
 /* Nelle quantità i grammi sono l'unità di default: un numero secco
    ("270") viene mostrato come "270 g"; tutto il resto (q.b., "2 uova",
    "1 cucchiaio") resta com'è scritto. */
-const UNITA_RICETTA = ['g','qb','cm','cc','n'];
+const UNITA_RICETTA = ['g','cm','cn','cc','qb','n'];
 /* Etichetta compatta dell'unità: testo per g/q.b./n°, iconcina a
    cucchiaio (da minestra) o cucchiaino (da caffè) per le altre. */
 function etichettaUnita(u){
   if(u === 'cm') return `<span style="display:inline-flex;vertical-align:-4px" title="cucchiaio da minestra">${ico('cucchiaio',17)}</span>`;
-  if(u === 'cc') return `<span style="display:inline-flex;vertical-align:-3px" title="cucchiaino da caffè">${ico('cucchiaino',14)}</span>`;
+  if(u === 'cn') return `<span style="display:inline-flex;vertical-align:-3px" title="cucchiaino">${ico('cucchiaino',16)}</span>`;
+  if(u === 'cc') return `<span style="display:inline-flex;vertical-align:-2px" title="cucchiaino da caffè">${ico('cucchiaino',12)}</span>`;
   return u === 'qb' ? 'q.b.' : u === 'n' ? 'n°' : 'g';
+}
+/* Etichetta estesa per il selettore dell'unità: icona + parola, così i
+   tre cucchiai (minestra, cucchiaino, caffè) si distinguono bene. */
+function etichettaUnitaPicker(u){
+  const testo = { g:'g', cm:'cucchiaio', cn:'cucchiaino', cc:'caffè', qb:'q.b.', n:'n°' }[u] || u;
+  const ic = u === 'cm' ? ico('cucchiaio',16) : (u === 'cn' || u === 'cc') ? ico('cucchiaino', u === 'cn' ? 15 : 12) : '';
+  return `${ic ? ic + ' ' : ''}${testo}`;
 }
 function qtaVoceHTML(v){
   const q = esc(String(v.q || '').trim());
@@ -1849,10 +1857,10 @@ function stratoRicettaForm(){
           <button class="card" style="padding:0 10px;color:var(--ink2)" data-a="rIngDel:${s}:${k}">${ico('chiudi',14)}</button>
         </div>
         ${S.rformUnita === s + ':' + k ? `
-        <div style="display:flex;gap:6px;margin:-2px 0 10px 40px;align-items:center">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 10px 40px;align-items:center">
           ${UNITA_RICETTA.map(u => `<button class="chip ${(v.ua || 'g') === u ? 'on' : ''}"
-            style="--c:var(--wave);padding:8px 12px;display:flex;align-items:center"
-            data-a="rUnitaSet:${s}:${k}:${u}">${etichettaUnita(u)}</button>`).join('')}
+            style="--c:var(--wave);padding:8px 12px;display:flex;align-items:center;gap:2px"
+            data-a="rUnitaSet:${s}:${k}:${u}">${etichettaUnitaPicker(u)}</button>`).join('')}
         </div>` : ''}
         <div id="cuc-${s}-${k}">${cucchiaioSuggerimentoHTML(v)}</div>`).join('')}
         <button class="chip" data-a="rIngAdd:${s}" style="--c:var(--wave);margin-top:2px">+ ingrediente</button>
