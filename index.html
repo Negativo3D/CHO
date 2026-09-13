@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-13.1';
+const VERSIONE = '2026-09-13.2';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -935,6 +935,50 @@ function qtaVoceHTML(v){
   if(q && alt) return `${q} g · ${alt}`;
   if(q) return q + ' g';
   return alt;
+}
+
+/* Dato un peso in grammi e l'alimento collegato, propone la porzione in
+   cucchiai usando i pesi-cucchiaio specifici dell'alimento, espressa come
+   frazione o multiplo "comodo" (⅕, ¼, ½, 1½…). Sceglie il cucchiaio che
+   dà la lettura più naturale. Stringa vuota se non si può proporre. */
+const FRAZIONI_CUC = [
+  [1/5,'⅕'],[1/4,'¼'],[1/3,'⅓'],[1/2,'½'],[2/3,'⅔'],[3/4,'¾'],
+  [1,'1'],[1.25,'1¼'],[1/3+1,'1⅓'],[1.5,'1½'],[1.75,'1¾'],
+  [2,'2'],[2.5,'2½'],[3,'3'],[3.5,'3½'],[4,'4'],[5,'5'],[6,'6']
+];
+function fraseCucchiaio(g, alimento){
+  if(!(g > 0) || !alimento || !Array.isArray(alimento.porz)) return '';
+  const pesoDi = et => { const e = alimento.porz.find(p => norm(p[0]) === norm(et)); return e ? e[1] : 0; };
+  const cand = [
+    { g: pesoDi('1 cucchiaio da minestra'), uno: 'cucchiaio da minestra', tanti: 'cucchiai da minestra' },
+    { g: pesoDi('1 cucchiaino'),            uno: 'cucchiaino',            tanti: 'cucchiaini' },
+    { g: pesoDi('1 cucchiaino da caffè'),   uno: 'cucchiaino da caffè',   tanti: 'cucchiaini da caffè' }
+  ].filter(c => c.g > 0);
+  if(!cand.length) return '';
+  const valutati = cand.map(c => {
+    const conteggio = g / c.g;
+    let best = null;
+    for(const [v,t] of FRAZIONI_CUC){
+      const err = Math.abs(conteggio - v) / v;
+      if(!best || err < best.err) best = { v, t, err };
+    }
+    return { uno: c.uno, tanti: c.tanti, g: c.g, v: best.v, t: best.t, err: best.err };
+  });
+  const ok = valutati.filter(x => x.err <= 0.15);
+  const scelto = ok.length
+    ? ok.reduce((a,b) => (b.g > a.g || (b.g === a.g && b.err < a.err)) ? b : a)
+    : valutati.reduce((a,b) => b.err < a.err ? b : a);
+  return `≈ ${scelto.t} ${scelto.v >= 2 ? scelto.tanti : scelto.uno}`;
+}
+/* Riga di suggerimento sotto l'ingrediente, solo quando si conta in
+   grammi e l'alimento ha i pesi-cucchiaio impostati. */
+function cucchiaioSuggerimentoHTML(v){
+  if(v.ua && v.ua !== 'g') return '';
+  const g = pesoScritto(v.q);
+  if(!g) return '';
+  const fr = fraseCucchiaio(g, trovaAlimento(v.n));
+  return fr ? `<div style="font-size:11.5px;color:var(--wave);font-weight:600;margin:-2px 0 8px 40px;
+    display:flex;align-items:center;gap:5px">${ico('cucchiaio',13)} ${fr}</div>` : '';
 }
 
 /* Testo e foto del taglio delle verdure per la ricetta di partenza. */
@@ -1809,7 +1853,8 @@ function stratoRicettaForm(){
           ${UNITA_RICETTA.map(u => `<button class="chip ${(v.ua || 'g') === u ? 'on' : ''}"
             style="--c:var(--wave);padding:8px 12px;display:flex;align-items:center"
             data-a="rUnitaSet:${s}:${k}:${u}">${etichettaUnita(u)}</button>`).join('')}
-        </div>` : ''}`).join('')}
+        </div>` : ''}
+        <div id="cuc-${s}-${k}">${cucchiaioSuggerimentoHTML(v)}</div>`).join('')}
         <button class="chip" data-a="rIngAdd:${s}" style="--c:var(--wave);margin-top:2px">+ ingrediente</button>
       </div>`).join('')}
       <button class="chip" data-a="rSezAdd" style="--c:var(--wave);margin-bottom:16px">+ sezione ingredienti</button>
@@ -3336,7 +3381,9 @@ document.addEventListener('input', e => {
   else if(id.startsWith('ri-') && S.rform){
     const [, s, k, campo] = id.split('-');
     const v = S.rform.sezioni[+s] && S.rform.sezioni[+s].voci[+k];
-    if(v && campo === 'q') v.q = e.target.value;
+    if(v && campo === 'q'){ v.q = e.target.value;
+      const box = document.getElementById('cuc-' + s + '-' + k);
+      if(box) box.innerHTML = cucchiaioSuggerimentoHTML(v); }
     else if(v && campo === 'a') v.qa = e.target.value;
   }
   else if(id.startsWith('rpsez-') && S.rform){
