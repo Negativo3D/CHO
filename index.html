@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-12.16';
+const VERSIONE = '2026-09-13.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1203,7 +1203,7 @@ const FORMATI_BARCODE = ['ean_13','ean_8','upc_a','upc_e','code_128'];
 let flussoCamera = null, cicloScan = null, rilevatore = null, zxReader = null, zxPromise = null;
 
 function formVuoto(){
-  return { n:'', e:'', cho:'', f:'', p:'', ig:'medio', alcol:'no', cat:'Altro', porz:'', foto:null, ondaPct:'100', ondaOre:'' };
+  return { n:'', e:'', cho:'', f:'', p:'', ig:'medio', alcol:'no', cat:'Altro', porz:'', cm:'', cn:'', cc:'', foto:null, ondaPct:'100', ondaOre:'' };
 }
 
 const EMOJI_CIBO = ['🍞','🥐','🥖','🍝','🍚','🥔','🍕','🥪','🍔','🍎','🍌','🍊','🍇','🍓','🍑','🥝','🥦','🥕','🍅','🫘','🥛','🧀','🥣','🥚','🍖','🐟','🍪','🍫','🍰','🍨','🍯','🍬','🥤','🧃','🍺','🍷'];
@@ -1387,13 +1387,22 @@ function salvaAlimento(){
   if(!(cho >= 0 && cho <= 100)){ alert("Indica i carboidrati per 100 g: un numero da 0 a 100."); return; }
   const num = v => { const x = dec(v); return x >= 0 && x <= 100 ? Math.round(x*10)/10 : 0; };
   const porzG = Math.round(dec(F.porz)*10)/10;
+  /* Peso dei cucchiai, specifico per alimento: se impostato (> 0)
+     diventa una porzione rapida nel dettaglio. */
+  const gCuc = v => { const x = Math.round(dec(v)*10)/10; return isFinite(x) && x > 0 ? x : 0; };
+  const listaPorz = [];
+  if(porzG > 0) listaPorz.push(["1 porzione", porzG]);
+  [["1 cucchiaio da minestra", gCuc(F.cm)],
+   ["1 cucchiaino", gCuc(F.cn)],
+   ["1 cucchiaino da caffè", gCuc(F.cc)]].forEach(e => { if(e[1] > 0) listaPorz.push(e); });
+  listaPorz.push(["100 g", 100]);
   const dati = sanificaAlimento({
     id: S.editId || undefined,
     n: nome, e: F.e, cat: F.cat, foto: F.foto,
     cho: Math.round(cho*10)/10, f: num(F.f), p: num(F.p),
     ig: F.ig, alcol: F.alcol === 'si',
     ondaPct: F.ondaPct, ondaOre: F.ondaOre,
-    porz: porzG > 0 ? [["1 porzione", porzG], ["100 g", 100]] : [["100 g", 100]]
+    porz: listaPorz
   });
   if(S.editId){
     const i = FOODS.findIndex(x => x.id === S.editId);
@@ -2806,6 +2815,24 @@ function stratoNuovo(){
         ${CATS.map(c => chip(c, F.cat===c, `fset:cat:${c}`)).join('')}</div>
       <div style="margin-bottom:16px;max-width:200px"><div class="etich">Porzione tipica in grammi (facoltativa)</div>
         <input id="fi-porz" class="campo" inputmode="decimal" placeholder="es. 62,5" value="${esc(F.porz)}"></div>
+      <div style="margin-bottom:16px">
+        <div class="etich">Peso dei cucchiai per questo alimento (facoltativo)</div>
+        <div style="font-size:12px;color:var(--ink2);margin:2px 0 10px">Se lo imposti, ogni cucchiaio compare come porzione rapida nel dettaglio dell'alimento.</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${[['fi-cm','cucchiaio','Cucchiaio da minestra','es. 15', F.cm],
+             ['fi-cn','cucchiaino','Cucchiaino','es. 5', F.cn],
+             ['fi-cc','cucchiaino','Cucchiaino da caffè','es. 2,5', F.cc]].map(([id,icona,testo,ph,val]) => `
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="flex:1;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600">
+              <span style="color:var(--wave);display:inline-flex">${ico(icona,18)}</span>${testo}</span>
+            <div style="width:104px;position:relative;flex:none">
+              <input id="${id}" class="campo" inputmode="decimal" placeholder="${ph}" value="${esc(val ?? '')}"
+                style="text-align:right;padding-right:28px">
+              <span style="position:absolute;right:11px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--ink2);pointer-events:none">g</span>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
       ${ondaForm('fi-', F)}
       <button class="primario" data-a="salvaAlimento">${S.editId ? 'Salva le modifiche' : 'Aggiungi ai miei alimenti'}</button>
     </div>
@@ -3117,10 +3144,17 @@ document.addEventListener('click', e => {
   else if(a==='modifica'){
     const f = cibo(p1);
     if(f){
+      /* Grammi per etichetta esatta (per i cucchiai) e porzione tipica
+         = prima porzione che non sia un cucchiaio né i 100 g. */
+      const gEsatto = et => { const e = f.porz.find(p => norm(p[0]) === norm(et)); return e ? String(e[1]).replace('.', ',') : ''; };
+      const tipica = f.porz.find(p => p[1] !== 100 && !norm(p[0]).includes('cucchiai'));
       S.form = { n:f.n, e:f.e, cho:String(f.cho), f:String(f.f), p:String(f.p),
         ig:f.ig, alcol:f.alcol ? 'si' : 'no', cat:f.cat || 'Altro', foto: f.foto || null,
         ondaPct: String(f.ondaPct || 100), ondaOre: f.ondaOre ? String(f.ondaOre).replace('.', ',') : '',
-        porz: f.porz[0][1] !== 100 ? String(f.porz[0][1]) : '' };
+        porz: tipica ? String(tipica[1]).replace('.', ',') : '',
+        cm: gEsatto('1 cucchiaio da minestra'),
+        cn: gEsatto('1 cucchiaino'),
+        cc: gEsatto('1 cucchiaino da caffè') };
       S.editId = p1; S.nuovo = 'form'; S.aperto = null;
     }
   }
