@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-16.3';
+const VERSIONE = '2026-09-19.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -4614,6 +4614,52 @@ importaRicettario('kr4Trio',
     passi: PASSI_HOTTEOK,
     cottura: [],
     porzG: 80, perdita: 8
+  }]);
+
+/* ---------- tofu all'olio di perilla (들기름 두부구이) ----------
+   Ricetta di 만개의 레시피 (10000recipe.com), tradotta in italiano.
+   Nuovi alimenti: tofu compatto e olio di perilla (deulgireum). */
+const PASSI_DUBU = [
+  { titolo: 'La salsa da intingere', passi: [
+    { t: 'Taglia i cipollotti molto finemente, a rondelline di circa 3 mm.', foto: null },
+    { t: 'In una ciotola mescola i cipollotti con la salsa di soia, il gochugaru, l\'aglio tritato, lo zucchero, l\'olio di sesamo tostato e i semi di sesamo. Lascia la salsa a temperatura ambiente mentre prepari il tofu.', foto: null } ] },
+  { titolo: 'Il tofu', passi: [
+    { t: 'Taglia il tofu: la ricetta originale divide il panetto in 6 pezzi; per un aperitivo puoi farne bocconcini più piccoli, da prendere con uno stecchino in un solo boccone.', foto: null },
+    { t: 'Asciuga molto bene ogni pezzo tamponandolo con carta da cucina: serve a farlo dorare invece di farlo bollire nella sua acqua.', foto: null },
+    { t: 'Cospargi il tofu asciutto con un po\' di sale e di pepe.', foto: null } ] },
+  { titolo: 'In padella e servizio', passi: [
+    { t: 'Scalda bene una padella e versa olio di perilla e olio di semi in parti uguali (qui 2 cucchiai + 2 cucchiai): così il tofu non brucia facilmente ma mantiene l\'aroma della perilla.', foto: null },
+    { t: 'Adagia il tofu e fallo dorare bene su entrambi i lati, fino a una superficie uniformemente dorata.', foto: null },
+    { t: 'Servi il tofu caldo intingendolo nella salsa preparata a parte. Per una versione più piccante si può aggiungere alla salsa del peperoncino Cheongyang tritato.', foto: null } ] }
+];
+
+importaRicettario('kr5Dubu',
+  [
+    { n:'Tofu compatto',                e:'⬜', cho:2, f:5,   p:9, ig:'basso', cat:'Altro' },
+    { n:'Olio di perilla (deulgireum)', e:'🌿', cho:0, f:100, p:0, ig:'basso', cat:'Altro' }
+  ],
+  [{
+    n: "Deulgireum dubu-gui (들기름 두부구이) — tofu dorato all'olio di perilla con salsa",
+    paese: 'KR',
+    sezioni: [
+      { titolo: 'Per il tofu', voci: [
+        { n:'Tofu compatto',                q:'300', u:'g' },
+        { n:'Olio di perilla (deulgireum)', q:'2',   u:'cm' },
+        { n:'Olio di semi',                 q:'2',   u:'cm' },
+        { n:'Sale fino',                    u:'qb' },
+        { n:'Pepe nero',                    u:'qb' } ] },
+      { titolo: 'Per la salsa da intingere', voci: [
+        { n:'Cipollotto',                                 q:'40', u:'g' },
+        { n:'Salsa di soia',                              q:'6',  u:'cm' },
+        { n:'Peperoncino coreano in polvere (gochugaru)', q:'2',  u:'cm' },
+        { n:'Aglio',                                      q:'10', u:'g' },
+        { n:'Zucchero',                                   q:'1',  u:'cm' },
+        { n:'Olio di sesamo tostato',                     q:'1',  u:'cm' },
+        { n:'Semi di sesamo',                             q:'1',  u:'cm' } ] }
+    ],
+    passi: PASSI_DUBU,
+    cottura: [],
+    porzG: 150
   }]);
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
