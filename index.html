@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-19.3';
+const VERSIONE = '2026-09-19.4';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -3757,19 +3757,28 @@ if(!leggi().pwRimossa1){
    porzione, perdita in cottura e onda quadra se indicate). Serve per
    i ricettari tematici, come quello coreano. */
 function importaRicettario(chiave, alimenti, ricette){
-  if(leggi()[chiave]) return;
-  let toccaAlimenti = false;
-  for(const a of (alimenti || [])){
-    if(FOODS.some(f => norm(f.n) === norm(a.n))) continue;
-    const nuovo = sanificaAlimento(a);
-    if(nuovo){ FOODS.push(nuovo); toccaAlimenti = true; }
+  const primaVolta = !leggi()[chiave];
+  /* Gli alimenti del ricettario si inseriscono solo la prima volta, così
+     le cancellazioni fatte dall'utente restano. */
+  if(primaVolta){
+    let toccaAlimenti = false;
+    for(const a of (alimenti || [])){
+      if(FOODS.some(f => norm(f.n) === norm(a.n))) continue;
+      const nuovo = sanificaAlimento(a);
+      if(nuovo){ FOODS.push(nuovo); toccaAlimenti = true; }
+    }
+    if(toccaAlimenti) scrivi({ alimenti: FOODS });
   }
-  if(toccaAlimenti) scrivi({ alimenti: FOODS });
+  /* Le ricette del ricettario vivono nel codice: le riportiamo sempre in
+     memoria se mancano, anche quando il flag è già impostato ma un
+     salvataggio precedente non è andato a buon fine (per esempio per
+     spazio insufficiente sul dispositivo). L'id stabile evita che
+     ricetta e piatto collegato si duplichino a ogni avvio. */
   let nuove = false;
-  for(const r of (ricette || [])){
-    if(RICETTE.some(x => norm(x.n) === norm(r.n))) continue;
-    const dati = sanificaRicetta(r);
-    if(!dati) continue;
+  (ricette || []).forEach((r, idx) => {
+    if(RICETTE.some(x => norm(x.n) === norm(r.n))) return;
+    const dati = sanificaRicetta({ ...r, id: 'seed-' + chiave + (idx ? '-' + idx : '') });
+    if(!dati) return;
     RICETTE.push(dati);
     sincronizzaPiattoRicetta(dati);
     const i = PIATTI.findIndex(pl => pl.daRicetta === dati.id);
@@ -3779,9 +3788,9 @@ function importaRicettario(chiave, alimenti, ricette){
       if(agg) PIATTI[i] = agg;
     }
     nuove = true;
-  }
+  });
   if(nuove) scrivi({ ricette: RICETTE, piatti: PIATTI });
-  scrivi({ [chiave]: true });
+  if(primaVolta) scrivi({ [chiave]: true });
 }
 
 /* ---------- ricettario coreano ----------
