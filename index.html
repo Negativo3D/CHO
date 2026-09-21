@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-19.4';
+const VERSIONE = '2026-09-21.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -4702,6 +4702,42 @@ if(!leggi().dubuFoto2){
   }
   scrivi({ dubuFoto2: true });
 }
+
+/* ---------- penne al pomodoro, pesto e pecorino ----------
+   Ricetta italiana semplice; valori nutrizionali indicativi per 100 g.
+   Nuovi alimenti: penne, pesto alla genovese e pecorino. */
+importaRicettario('itPennePomodoroPesto',
+  [
+    { n:'Penne',               e:'🍝', cho:71, f:1.5, p:13, ig:'medio', cat:'Primi e patate' },
+    { n:'Pesto alla genovese', e:'🌿', cho:6,  f:45,  p:5,  ig:'basso', cat:'Altro' },
+    { n:'Pecorino',            e:'🧀', cho:1,  f:33,  p:28, ig:'basso', cat:'Latte e derivati' }
+  ],
+  [{
+    n: 'Penne al pomodoro, pesto e pecorino',
+    paese: 'IT',
+    sezioni: [
+      { titolo: 'Ingredienti', voci: [
+        { n:'Penne',                     q:'180', u:'g' },
+        { n:'Passata di pomodoro',       q:'200', u:'g' },
+        { n:'Pesto alla genovese',       q:'40',  u:'g' },
+        { n:'Pecorino',                  q:'30',  u:'g' },
+        { n:'Olio extravergine d\'oliva', u:'qb' },
+        { n:'Aglio',                     q:'1',   u:'n' },
+        { n:'Sale fino',                 u:'qb' },
+        { n:'Basilico',                  u:'qb' } ] }
+    ],
+    passi: [
+      { titolo: 'Preparazione', passi: [
+        { t: 'Porta a bollore abbondante acqua salata per le penne.', foto: null },
+        { t: 'In una padella scalda un filo d\'olio con lo spicchio d\'aglio; unisci la passata di pomodoro, sala e cuoci a fuoco medio per circa 10 minuti, finché si addensa. Togli l\'aglio.', foto: null },
+        { t: 'Lessa le penne al dente; scolale tenendo da parte un mestolo d\'acqua di cottura.', foto: null },
+        { t: 'Versa le penne nel sugo di pomodoro e saltale un minuto, con un po\' d\'acqua di cottura se serve.', foto: null },
+        { t: 'Togli dal fuoco e manteca con il pesto (a crudo, così resta profumato) e metà del pecorino.', foto: null },
+        { t: 'Servi con il pecorino rimasto e qualche foglia di basilico fresco.', foto: null } ] }
+    ],
+    cottura: [],
+    porzG: 350
+  }]);
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
    ancora grassi e proteine se li ritrova salvati a zero. Si completano
