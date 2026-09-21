@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-21.2';
+const VERSIONE = '2026-09-21.3';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -4706,38 +4706,73 @@ if(!leggi().dubuFoto2){
 /* ---------- penne al pomodoro, pesto e pecorino ----------
    Ricetta italiana semplice; valori nutrizionali indicativi per 100 g.
    Nuovi alimenti: penne, pesto alla genovese e pecorino. */
+/* Ingredienti e passi delle penne: il pesto si prepara al momento in
+   piccola dose ("micro pesto"), giusto per la ricetta. Definiti come
+   costanti così valgono sia per il seed sia per la migrazione che
+   aggiorna le copie già installate. */
+const SEZIONI_PENNE = [
+  { titolo: 'Per la pasta e il sugo', voci: [
+    { n:'Penne',                     q:'180', u:'g' },
+    { n:'Passata di pomodoro',       q:'200', u:'g' },
+    { n:'Pecorino',                  q:'30',  u:'g' },
+    { n:'Olio extravergine d\'oliva', u:'qb' },
+    { n:'Aglio',                     q:'1',   u:'n' },
+    { n:'Sale fino',                 u:'qb' } ] },
+  { titolo: 'Per il micro pesto', voci: [
+    { n:'Basilico',                  q:'15', u:'g' },
+    { n:'Pinoli',                    q:'8',  u:'g' },
+    { n:'Pecorino',                  q:'10', u:'g' },
+    { n:'Aglio',                     u:'qb' },
+    { n:'Olio extravergine d\'oliva', q:'20', u:'g' },
+    { n:'Sale fino',                 u:'qb' } ] }
+];
+const PASSI_PENNE = [
+  { titolo: 'Il micro pesto', passi: [
+    { t: 'Prepara un piccolo pesto giusto per la ricetta: in un mortaio (o con un frullatore a immersione) pesta il basilico con un pizzico di sale, l\'aglio e i pinoli fino a ottenere una crema.', foto: null },
+    { t: 'Unisci il pecorino e versa l\'olio extravergine a filo, amalgamando fino a un pesto liscio e profumato. Tienilo da parte.', foto: null } ] },
+  { titolo: 'La pasta', passi: [
+    { t: 'Porta a bollore abbondante acqua salata per le penne.', foto: null },
+    { t: 'In una padella scalda un filo d\'olio con lo spicchio d\'aglio; unisci la passata di pomodoro, sala e cuoci a fuoco medio per circa 10 minuti, finché si addensa. Togli l\'aglio.', foto: null },
+    { t: 'Lessa le penne al dente; scolale tenendo da parte un mestolo d\'acqua di cottura.', foto: null },
+    { t: 'Versa le penne nel sugo di pomodoro e saltale un minuto, con un po\' d\'acqua di cottura se serve.', foto: null },
+    { t: 'Togli dal fuoco e manteca con il micro pesto (a crudo, così resta profumato) e metà del pecorino.', foto: null },
+    { t: 'Servi con il pecorino rimasto e qualche foglia di basilico fresco.', foto: null } ] }
+];
 importaRicettario('itPennePomodoroPesto',
   [
     { n:'Penne',               e:'🍝', cho:71, f:1.5, p:13, ig:'medio', cat:'Primi e patate' },
     { n:'Pesto alla genovese', e:'🌿', cho:6,  f:45,  p:5,  ig:'basso', cat:'Altro' },
-    { n:'Pecorino',            e:'🧀', cho:1,  f:33,  p:28, ig:'basso', cat:'Latte e derivati' }
+    { n:'Pecorino',            e:'🧀', cho:1,  f:33,  p:28, ig:'basso', cat:'Latte e derivati' },
+    { n:'Pinoli',              e:'🌰', cho:4,  f:68,  p:14, ig:'basso', cat:'Altro' },
+    { n:'Basilico',            e:'🌿', cho:2,  f:0.6, p:3,  ig:'basso', cat:'Verdura e legumi' }
   ],
   [{
     n: 'Penne al pomodoro, pesto e pecorino',
     paese: 'IT',
-    sezioni: [
-      { titolo: 'Ingredienti', voci: [
-        { n:'Penne',                     q:'180', u:'g' },
-        { n:'Passata di pomodoro',       q:'200', u:'g' },
-        { n:'Pesto alla genovese',       q:'40',  u:'g' },
-        { n:'Pecorino',                  q:'30',  u:'g' },
-        { n:'Olio extravergine d\'oliva', u:'qb' },
-        { n:'Aglio',                     q:'1',   u:'n' },
-        { n:'Sale fino',                 u:'qb' },
-        { n:'Basilico',                  u:'qb' } ] }
-    ],
-    passi: [
-      { titolo: 'Preparazione', passi: [
-        { t: 'Porta a bollore abbondante acqua salata per le penne.', foto: null },
-        { t: 'In una padella scalda un filo d\'olio con lo spicchio d\'aglio; unisci la passata di pomodoro, sala e cuoci a fuoco medio per circa 10 minuti, finché si addensa. Togli l\'aglio.', foto: null },
-        { t: 'Lessa le penne al dente; scolale tenendo da parte un mestolo d\'acqua di cottura.', foto: null },
-        { t: 'Versa le penne nel sugo di pomodoro e saltale un minuto, con un po\' d\'acqua di cottura se serve.', foto: null },
-        { t: 'Togli dal fuoco e manteca con il pesto (a crudo, così resta profumato) e metà del pecorino.', foto: null },
-        { t: 'Servi con il pecorino rimasto e qualche foglia di basilico fresco.', foto: null } ] }
-    ],
+    sezioni: SEZIONI_PENNE,
+    passi: PASSI_PENNE,
     cottura: [],
     porzG: 350
   }]);
+
+/* Una tantum: aggiunge il "micro pesto" (ingredienti + preparazione)
+   alla ricetta delle penne già salvata, e assicura gli alimenti pinoli
+   e basilico. Solo se la sezione del micro pesto non c'è già. */
+if(!leggi().pennePestoMicro){
+  [{ n:'Pinoli',   e:'🌰', cho:4, f:68,  p:14, ig:'basso', cat:'Altro' },
+   { n:'Basilico', e:'🌿', cho:2, f:0.6, p:3,  ig:'basso', cat:'Verdura e legumi' }].forEach(a => {
+    if(!FOODS.some(f => norm(f.n) === norm(a.n))){
+      const nuovo = sanificaAlimento(a);
+      if(nuovo){ FOODS.push(nuovo); scrivi({ alimenti: FOODS }); }
+    }
+  });
+  const r = RICETTE.find(x => norm(x.n).includes('penne al pomodoro'));
+  if(r && !r.sezioni.some(sz => norm(sz.titolo).includes('micro pesto'))){
+    const dati = sanificaRicetta({ ...r, sezioni: SEZIONI_PENNE, passi: PASSI_PENNE });
+    if(dati){ r.sezioni = dati.sezioni; r.passi = dati.passi; scrivi({ ricette: RICETTE }); sincronizzaPiattoRicetta(r); }
+  }
+  scrivi({ pennePestoMicro: true });
+}
 
 /* ---------- bigoli con le sarde (bigoli in salsa) ----------
    Piatto veneziano: bigoli conditi con una salsa di cipolla stufata e
