@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-21.3';
+const VERSIONE = '2026-09-27.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1233,6 +1233,89 @@ function esportaDati(){
   a.download = `atlante-cho-alimenti-${new Date().toISOString().slice(0,10)}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ---------- backup e ripristino di tutti i dati ----------
+   Esporta l'intero archivio (alimenti, ricette, piatti, pesate,
+   parametri, preferiti) in un file JSON, da salvare o passare a un altro
+   telefono. L'importazione lo riporta: "unisci" aggiunge ciò che manca
+   tenendo i dati attuali, "sostituisci" fa una copia identica. */
+function esportaBackup(){
+  try{
+    const contenuto = JSON.stringify({ app:'CHO', tipo:'backup', versione: VERSIONE,
+      data: new Date().toISOString(), dati: leggi() });
+    const blob = new Blob([contenuto], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cho-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }catch(e){ alert('Non riesco a creare il backup.'); }
+}
+
+function importaBackup(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'application/json,.json';
+  inp.onchange = () => {
+    const file = inp.files && inp.files[0];
+    if(!file) return;
+    const lettore = new FileReader();
+    lettore.onload = () => {
+      let pacco;
+      try{ pacco = JSON.parse(lettore.result); }
+      catch(e){ alert('Il file non è un backup valido.'); return; }
+      const dati = pacco && pacco.dati && typeof pacco.dati === 'object' ? pacco.dati : pacco;
+      if(!dati || typeof dati !== 'object' || (!Array.isArray(dati.alimenti) && !Array.isArray(dati.ricette))){
+        alert('Il file non sembra un backup di questa app.'); return;
+      }
+      const scelta = prompt('Come importare i dati del backup?\n\n1 = Unisci: aggiunge ciò che manca e tiene i tuoi dati\n2 = Sostituisci tutto: copia identica del backup (i dati di questo telefono vengono persi)\n\nScrivi 1 o 2:', '1');
+      if(scelta === null) return;
+      if(scelta.trim() === '2'){
+        if(!confirm('Sostituire TUTTI i dati di questo telefono con quelli del backup? I dati attuali andranno persi.')) return;
+        try{
+          const nuovo = { ...dati };
+          const acc = leggi().accesso;
+          if(acc) nuovo.accesso = acc;   /* la password resta di questo telefono */
+          localStorage.setItem(CHIAVE, JSON.stringify(nuovo));
+          location.reload();
+        }catch(e){ alert('Spazio insufficiente per importare tutti i dati.'); }
+      } else {
+        applicaBackupUnendo(dati);
+      }
+    };
+    lettore.readAsText(file);
+  };
+  inp.click();
+}
+
+function applicaBackupUnendo(dati){
+  const cur = leggi();
+  const patch = {};
+  let aggiunti = 0;
+  /* alimenti e ricette: aggiunge quelli non già presenti per nome */
+  for(const chiave of ['alimenti','ricette']){
+    if(!Array.isArray(dati[chiave])) continue;
+    const attuali = Array.isArray(cur[chiave]) ? cur[chiave] : [];
+    const presenti = new Set(attuali.map(x => norm((x && x.n) || '')));
+    const daAgg = dati[chiave].filter(x => x && x.n && !presenti.has(norm(x.n)));
+    if(daAgg.length){ patch[chiave] = attuali.concat(daAgg); aggiunti += daAgg.length; }
+  }
+  /* pesate: aggiunge le voci non identiche a una già presente */
+  if(Array.isArray(dati.peso)){
+    const attuali = Array.isArray(cur.peso) ? cur.peso : [];
+    const viste = new Set(attuali.map(x => JSON.stringify(x)));
+    const daAgg = dati.peso.filter(x => !viste.has(JSON.stringify(x)));
+    if(daAgg.length){ patch.peso = attuali.concat(daAgg); aggiunti += daAgg.length; }
+  }
+  /* preferiti: unione */
+  if(Array.isArray(dati.preferiti)){
+    patch.preferiti = [...new Set([...(cur.preferiti || []), ...dati.preferiti])];
+  }
+  if(!aggiunti){ alert('Nel backup non c\'è niente di nuovo da aggiungere.'); return; }
+  if(!scrivi(patch)){ alert('Spazio insufficiente: non riesco a salvare tutti i dati importati.'); return; }
+  alert('Importati ' + aggiunti + ' elementi nuovi.');
+  location.reload();
 }
 
 let S = {
@@ -2535,7 +2618,17 @@ function stratoParametriApp(){
           ${campoPw('pw-nuova', 'Password (almeno 4 caratteri)')}
           <button class="card" style="width:100%;padding:12px;font-weight:600;color:var(--cho)" data-a="pwAttiva">Attiva la password</button>`}`;
       })()}
-      <button class="primario" style="margin-top:12px" data-a="chiudiParamApp">Fatto</button>
+      <div style="font-weight:700;margin:18px 0 2px">Backup e ripristino</div>
+      <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">I dati restano su questo telefono e non si
+        sincronizzano da soli. Esporta un backup per salvarli o passarli a un altro telefono; sull'altro telefono
+        usa "Importa" e scegli se unirlo ai dati esistenti o sostituirli.</p>
+      <div style="display:flex;gap:8px">
+        <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--cho);display:flex;
+          align-items:center;justify-content:center;gap:6px" data-a="backupEsporta">${ico('su',16)} Esporta backup</button>
+        <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--wave);display:flex;
+          align-items:center;justify-content:center;gap:6px" data-a="backupImporta">${ico('giu',16)} Importa backup</button>
+      </div>
+      <button class="primario" style="margin-top:14px" data-a="chiudiParamApp">Fatto</button>
     </div>
   </div>`;
 }
@@ -3299,6 +3392,8 @@ document.addEventListener('click', e => {
   else if(a==='pesoRange'){ S.pesoRange = p1; S.pesoTip = null; }
   else if(a==='pesoTip') S.pesoTip = S.pesoTip === +p1 ? null : +p1;
   else if(a==='esporta'){ esportaDati(); return; }
+  else if(a==='backupEsporta'){ esportaBackup(); return; }
+  else if(a==='backupImporta'){ importaBackup(); return; }
   else if(a==='ok') scrivi({avvisoVisto:true});
   disegna();
 });
