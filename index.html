@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-21.3';
+const VERSIONE = '2026-09-27.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -4825,6 +4825,31 @@ if(!leggi().alimentiBase1){
   }
   if(toccati) scrivi({ alimenti: FOODS });
   scrivi({ alimentiBase1: true });
+}
+
+/* Una tantum: cinque alimenti aggiunti su richiesta. Creati solo se
+   non gia' presenti per nome, cosi' non toccano eventuali voci
+   modificate a mano. */
+if(!leggi().alimentiAggiunti1){
+  const nuovi = [
+    { n:'Lievito vanigliato',   e:'🧁', cho:22,  f:0.5, p:1,    ig:'medio', cat:'Dolci e snack',
+      porz:[['1 bustina (16 g)',16],['100 g',100]] },
+    { n:'Basilico',             e:'🌿', cho:1.1, f:0.6, p:3.2,  ig:'basso', cat:'Verdura e legumi' },
+    { n:'Pinoli',               e:'🌰', cho:13,  f:68,  p:14,   ig:'basso', cat:'Altro',
+      porz:[['1 cucchiaio',10],['100 g',100]] },
+    { n:'Vanillina',            e:'🌼', cho:60,  f:0,   p:0,    ig:'basso', cat:'Altro',
+      porz:[['1 bustina (0,5 g)',0.5],['100 g',100]] },
+    { n:'Cioccolato fondente',  e:'🍫', cho:46,  f:42,  p:6.5,  ig:'basso', cat:'Dolci e snack',
+      porz:[['1 quadretto (5 g)',5],['100 g',100]] }
+  ];
+  let agg = 0;
+  for(const a of nuovi){
+    if(FOODS.some(f => norm(f.n) === norm(a.n))) continue;
+    const s = sanificaAlimento(a);
+    if(s){ FOODS.push(s); agg++; }
+  }
+  if(agg) scrivi({ alimenti: FOODS });
+  scrivi({ alimentiAggiunti1: true });
 }
 
 /* Una tantum: nelle lasagne l'ingrediente vero è la pasta fresca
