@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-27.1';
+const VERSIONE = '2026-09-27.2';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1273,13 +1273,7 @@ function importaBackup(){
       if(scelta === null) return;
       if(scelta.trim() === '2'){
         if(!confirm('Sostituire TUTTI i dati di questo telefono con quelli del backup? I dati attuali andranno persi.')) return;
-        try{
-          const nuovo = { ...dati };
-          const acc = leggi().accesso;
-          if(acc) nuovo.accesso = acc;   /* la password resta di questo telefono */
-          localStorage.setItem(CHIAVE, JSON.stringify(nuovo));
-          location.reload();
-        }catch(e){ alert('Spazio insufficiente per importare tutti i dati.'); }
+        applicaBackupSostituendo(dati);
       } else {
         applicaBackupUnendo(dati);
       }
@@ -1316,6 +1310,98 @@ function applicaBackupUnendo(dati){
   if(!scrivi(patch)){ alert('Spazio insufficiente: non riesco a salvare tutti i dati importati.'); return; }
   alert('Importati ' + aggiunti + ' elementi nuovi.');
   location.reload();
+}
+
+function applicaBackupSostituendo(dati){
+  try{
+    const nuovo = { ...dati };
+    const acc = leggi().accesso;
+    if(acc) nuovo.accesso = acc;   /* la password resta di questo telefono */
+    localStorage.setItem(CHIAVE, JSON.stringify(nuovo));
+    location.reload();
+  }catch(e){ alert('Spazio insufficiente per importare tutti i dati.'); }
+}
+
+/* ---------- sincronizzazione cloud (Supabase) ----------
+   Config (URL del progetto, chiave pubblica anon, codice segreto) salvata
+   solo su questo dispositivo, fuori dall'archivio dei dati. I dati
+   vengono cifrati con il codice (AES-GCM, chiave derivata con PBKDF2)
+   prima di partire: sul cloud finisce solo testo cifrato, sotto una
+   riga identificata dall'hash del codice. Invio e scarico manuali. */
+const SYNC_KEY = 'cho-sync-config';
+function syncCfg(){ try{ return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; }catch(e){ return {}; } }
+function syncSalvaCfg(cfg){ try{ localStorage.setItem(SYNC_KEY, JSON.stringify(cfg)); return true; }catch(e){ return false; } }
+
+function _b64(buf){
+  const bytes = new Uint8Array(buf); let s = '';
+  for(let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function _unb64(str){ return Uint8Array.from(atob(str), c => c.charCodeAt(0)); }
+async function _sha256hex(txt){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function _chiaveDa(codice, salt){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(codice), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name:'PBKDF2', salt, iterations:100000, hash:'SHA-256' },
+    base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+}
+async function _cifra(testo, codice){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await _chiaveDa(codice, salt);
+  const ct = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, new TextEncoder().encode(testo));
+  return JSON.stringify({ v:1, salt:_b64(salt), iv:_b64(iv), ct:_b64(ct) });
+}
+async function _decifra(bundle, codice){
+  const o = JSON.parse(bundle);
+  const key = await _chiaveDa(codice, _unb64(o.salt));
+  const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv:_unb64(o.iv) }, key, _unb64(o.ct));
+  return new TextDecoder().decode(pt);
+}
+function _syncMancante(c){
+  if(!c.url || !c.key || !c.codice){ alert('Prima inserisci Project URL, chiave anon e codice di sincronizzazione, poi tocca "Salva impostazioni".'); return true; }
+  return false;
+}
+async function syncInvia(){
+  const c = syncCfg();
+  if(_syncMancante(c)) return;
+  try{
+    const bundle = await _cifra(JSON.stringify(leggi()), c.codice);
+    const id = await _sha256hex(c.codice);
+    const r = await fetch(c.url.replace(/\/+$/, '') + '/rest/v1/cho_sync', {
+      method:'POST',
+      headers:{ apikey:c.key, Authorization:'Bearer ' + c.key, 'Content-Type':'application/json',
+        Prefer:'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ codice:id, dati:bundle, aggiornato:new Date().toISOString() }])
+    });
+    if(!r.ok){ const t = await r.text(); alert('Invio non riuscito (codice ' + r.status + ').\n' + t.slice(0, 160)); return; }
+    syncSalvaCfg({ ...c, ultimo:new Date().toISOString() });
+    alert('Dati inviati al cloud.'); disegna();
+  }catch(e){ alert('Invio non riuscito: controlla la connessione e i dati del progetto Supabase.'); }
+}
+async function syncScarica(){
+  const c = syncCfg();
+  if(_syncMancante(c)) return;
+  try{
+    const id = await _sha256hex(c.codice);
+    const r = await fetch(c.url.replace(/\/+$/, '') + '/rest/v1/cho_sync?select=dati,aggiornato&codice=eq.' + id, {
+      headers:{ apikey:c.key, Authorization:'Bearer ' + c.key }
+    });
+    if(!r.ok){ const t = await r.text(); alert('Scaricamento non riuscito (codice ' + r.status + ').\n' + t.slice(0, 160)); return; }
+    const arr = await r.json();
+    if(!Array.isArray(arr) || !arr.length){ alert('Nel cloud non ci sono ancora dati per questo codice: invia prima da un telefono.'); return; }
+    let testo;
+    try{ testo = await _decifra(arr[0].dati, c.codice); }
+    catch(e){ alert('Non riesco a decifrare i dati: il codice di sincronizzazione non è lo stesso usato per inviarli.'); return; }
+    let dati; try{ dati = JSON.parse(testo); }catch(e){ alert('I dati scaricati non sono validi.'); return; }
+    const scelta = prompt('Dati trovati nel cloud. Come applicarli a questo telefono?\n\n1 = Unisci (aggiunge ciò che manca)\n2 = Sostituisci tutto\n\nScrivi 1 o 2:', '1');
+    if(scelta === null) return;
+    syncSalvaCfg({ ...c, ultimoScarico:new Date().toISOString() });
+    if(scelta.trim() === '2'){ if(!confirm('Sostituire TUTTI i dati di questo telefono con quelli del cloud?')) return; applicaBackupSostituendo(dati); }
+    else applicaBackupUnendo(dati);
+  }catch(e){ alert('Scaricamento non riuscito: controlla la connessione.'); }
 }
 
 let S = {
@@ -2628,6 +2714,28 @@ function stratoParametriApp(){
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--wave);display:flex;
           align-items:center;justify-content:center;gap:6px" data-a="backupImporta">${ico('giu',16)} Importa backup</button>
       </div>
+      ${(() => { const c = syncCfg(); return `
+      <div style="font-weight:700;margin:18px 0 2px">Sincronizzazione tra telefoni (cloud)</div>
+      <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">Allinea i dati tra più telefoni con un progetto
+        Supabase gratuito. Inserisci i dati del progetto e un <b>codice segreto</b> uguale su ogni telefono: i dati
+        vengono <b>cifrati</b> con quel codice prima di partire. Invio e scarico sono manuali.</p>
+      <div class="etich">Project URL</div>
+      <input id="sync-url" class="campo" placeholder="https://xxxx.supabase.co" value="${esc(c.url || '')}" style="margin-bottom:8px">
+      <div class="etich">Chiave anon (public)</div>
+      <input id="sync-key" class="campo" placeholder="eyJhbGciOi..." value="${esc(c.key || '')}" style="margin-bottom:8px">
+      <div class="etich">Codice di sincronizzazione (segreto, uguale su tutti i telefoni)</div>
+      <input id="sync-codice" class="campo" placeholder="una frase lunga e segreta" value="${esc(c.codice || '')}" style="margin-bottom:8px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="card" style="flex:1;padding:10px;font-weight:600;color:var(--ink2);font-size:13px" data-a="syncGenera">Genera codice</button>
+        <button class="card" style="flex:1;padding:10px;font-weight:600;color:var(--cho);font-size:13px" data-a="syncSalva">Salva impostazioni</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--cho);display:flex;
+          align-items:center;justify-content:center;gap:6px" data-a="syncInvia">${ico('su',16)} Invia al cloud</button>
+        <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--wave);display:flex;
+          align-items:center;justify-content:center;gap:6px" data-a="syncScarica">${ico('giu',16)} Scarica dal cloud</button>
+      </div>
+      ${c.ultimo ? `<div style="font-size:11px;color:var(--ink2);margin-top:6px">Ultimo invio: ${new Date(c.ultimo).toLocaleString('it-IT')}</div>` : ''}`; })()}
       <button class="primario" style="margin-top:14px" data-a="chiudiParamApp">Fatto</button>
     </div>
   </div>`;
@@ -3394,6 +3502,19 @@ document.addEventListener('click', e => {
   else if(a==='esporta'){ esportaDati(); return; }
   else if(a==='backupEsporta'){ esportaBackup(); return; }
   else if(a==='backupImporta'){ importaBackup(); return; }
+  else if(a==='syncSalva'){
+    const g = id => (document.getElementById(id) || {}).value || '';
+    syncSalvaCfg({ ...syncCfg(), url: g('sync-url').trim(), key: g('sync-key').trim(), codice: g('sync-codice').trim() });
+    alert('Impostazioni di sincronizzazione salvate su questo telefono.'); return;
+  }
+  else if(a==='syncGenera'){
+    const rnd = _b64(crypto.getRandomValues(new Uint8Array(18))).replace(/[+/=]/g, '').slice(0, 24);
+    const el = document.getElementById('sync-codice'); if(el) el.value = rnd;
+    syncSalvaCfg({ ...syncCfg(), url:(document.getElementById('sync-url')||{}).value||syncCfg().url||'', key:(document.getElementById('sync-key')||{}).value||syncCfg().key||'', codice: rnd });
+    alert('Codice generato e salvato:\n\n' + rnd + '\n\nUsa lo STESSO codice su tutti i telefoni (copialo e conservalo).'); return;
+  }
+  else if(a==='syncInvia'){ syncInvia(); return; }
+  else if(a==='syncScarica'){ syncScarica(); return; }
   else if(a==='ok') scrivi({avvisoVisto:true});
   disegna();
 });
