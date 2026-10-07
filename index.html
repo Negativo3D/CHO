@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-07.1';
+const VERSIONE = '2026-10-07.2';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -2478,7 +2478,7 @@ function vistaPeso(){
     S.pesoData = `${adesso.getFullYear()}-${String(adesso.getMonth()+1).padStart(2,'0')}-${String(adesso.getDate()).padStart(2,'0')}`;
     S.pesoOra = adesso.toTimeString().slice(0,5);
   }
-  const giorni = S.pesoRange === '1m' ? 30 : S.pesoRange === '6m' ? 183 : Infinity;
+  const giorni = S.pesoRange === '7g' ? 7 : S.pesoRange === '1m' ? 30 : S.pesoRange === '6m' ? 183 : Infinity;
   const dati = PESO.filter(v => (adesso - new Date(v.t)) / 86400000 <= giorni);
   const media = dati.length ? Math.round(dati.reduce((a,v) => a+v.kg, 0)/dati.length*10)/10 : null;
 
@@ -2516,7 +2516,7 @@ function vistaPeso(){
         <div style="flex:1;min-width:0"><div class="etich">Ora</div><input id="peso-ora" type="time" class="campo" style="min-width:0" value="${esc(S.pesoOra)}"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-end">
-        <div style="flex:1;min-width:0"><div class="etich">Peso (kg)</div><input id="peso-kg" class="campo" inputmode="decimal" placeholder="78,4" value="${esc(S.pesoKg)}"></div>
+        <div style="flex:1;min-width:0"><div class="etich">Peso (kg)</div><input id="peso-kg" class="campo" inputmode="decimal" placeholder="${PESO.length ? esc(gr1(PESO[PESO.length-1].kg)) : '78,4'}" value="${esc(S.pesoKg)}"></div>
         <button class="primario" style="flex:1.4;background:#1C6FA8" data-a="pesoSalva">Registra</button>
       </div>
     </div>
@@ -2526,7 +2526,7 @@ function vistaPeso(){
         <div style="font-weight:700">Andamento del peso (kg)</div>
       </div>
       <div class="chips-wrap" style="margin-bottom:10px">
-        ${[['1m','30 giorni'],['6m','6 mesi'],['tutto','Tutto']].map(([v,t]) => chip(t, S.pesoRange===v, `pesoRange:${v}`)).join('')}
+        ${[['7g','7 giorni'],['1m','30 giorni'],['6m','6 mesi'],['tutto','Tutto']].map(([v,t]) => chip(t, S.pesoRange===v, `pesoRange:${v}`)).join('')}
       </div>
       ${dati.length ? `
         <div style="background:var(--cho-soft);border-radius:16px;padding:12px 16px;margin-bottom:12px;
