@@ -580,7 +580,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-09-27.2';
+const VERSIONE = '2026-10-07.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1361,47 +1361,58 @@ async function _decifra(bundle, codice){
   return new TextDecoder().decode(pt);
 }
 function _syncMancante(c){
-  if(!c.url || !c.key || !c.codice){ alert('Prima inserisci Project URL, chiave anon e codice di sincronizzazione, poi tocca "Salva impostazioni".'); return true; }
+  if(!c.url || !c.key || !c.codice){ const m='Prima inserisci Project URL, chiave anon e codice di sincronizzazione, poi tocca "Salva impostazioni".'; _syncMsg(m, '#C0362C'); alert(m); return true; }
   return false;
+}
+/* Mostra l'esito della sincronizzazione scritto nella pagina (nella sezione
+   Parametri), così è leggibile anche quando Safari blocca gli avvisi. */
+function _syncMsg(testo, colore){
+  const el = document.getElementById('sync-stato');
+  if(el){ el.textContent = testo; el.style.color = colore || 'var(--ink2)'; }
 }
 async function syncInvia(){
   const c = syncCfg();
   if(_syncMancante(c)) return;
+  const endpoint = c.url.replace(/\/+$/, '') + '/rest/v1/cho_sync';
+  _syncMsg('Invio in corso… (attendi qualche secondo)', 'var(--ink2)');
   try{
     const bundle = await _cifra(JSON.stringify(leggi()), c.codice);
     const id = await _sha256hex(c.codice);
-    const r = await fetch(c.url.replace(/\/+$/, '') + '/rest/v1/cho_sync', {
+    const r = await fetch(endpoint, {
       method:'POST',
       headers:{ apikey:c.key, Authorization:'Bearer ' + c.key, 'Content-Type':'application/json',
         Prefer:'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify([{ codice:id, dati:bundle, aggiornato:new Date().toISOString() }])
     });
-    if(!r.ok){ const t = await r.text(); alert('Invio non riuscito (codice ' + r.status + ').\n' + t.slice(0, 160)); return; }
+    if(!r.ok){ const t = await r.text(); _syncMsg('Invio non riuscito — errore ' + r.status + '. ' + t.slice(0, 220), '#C0362C'); return; }
     syncSalvaCfg({ ...c, ultimo:new Date().toISOString() });
-    alert('Dati inviati al cloud.'); disegna();
-  }catch(e){ alert('Invio non riuscito: controlla la connessione e i dati del progetto Supabase.'); }
+    _syncMsg('✓ Dati inviati al cloud.', 'var(--cho)'); disegna();
+  }catch(e){ _syncMsg('Invio non riuscito: ' + (e && e.message ? e.message : e) + ' · indirizzo usato: ' + endpoint, '#C0362C'); }
 }
 async function syncScarica(){
   const c = syncCfg();
   if(_syncMancante(c)) return;
+  const endpoint = c.url.replace(/\/+$/, '') + '/rest/v1/cho_sync';
+  _syncMsg('Scaricamento in corso…', 'var(--ink2)');
   try{
     const id = await _sha256hex(c.codice);
-    const r = await fetch(c.url.replace(/\/+$/, '') + '/rest/v1/cho_sync?select=dati,aggiornato&codice=eq.' + id, {
+    const r = await fetch(endpoint + '?select=dati,aggiornato&codice=eq.' + id, {
       headers:{ apikey:c.key, Authorization:'Bearer ' + c.key }
     });
-    if(!r.ok){ const t = await r.text(); alert('Scaricamento non riuscito (codice ' + r.status + ').\n' + t.slice(0, 160)); return; }
+    if(!r.ok){ const t = await r.text(); _syncMsg('Scaricamento non riuscito — errore ' + r.status + '. ' + t.slice(0, 220), '#C0362C'); return; }
     const arr = await r.json();
-    if(!Array.isArray(arr) || !arr.length){ alert('Nel cloud non ci sono ancora dati per questo codice: invia prima da un telefono.'); return; }
+    if(!Array.isArray(arr) || !arr.length){ _syncMsg('Nel cloud non ci sono ancora dati per questo codice: invia prima da un telefono.', '#C0362C'); return; }
     let testo;
     try{ testo = await _decifra(arr[0].dati, c.codice); }
-    catch(e){ alert('Non riesco a decifrare i dati: il codice di sincronizzazione non è lo stesso usato per inviarli.'); return; }
-    let dati; try{ dati = JSON.parse(testo); }catch(e){ alert('I dati scaricati non sono validi.'); return; }
+    catch(e){ _syncMsg('Non riesco a decifrare i dati: il codice di sincronizzazione non è lo stesso usato per inviarli.', '#C0362C'); return; }
+    let dati; try{ dati = JSON.parse(testo); }catch(e){ _syncMsg('I dati scaricati non sono validi.', '#C0362C'); return; }
+    _syncMsg('✓ Dati trovati nel cloud, li applico…', 'var(--cho)');
     const scelta = prompt('Dati trovati nel cloud. Come applicarli a questo telefono?\n\n1 = Unisci (aggiunge ciò che manca)\n2 = Sostituisci tutto\n\nScrivi 1 o 2:', '1');
     if(scelta === null) return;
     syncSalvaCfg({ ...c, ultimoScarico:new Date().toISOString() });
     if(scelta.trim() === '2'){ if(!confirm('Sostituire TUTTI i dati di questo telefono con quelli del cloud?')) return; applicaBackupSostituendo(dati); }
     else applicaBackupUnendo(dati);
-  }catch(e){ alert('Scaricamento non riuscito: controlla la connessione.'); }
+  }catch(e){ _syncMsg('Scaricamento non riuscito: ' + (e && e.message ? e.message : e) + ' · indirizzo usato: ' + endpoint, '#C0362C'); }
 }
 
 let S = {
@@ -2735,6 +2746,7 @@ function stratoParametriApp(){
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--wave);display:flex;
           align-items:center;justify-content:center;gap:6px" data-a="syncScarica">${ico('giu',16)} Scarica dal cloud</button>
       </div>
+      <div id="sync-stato" style="font-size:12px;margin-top:8px;line-height:1.45;word-break:break-word"></div>
       ${c.ultimo ? `<div style="font-size:11px;color:var(--ink2);margin-top:6px">Ultimo invio: ${new Date(c.ultimo).toLocaleString('it-IT')}</div>` : ''}`; })()}
       <button class="primario" style="margin-top:14px" data-a="chiudiParamApp">Fatto</button>
     </div>
