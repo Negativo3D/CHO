@@ -581,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-11.1';
+const VERSIONE = '2026-10-11.2';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1116,6 +1116,11 @@ if(!leggi().lasagnePrepAlbero){
   scrivi({ lasagnePrepAlbero: true });
 }
 
+/* Una tantum: riduce le foto già salvate per liberare spazio nel
+   browser (vedi comprimiFotoSalvate). Gira in automatico dopo il primo
+   caricamento con questa versione; se libera spazio, ridisegna. */
+comprimiFotoSalvate(false).then(r => { if(r && r.ok && r.dopo < r.prima) disegna(); }).catch(() => {});
+
 /* ---------- registro del peso ---------- */
 function sanificaPeso(o){
   if(!o || typeof o !== 'object') return null;
@@ -1145,6 +1150,63 @@ async function ridimensionaFoto(sorgente){
   cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
   cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
   return cv.toDataURL('image/jpeg', .72);
+}
+
+/* Ricomprime una foto già salvata (data:image) a un lato massimo e una
+   qualità dati; torna la versione più piccola, o l'originale se non si
+   riduce (così non peggiora mai le foto già piccole). */
+async function _ricomprimiDataURL(dataUrl, maxLato, q){
+  if(typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) return dataUrl;
+  try{
+    const img = await new Promise((res, rej) => {
+      const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = dataUrl;
+    });
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if(!w || !h) return dataUrl;
+    const sc = Math.min(1, maxLato / Math.max(w, h));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(w*sc); cv.height = Math.round(h*sc);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    const out = cv.toDataURL('image/jpeg', q);
+    return (typeof out === 'string' && out.length < dataUrl.length) ? out : dataUrl;
+  }catch(e){ return dataUrl; }
+}
+
+/* Riduce le foto già salvate per liberare spazio nel browser (lo spazio
+   che Safari riserva al sito, ~5 MB, non la memoria del telefono). Le
+   foto del ricettario sono salvate come testo e, accumulandosi, possono
+   riempire quello spazio e bloccare anche piccole modifiche. Le
+   ricomprime a misura "indicativa" e risalva un blocco più piccolo. Gira
+   una volta in automatico (flag fotoRidotte1) e si può rilanciare a mano
+   dai Parametri. */
+async function comprimiFotoSalvate(forzato){
+  const dati = leggi();
+  if(!forzato && dati.fotoRidotte1) return { saltato: true };
+  const MAX = 400, Q = 0.6;
+  const prima = (localStorage.getItem(CHIAVE) || '').length;
+  const f = async foto => await _ricomprimiDataURL(foto, MAX, Q);
+  for(const r of (dati.ricette || [])){
+    if(r && typeof r.foto === 'string' && r.foto.startsWith('data:image')) r.foto = await f(r.foto);
+    if(Array.isArray(r.passi)) for(const sz of r.passi)
+      if(sz && Array.isArray(sz.passi)) for(const p of sz.passi)
+        if(p && typeof p.foto === 'string' && p.foto.startsWith('data:image')) p.foto = await f(p.foto);
+    if(Array.isArray(r.cottura)) for(const p of r.cottura)
+      if(p && typeof p.foto === 'string' && p.foto.startsWith('data:image')) p.foto = await f(p.foto);
+  }
+  for(const pl of (dati.piatti || []))
+    if(pl && typeof pl.foto === 'string' && pl.foto.startsWith('data:image')) pl.foto = await f(pl.foto);
+  for(const a of (dati.alimenti || []))
+    if(a && typeof a.foto === 'string' && a.foto.startsWith('data:image')) a.foto = await f(a.foto);
+  dati.fotoRidotte1 = true;
+  let ok = false;
+  try{ localStorage.setItem(CHIAVE, JSON.stringify(dati)); ok = true; }catch(e){ ok = false; }
+  const dopo = (localStorage.getItem(CHIAVE) || '').length;
+  if(ok){
+    FOODS = (leggi().alimenti || []).map(sanificaAlimento).filter(Boolean);
+    PIATTI = (leggi().piatti || []).map(sanificaPiatto).filter(Boolean);
+    RICETTE = (leggi().ricette || []).map(sanificaRicetta).filter(Boolean);
+  }
+  return { ok, prima, dopo, liberati: Math.max(0, prima - dopo) };
 }
 function scegliFoto(usa){
   const inp = document.createElement('input');
@@ -2742,6 +2804,12 @@ function stratoParametriApp(){
         <button class="card" style="flex:1;padding:12px;font-weight:600;color:var(--wave);display:flex;
           align-items:center;justify-content:center;gap:6px" data-a="backupImporta">${ico('giu',16)} Importa backup</button>
       </div>
+      <p style="font-size:12px;color:var(--ink2);margin:12px 0 8px">Se l'app dice che lo <b>spazio è esaurito</b> (è lo
+        spazio del browser, non del telefono), riduci le foto delle ricette già salvate: diventano più leggere ma
+        restano indicative, e si libera spazio per nuove modifiche.</p>
+      <button class="card" style="width:100%;padding:12px;font-weight:600;color:var(--cho);display:flex;
+        align-items:center;justify-content:center;gap:6px" data-a="fotoRiduci">${ico('camera',16)} Riduci le foto (libera spazio)</button>
+      <div id="foto-stato" style="font-size:12px;margin-top:8px;line-height:1.45;color:var(--ink2)"></div>
       ${(() => { const c = syncCfg(); return `
       <div style="font-weight:700;margin:18px 0 2px">Sincronizzazione tra telefoni (cloud)</div>
       <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">Allinea i dati tra più telefoni con un progetto
@@ -3531,6 +3599,24 @@ document.addEventListener('click', e => {
   else if(a==='esporta'){ esportaDati(); return; }
   else if(a==='backupEsporta'){ esportaBackup(); return; }
   else if(a==='backupImporta'){ importaBackup(); return; }
+  else if(a==='fotoRiduci'){
+    const el = document.getElementById('foto-stato');
+    if(el){ el.textContent = 'Riduco le foto…'; el.style.color = 'var(--ink2)'; }
+    comprimiFotoSalvate(true).then(r => {
+      const el2 = document.getElementById('foto-stato');
+      if(!r || !r.ok){ if(el2){ el2.textContent = 'Non sono riuscito a salvare la riduzione.'; el2.style.color = '#C0362C'; } return; }
+      const kb = Math.round(r.liberati/1024);
+      const msg = kb > 0 ? `✓ Fatto: liberati circa ${kb} KB. Ora puoi fare le tue modifiche.`
+                         : '✓ Fatto: le foto erano già leggere, non c\'era molto da ridurre.';
+      disegna();
+      const el3 = document.getElementById('foto-stato');
+      if(el3){ el3.textContent = msg; el3.style.color = 'var(--cho)'; }
+    }).catch(() => {
+      const el2 = document.getElementById('foto-stato');
+      if(el2){ el2.textContent = 'Errore durante la riduzione delle foto.'; el2.style.color = '#C0362C'; }
+    });
+    return;
+  }
   else if(a==='syncSalva'){
     const g = id => (document.getElementById(id) || {}).value || '';
     syncSalvaCfg({ ...syncCfg(), url: g('sync-url').trim(), key: g('sync-key').trim(), codice: g('sync-codice').trim() });
