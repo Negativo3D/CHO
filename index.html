@@ -562,6 +562,7 @@ const IC = {
   casa:'<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-6h4v6"/>',
   spunta:'<path d="M4 12l5 5L20 7"/>',
   su:'<path d="M6 14l6-6 6 6"/>', giu:'<path d="M6 10l6 6 6-6"/>',
+  indietro:'<path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>',
   grip:'<path d="M5 9h14M5 15h14"/>',
   cucchiaio:'<ellipse cx="12" cy="7" rx="4.2" ry="5"/><path d="M12 12v9"/>',
   cucchiaino:'<ellipse cx="12" cy="8.5" rx="3" ry="3.6"/><path d="M12 12.2V20"/>',
@@ -580,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-07.2';
+const VERSIONE = '2026-10-11.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1900,8 +1901,10 @@ function stratoRicetta(){
     </button>
     ${esp[chiave] ? `<div style="padding:4px 0 10px">${contenuto}</div>` : ''}`;
 
-  /* I grammi sono un campo scrivibile: si tocca il numero, si scrive
-     e alla conferma la ricetta si salva e il piatto si riallinea. */
+  /* I grammi nella vista ricetta sono di sola lettura: si modificano
+     solo dal form "Modifica ricetta" oppure, in modo temporaneo per
+     riproporzionare, con la bacchetta magica attiva (campo scrivibile
+     che ricava il fattore di scala, senza toccare la ricetta salvata). */
   const righeVoci = (voci, si) => voci.map((v,i) => {
     const qaMostra = magia ? scalaQa(v.qa) : String(v.qa || '');
     const alt = v.ua && v.ua !== 'qb' && qaMostra.trim()
@@ -1912,8 +1915,10 @@ function stratoRicetta(){
       padding:3px 0;font-size:13.5px${i ? ';border-top:1px dashed var(--line)' : ''}">
       <b>${esc(v.n)}</b>
       <span class="num" style="color:var(--ink2);flex:none">${v.ua === 'qb' ? 'q.b.'
-        : `<input id="rl-${si}-${i}" class="num campoPesoMini${magia ? ' campoMagia' : ''}" inputmode="decimal"
-            value="${esc(gMostra)}" aria-label="Grammi di ${esc(v.n)}"> g${alt ? ` · ${alt}` : ''}`}</span>
+        : magia
+          ? `<input id="rl-${si}-${i}" class="num campoPesoMini campoMagia" inputmode="decimal"
+              value="${esc(gMostra)}" aria-label="Grammi di ${esc(v.n)}"> g${alt ? ` · ${alt}` : ''}`
+          : `${esc(gMostra)} g${alt ? ` · ${alt}` : ''}`}</span>
     </div>`;
   }).join('');
 
@@ -2481,12 +2486,18 @@ function vistaPeso(){
   const giorni = S.pesoRange === '7g' ? 7 : S.pesoRange === '1m' ? 30 : S.pesoRange === '6m' ? 183 : Infinity;
   const dati = PESO.filter(v => (adesso - new Date(v.t)) / 86400000 <= giorni);
   const media = dati.length ? Math.round(dati.reduce((a,v) => a+v.kg, 0)/dati.length*10)/10 : null;
+  /* Differenza nel periodo: quanto è cambiato il peso dalla prima
+     all'ultima misurazione dell'intervallo (dati è ordinato per data).
+     Negativo = calo, positivo = aumento. Serve ≥ 2 misurazioni. */
+  const primoP = dati.length ? dati[0] : null, ultimoP = dati.length ? dati[dati.length-1] : null;
+  const diffPeriodo = dati.length >= 2 ? Math.round((ultimoP.kg - primoP.kg)*10)/10 : null;
 
   const ultimo = PESO[PESO.length-1], prec = PESO[PESO.length-2];
   const delta = ultimo && prec ? Math.round((ultimo.kg - prec.kg)*10)/10 : null;
   const hero = `
-    <button class="chip" data-a="tab:sport" aria-label="Torna all'attività fisica"
-      style="margin:10px 0 2px;display:inline-flex;align-items:center;gap:6px">${ico('chiudi',14)} Attività fisica</button>
+    <button data-a="tab:sport" aria-label="Torna all'attività fisica"
+      style="margin:10px 0 8px;display:inline-flex;align-items:center;gap:7px;color:var(--ink2);font-weight:600;font-size:14px">
+      ${ico('indietro',18)}<span>Attività fisica</span></button>
     <div class="hero blu">
       <div class="occhiello">Registro del peso</div>
       ${ultimo ? `
@@ -2529,13 +2540,19 @@ function vistaPeso(){
         ${[['7g','7 giorni'],['1m','30 giorni'],['6m','6 mesi'],['tutto','Tutto']].map(([v,t]) => chip(t, S.pesoRange===v, `pesoRange:${v}`)).join('')}
       </div>
       ${dati.length ? `
-        <div style="background:var(--cho-soft);border-radius:16px;padding:12px 16px;margin-bottom:12px;
-          display:flex;align-items:baseline;justify-content:space-between">
-          <div>
-            <div style="font-size:12px;color:var(--ink2);font-weight:600">Media del periodo</div>
-            <div class="num" style="font-size:28px;font-weight:800;color:var(--cho);line-height:1.1">${gr1(media)}<span style="font-size:15px;font-weight:600"> kg</span></div>
+        <div style="background:var(--cho-soft);border-radius:16px;padding:12px 16px;margin-bottom:12px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:12px;color:var(--ink2);font-weight:600">Media del periodo</div>
+              <div class="num" style="font-size:28px;font-weight:800;color:var(--cho);line-height:1.1">${gr1(media)}<span style="font-size:15px;font-weight:600"> kg</span></div>
+            </div>
+            ${diffPeriodo !== null ? `
+            <div style="text-align:right">
+              <div style="font-size:12px;color:var(--ink2);font-weight:600">Differenza nel periodo</div>
+              <div class="num" style="font-size:28px;font-weight:800;line-height:1.1;color:${diffPeriodo < 0 ? 'var(--cho)' : diffPeriodo > 0 ? 'var(--wave)' : 'var(--ink2)'}">${diffPeriodo > 0 ? '+' : ''}${gr1(diffPeriodo)}<span style="font-size:15px;font-weight:600"> kg</span></div>
+            </div>` : ''}
           </div>
-          <div style="font-size:12px;color:var(--ink2);text-align:right">su ${dati.length} misurazion${dati.length===1?'e':'i'}</div>
+          <div style="font-size:12px;color:var(--ink2);margin-top:8px">su ${dati.length} misurazion${dati.length===1?'e':'i'}${diffPeriodo !== null ? ` · dal ${new Date(primoP.t).toLocaleDateString('it-IT',{day:'numeric',month:'short'})} al ${new Date(ultimoP.t).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}` : ''}</div>
         </div>
         ${graficoPeso(dati)}
         <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:10px">
@@ -3547,21 +3564,14 @@ document.addEventListener('change', e => {
     const v = r && r.sezioni[si] && r.sezioni[si].voci[vi];
     if(v){
       const n = pesoScritto(e.target.value);
+      /* Nella vista ricetta l'unico campo grammi scrivibile è quello
+         della bacchetta magica: la quantità scritta ricava il fattore di
+         scala rispetto all'originale e tutte le altre si adeguano. La
+         ricetta salvata non viene toccata (le modifiche permanenti si
+         fanno solo dal form "Modifica ricetta"). */
       if(S.magia){
-        /* Bacchetta magica: la quantità scritta ricava il fattore di
-           scala rispetto all'originale; tutte le altre si adeguano.
-           La ricetta salvata non viene toccata. */
         const base = pesoScritto(String(v.q || ''));
         if(n != null && base && base > 0) S.magiaFatt = Math.round((n / base) * 1000) / 1000;
-        disegna();
-      } else {
-        /* Modifica permanente: si salva la ricetta e si riallinea il
-           piatto in anagrafica. */
-        if(n != null && gr1(n) !== v.q){
-          v.q = gr1(n);
-          scrivi({ ricette: RICETTE });
-          sincronizzaPiattoRicetta(r);
-        }
         disegna();
       }
     }
