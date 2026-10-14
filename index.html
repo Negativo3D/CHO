@@ -581,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-14.4';
+const VERSIONE = '2026-10-14.5';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -5348,7 +5348,47 @@ if(!leggi().lasagneFresche1){
   scrivi({ lasagneFresche1: true });
 }
 
+/* ---------- ritrovarsi dov'eri alla riapertura ----------
+   iOS, quando serve memoria, chiude le web app in background e le
+   ricarica alla riapertura. Per non perdere il punto salviamo la vista
+   corrente (scheda, ricerca, ricetta aperta, scorrimento) quando l'app
+   passa in background e la ripristiniamo all'avvio, se recente. */
+const VISTA_KEY = 'cho-vista';
+function salvaVista(){
+  try{
+    const sc = (document.scrollingElement || document.documentElement || {}).scrollTop || 0;
+    localStorage.setItem(VISTA_KEY, JSON.stringify({
+      tab: S.tab, q: S.q, cat: S.cat, vedi: S.vedi, qr: S.qr,
+      paeseRicette: S.paeseRicette, ricettaAperta: S.ricettaAperta, ricettaEspansi: S.ricettaEspansi,
+      scroll: sc, t: Date.now()
+    }));
+  }catch(e){}
+}
+function ripristinaVista(){
+  try{
+    const v = JSON.parse(localStorage.getItem(VISTA_KEY) || 'null');
+    if(!v || (Date.now() - (v.t || 0)) > 6*3600*1000) return null; // solo se recente (< 6 ore)
+    if(['atlante','ricette','peso','sport'].includes(v.tab)) S.tab = v.tab;
+    if(typeof v.q === 'string') S.q = v.q;
+    if(typeof v.cat === 'string') S.cat = v.cat;
+    if(typeof v.vedi === 'string') S.vedi = v.vedi;
+    if(typeof v.qr === 'string') S.qr = v.qr;
+    if(v.paeseRicette && PAESI_RICETTE[v.paeseRicette]) S.paeseRicette = v.paeseRicette;
+    if(v.ricettaAperta && RICETTE.some(r => r.id === v.ricettaAperta)){
+      S.ricettaAperta = v.ricettaAperta;
+      if(v.ricettaEspansi && typeof v.ricettaEspansi === 'object') S.ricettaEspansi = v.ricettaEspansi;
+    }
+    return v;
+  }catch(e){ return null; }
+}
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') salvaVista(); });
+window.addEventListener('pagehide', salvaVista);
+
+const _vistaRip = ripristinaVista();
 disegna();
+if(_vistaRip && _vistaRip.scroll && !S.ricettaAperta){
+  try{ (document.scrollingElement || document.documentElement).scrollTop = _vistaRip.scroll; }catch(e){}
+}
 
 /* ---------- blocco all'avvio ----------
    Se la password è attiva, un velo pieno copre l'app finché non viene
@@ -5383,10 +5423,16 @@ disegna();
   const sp = document.getElementById('splash');
   if(!sp) return;
   const veloce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* Se hai riaperto l'app da poco (iOS l'ha ricaricata in background),
+     l'animazione lunga darebbe fastidio: la mostriamo per intero solo al
+     primo avvio o dopo una pausa, e quasi subito se rientri a breve. */
+  let ultimo = 0; try{ ultimo = +localStorage.getItem('cho-splash-t') || 0; }catch(e){}
+  const riapertura = Date.now() - ultimo < 30*60*1000;
+  try{ localStorage.setItem('cho-splash-t', String(Date.now())); }catch(e){}
   setTimeout(() => {
     sp.classList.add('via');
     setTimeout(() => sp.remove(), 600);
-  }, veloce ? 250 : 1700);
+  }, veloce ? 200 : (riapertura ? 300 : 1700));
 })();
 
 /* ---------- controllo aggiornamenti ----------
