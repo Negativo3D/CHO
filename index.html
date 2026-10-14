@@ -581,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-14.1';
+const VERSIONE = '2026-10-14.2';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -1118,8 +1118,14 @@ if(!leggi().lasagnePrepAlbero){
 
 /* Una tantum: riduce le foto già salvate per liberare spazio nel
    browser (vedi comprimiFotoSalvate). Gira in automatico dopo il primo
-   caricamento con questa versione; se libera spazio, ridisegna. */
-comprimiFotoSalvate(false).then(r => { if(r && r.ok && r.dopo < r.prima) disegna(); }).catch(() => {});
+   caricamento con questa versione; se libera spazio, ridisegna. Va
+   rimandata a dopo il resto dell'inizializzazione (seed delle ricette
+   inclusi, più in basso nel file) con setTimeout: la funzione legge una
+   copia dei dati all'avvio, e se partisse qui catturerebbe uno stato
+   incompleto sovrascrivendo le ricette seminate dopo. */
+setTimeout(() => {
+  comprimiFotoSalvate(false).then(r => { if(r && r.ok && r.dopo < r.prima) disegna(); }).catch(() => {});
+}, 0);
 
 /* ---------- registro del peso ---------- */
 function sanificaPeso(o){
@@ -5153,7 +5159,7 @@ importaRicettario('jp1Chanchan',
     paese: 'JP',
     sezioni: [
       { titolo: 'Salmone e verdure', voci: [
-        { n:'Salmone',                q:'1040', u:'g' },
+        { n:'Salmone',                q:'1000', u:'g' },
         { n:'Cavolo cappuccio',       q:'300',  u:'g' },
         { n:'Cipollotto',             q:'230',  u:'g' },
         { n:'Carote',                 q:'130',  u:'g' },
@@ -5190,8 +5196,27 @@ importaRicettario('jp1Chanchan',
         { t: 'Preparazione anticipata: puoi cuocere le verdure in anticipo, conservarle in frigorifero e riscaldarle prima di aggiungere il salmone crudo e la salsa. Il pesce è meglio cuocerlo solo poco prima di servire.', foto: null } ] }
     ],
     cottura: [],
-    porzG: 615
+    porzG: 605
   }]);
+
+/* Una tantum: normalizza il salmone del Chanchan-yaki a 1 kg tondo (da
+   1040 g) anche nelle copie già salvate, e riallinea la porzione a 605 g
+   (totale ingredienti / 4). */
+if(!leggi().jpChanchanSalmone1kg){
+  const r = RICETTE.find(x => /chanchan/i.test(x.n));
+  if(r){
+    let tocca = false;
+    for(const s of r.sezioni) for(const v of s.voci)
+      if(norm(v.n) === norm('Salmone') && v.q === '1040'){ v.q = '1000'; tocca = true; }
+    if(tocca){
+      scrivi({ ricette: RICETTE });
+      sincronizzaPiattoRicetta(r);
+      const i = PIATTI.findIndex(pl => pl.daRicetta === r.id);
+      if(i >= 0){ const agg = sanificaPiatto({ ...PIATTI[i], porzG: 605 }); if(agg){ PIATTI[i] = agg; scrivi({ piatti: PIATTI }); } }
+    }
+  }
+  scrivi({ jpChanchanSalmone1kg: true });
+}
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
    ancora grassi e proteine se li ritrova salvati a zero. Si completano
