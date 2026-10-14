@@ -581,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-11.2';
+const VERSIONE = '2026-10-14.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -844,7 +844,7 @@ let PIATTI = (leggi().piatti || []).map(sanificaPiatto).filter(Boolean);
    aggiungibili, modificabili ed eliminabili dal modulo. Indipendenti
    dal conteggio dei carboidrati. */
 /* Paesi del ricettario: bandierina e nome per i raggruppamenti. */
-const PAESI_RICETTE = { IT: ['🇮🇹', 'Italia'], KR: ['🇰🇷', 'Corea del Sud'] };
+const PAESI_RICETTE = { IT: ['🇮🇹', 'Italia'], KR: ['🇰🇷', 'Corea del Sud'], JP: ['🇯🇵', 'Giappone'] };
 
 function sanificaRicetta(o){
   if(!o || typeof o !== 'object' || Array.isArray(o)) return null;
@@ -5132,6 +5132,65 @@ importaRicettario('itBigoliSarde',
     ],
     cottura: [],
     porzG: 350
+  }]);
+
+/* ---------- ricettario giapponese ----------
+   Ricette tradotte in italiano; valori nutrizionali indicativi per 100 g
+   da tabelle di composizione ed etichette tipiche. */
+importaRicettario('jp1Chanchan',
+  [
+    { n:'Salmone',                e:'🐟', cho:0,  f:13, p:20,  ig:'basso', cat:'Altro',
+      porz:[['1 filetto (120 g)',120],['100 g',100]] },
+    { n:'Miso bianco',            e:'🥣', cho:25, f:6,  p:12,  ig:'medio', cat:'Altro',
+      porz:[['1 cucchiaio (18 g)',18],['100 g',100]] },
+    { n:'Sakè',                   e:'🍶', cho:5,  f:0,  p:0.5, ig:'medio', cat:'Bevande',
+      porz:[['1 cucchiaio (15 g)',15],['100 g',100]] },
+    { n:'Funghi shiitake secchi', e:'🍄', cho:63, f:1,  p:20,  ig:'basso', cat:'Verdura e legumi',
+      porz:[['100 g',100]] }
+  ],
+  [{
+    n: 'Chanchan-yaki di salmone (ちゃんちゃん焼き)',
+    paese: 'JP',
+    sezioni: [
+      { titolo: 'Salmone e verdure', voci: [
+        { n:'Salmone',                q:'1040', u:'g' },
+        { n:'Cavolo cappuccio',       q:'300',  u:'g' },
+        { n:'Cipollotto',             q:'230',  u:'g' },
+        { n:'Carote',                 q:'130',  u:'g' },
+        { n:'Funghi shiitake secchi', q:'30',   u:'g' },
+        { n:'Olio di girasole',       q:'30',   u:'g' },
+        { n:'Burro',                  q:'25',   u:'g' } ] },
+      { titolo: 'Salsa al miso', voci: [
+        { n:'Miso bianco',            q:'75',   u:'g' },
+        { n:'Zucchero',               q:'25',   u:'g' },
+        { n:'Sakè',                   q:'75',   u:'g' } ] },
+      { titolo: 'Accompagnamento', voci: [
+        { n:'Riso',                   q:'500',  u:'g' } ] }
+    ],
+    passi: [
+      { titolo: 'Shiitake — ammollo e precottura', passi: [
+        { t: 'Reidrata i funghi shiitake secchi in circa 400 ml d\'acqua fredda per 6–8 ore in frigorifero. Elimina i gambi duri, taglia le cappelle e filtra l\'acqua di ammollo.', foto: null },
+        { t: 'Cuoci i funghi coperti con 120–150 ml della loro acqua per 12–15 minuti, finché teneri. Fai evaporare il liquido e saltali 1–2 minuti con un filo d\'olio. Conserva 75 ml di acqua filtrata per la salsa.', foto: null } ] },
+      { titolo: 'Verdure', passi: [
+        { t: 'Taglia il cavolo in pezzi di 3–4 cm, la carota a bastoncini sottili e i cipollotti a rondelle, tenendo da parte la parte verde.', foto: null },
+        { t: 'In una padella capiente scalda 15 ml d\'olio a fuoco medio e rosola 3 minuti la carota con la parte bianca dei cipollotti.', foto: null },
+        { t: 'Aggiungi il cavolo e cuoci 5 minuti.', foto: null },
+        { t: 'Unisci gli shiitake precotti e 50 ml d\'acqua, copri e abbassa il fuoco per 5–7 minuti. Le verdure devono essere tenere ma non sfatte. Non salare.', foto: null } ] },
+      { titolo: 'Salsa al miso', passi: [
+        { t: 'Mescola il miso, lo zucchero, il sakè e 75 ml dell\'acqua filtrata degli shiitake fino a ottenere una salsa omogenea. Non aggiungere mirin.', foto: null } ] },
+      { titolo: 'Riso', passi: [
+        { t: 'Lava 500 g di riso giapponese (Yume Nishiki) 3–4 volte, poi mettilo in pentola con 600 ml d\'acqua e lascialo in ammollo 20–30 minuti.', foto: null },
+        { t: 'Porta a ebollizione coperto, abbassa al minimo e cuoci 12–15 minuti. Spegni, lascia riposare coperto 10–15 minuti e sgrana delicatamente. Senza sale né condimenti.', foto: null } ] },
+      { titolo: 'Salmone', passi: [
+        { t: 'Disponi i tre filetti interi sopra le verdure ammorbidite, con la pelle verso il basso. Versa la salsa al miso, copri e cuoci a fuoco medio-basso mantenendo un leggero sobbollore per circa 10–15 minuti.', foto: null },
+        { t: 'Non girare né spezzettare il salmone. Controlla prima il filetto più piccolo; per una cottura completa verifica 63 °C al cuore.', foto: null } ] },
+      { titolo: 'Finitura e servizio', passi: [
+        { t: 'Aggiungi il verde dei cipollotti negli ultimi 2–3 minuti. Se il sugo è troppo liquido, togli il salmone e fallo restringere scoperto 2–4 minuti: deve restare fluido ma leggermente cremoso, non acquoso.', foto: null },
+        { t: 'Spegni, incorpora i 25 g di burro e lascia riposare brevemente. Dividi il salmone in quattro porzioni, mantenendo pezzi grandi, e servi con verdure, salsa e riso bianco.', foto: null },
+        { t: 'Preparazione anticipata: puoi cuocere le verdure in anticipo, conservarle in frigorifero e riscaldarle prima di aggiungere il salmone crudo e la salsa. Il pesce è meglio cuocerlo solo poco prima di servire.', foto: null } ] }
+    ],
+    cottura: [],
+    porzG: 615
   }]);
 
 /* Una tantum: chi ha l'anagrafica seminata quando la base non aveva
