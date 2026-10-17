@@ -581,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-17.6';
+const VERSIONE = '2026-10-17.7';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -4095,7 +4095,9 @@ const INGREDIENTI_EXTRA = {
   [norm('Peperoncino')]: { e:'🌶️', cho:9,  f:0.4, p:1.9, ig:'basso', cat:'Verdura e legumi' },
   [norm('Sale grosso')]: { e:'🧂', cho:0,  f:0,   p:0,   ig:'basso', cat:'Altro' },
   [norm('Sale fino')]:   { e:'🧂', cho:0,  f:0,   p:0,   ig:'basso', cat:'Altro' },
-  [norm('Sale')]:        { e:'🧂', cho:0,  f:0,   p:0,   ig:'basso', cat:'Altro' }
+  [norm('Sale')]:        { e:'🧂', cho:0,  f:0,   p:0,   ig:'basso', cat:'Altro' },
+  [norm('Spezzatino di manzo')]:        { e:'🥩', cho:0, f:10,  p:19, ig:'basso', cat:'Altro' },
+  [norm("Olio extravergine d'oliva")]:  { e:'🫒', cho:0, f:100, p:0,  ig:'basso', cat:'Altro' }
 };
 function importaRicettario(chiave, alimenti, ricette){
   const primaVolta = !leggi()[chiave];
@@ -5163,15 +5165,38 @@ importaRicettario('itBigoliSarde',
     porzG: 350
   }]);
 
+/* Una tantum: il Gulasch passa dal vitello al manzo (carne e titolo).
+   Va fatto PRIMA del seed del gulasch, così importaRicettario riconosce
+   la ricetta per nome e non la duplica. */
+if(!leggi().gulaschManzo1){
+  const r = RICETTE.find(x => /gulasch/i.test(x.n));
+  if(r){
+    let tocca = false;
+    if(/vitello/i.test(r.n)){ r.n = r.n.replace(/vitello/i, 'manzo'); tocca = true; }
+    for(const s of r.sezioni) for(const v of s.voci)
+      if(norm(v.n) === norm('Spezzatino di vitello')){ v.n = 'Spezzatino di manzo'; tocca = true; }
+    if(tocca){
+      scrivi({ ricette: RICETTE });
+      sincronizzaPiattoRicetta(r);
+      const i = PIATTI.findIndex(pl => pl.daRicetta === r.id);
+      if(i >= 0 && /vitello/i.test(PIATTI[i].n || '')){
+        const agg = sanificaPiatto({ ...PIATTI[i], n: PIATTI[i].n.replace(/vitello/i, 'manzo') });
+        if(agg){ PIATTI[i] = agg; scrivi({ piatti: PIATTI }); }
+      }
+    }
+  }
+  scrivi({ gulaschManzo1: true });
+}
+
 /* ---------- gulasch ----------
-   Spezzatino di vitello in umido; dosi scalate a 1500 g di carne (×3
-   rispetto alla ricetta base da 500 g). L'acqua/brodo (~3 L) non è tra
-   gli ingredienti contati: è liquido di cottura e non apporta
+   Spezzatino di manzo in umido; dosi per 1500 g di carne. L'acqua/brodo
+   non è tra gli ingredienti contati: è liquido di cottura e non apporta
    carboidrati. */
 importaRicettario('itGulasch',
   [
     { n:'Cipolla bianca',          e:'🧅', cho:6,   f:0.1, p:1.1, ig:'basso', cat:'Verdura e legumi' },
-    { n:'Spezzatino di vitello',   e:'🥩', cho:0,   f:8,   p:20,  ig:'basso', cat:'Altro' },
+    { n:'Spezzatino di manzo',     e:'🥩', cho:0,   f:10,  p:19,  ig:'basso', cat:'Altro' },
+    { n:"Olio extravergine d'oliva", e:'🫒', cho:0, f:100, p:0,   ig:'basso', cat:'Altro' },
     { n:'Paprika dolce',           e:'🌶️', cho:34,  f:13,  p:14,  ig:'basso', cat:'Altro',
       porz:[['1 cucchiaio (7 g)',7],['100 g',100]] },
     { n:'Cumino macinato',         e:'🫘', cho:44,  f:22,  p:18,  ig:'basso', cat:'Altro',
@@ -5182,31 +5207,31 @@ importaRicettario('itGulasch',
       porz:[['1 bicchiere (125 g)',125],['100 g',100]] }
   ],
   [{
-    n: 'Gulasch di vitello',
+    n: 'Gulasch di manzo',
     paese: 'IT',
     sezioni: [
       { titolo: 'Ingredienti', voci: [
-        { n:'Spezzatino di vitello',   q:'1500', u:'g' },
+        { n:'Spezzatino di manzo',     q:'1500', u:'g' },
         { n:'Cipolla bianca',          q:'150',  u:'g' },
         { n:'Aglio',                   q:'10',   ua:'n',  qa:'2' },
         { n:'Concentrato di pomodoro', q:'30',   ua:'cm', qa:'2' },
         { n:'Farina 00',               q:'20',   ua:'cm', qa:'2' },
         { n:'Paprika dolce',           q:'2',    ua:'cn', qa:'1' },
-        { n:'Cumino macinato',         q:'1,5',  ua:'cc', qa:'1' },
+        { n:'Cumino macinato',         q:'0,8',  ua:'cc', qa:'0,5' },
         { n:'Vino rosso',              q:'125',  u:'g' },
         { n:'Burro',                   q:'20',   u:'g' },
-        { n:'Olio di semi',            u:'qb' },
-        { n:'Alloro',                  u:'qb' },
+        { n:"Olio extravergine d'oliva", u:'qb' },
+        { n:'Alloro',                  q:'1',    ua:'n',  qa:'3' },
         { n:'Noce moscata',            q:'0,5',  ua:'cc', qa:'0,5' },
         { n:'Peperoncino',             u:'qb' },
         { n:'Pepe nero',               u:'qb' },
-        { n:'Sale grosso',             u:'qb' } ] }
+        { n:'Sale fino',               u:'qb' } ] }
     ],
     passi: [
       { titolo: 'Preparazione', passi: [
-        { t: 'Taglia la cipolla e l\'aglio a cubetti e rosolali con le foglie d\'alloro in un po\' d\'olio neutro e 20 g di burro.', foto: null },
-        { t: 'Aggiungi la carne; quando è ben rosolata unisci le spezie (paprika, cumino, noce moscata, sale e pepe e, se vuoi, il peperoncino), spolvera con la farina e aggiungi il concentrato di pomodoro mescolando. Sfuma con un po\' di vino rosso (facoltativo) e, una volta evaporato, versa l\'acqua o il brodo di carne (circa 3 litri per questa dose).', foto: null },
-        { t: 'Copri e cuoci a fuoco basso 1 ora e mezza - 2 ore, mescolando ogni tanto e aggiungendo acqua per non far attaccare. Il gulasch è pronto quando la carne è molto tenera e la salsa un po\' densa.', foto: null } ] }
+        { t: 'Taglia la cipolla e l\'aglio a cubetti e rosolali con le 3 foglie d\'alloro in un po\' d\'olio extravergine d\'oliva e 20 g di burro.', foto: null },
+        { t: 'Aggiungi la carne; quando è ben rosolata unisci le spezie (paprika, cumino, noce moscata, sale e pepe e, se vuoi, il peperoncino), spolvera con la farina e aggiungi il concentrato di pomodoro mescolando. Sfuma con un po\' di vino rosso e, una volta evaporato, versa l\'acqua o il brodo di carne.', foto: null },
+        { t: 'Trasferisci tutto in una cottura a bassa temperatura (forno a bassa temperatura o slow cooker) e prosegui per 10-12 ore, controllando ogni tanto e aggiungendo acqua se serve per non far attaccare. Il gulasch è pronto quando la carne è molto tenera e la salsa un po\' densa.', foto: null } ] }
     ],
     cottura: [],
     porzG: 310
@@ -5250,7 +5275,7 @@ if(!leggi().gulaschCucchiai1){
       [norm('Concentrato di pomodoro')]: ['cm','2'],
       [norm('Farina 00')]:               ['cm','2'],
       [norm('Paprika dolce')]:           ['cn','1'],
-      [norm('Cumino macinato')]:         ['cc','1']
+      [norm('Cumino macinato')]:         ['cc','0,5']
     };
     let tocca = false;
     for(const s of r.sezioni) for(const v of s.voci){
@@ -5314,6 +5339,35 @@ if(!leggi().gulaschQuantita3){
     }
   }
   scrivi({ gulaschQuantita3: true });
+}
+
+/* Una tantum: dettagli Gulasch anche nelle copie già salvate: olio EVO
+   al posto dell'olio di semi, sale fino al posto del grosso, alloro n° 3
+   foglie, cumino 1/2 cucchiaino da caffè, cottura a bassa temperatura
+   10-12 ore. */
+if(!leggi().gulaschManzoDettagli1){
+  const r = RICETTE.find(x => /gulasch/i.test(x.n));
+  if(r){
+    let tocca = false;
+    for(const s of r.sezioni) for(const v of s.voci){
+      if(norm(v.n) === norm('Olio di semi')){ v.n = "Olio extravergine d'oliva"; tocca = true; }
+      if(norm(v.n) === norm('Sale grosso')){ v.n = 'Sale fino'; tocca = true; }
+      if(norm(v.n) === norm('Alloro') && v.ua !== 'n'){ v.q = '1'; v.ua = 'n'; v.qa = '3'; tocca = true; }
+      if(norm(v.n) === norm('Cumino macinato') && (v.q !== '0,8' || String(v.qa) !== '0,5')){ v.q = '0,8'; v.ua = 'cc'; v.qa = '0,5'; tocca = true; }
+    }
+    for(const s of r.passi) for(const p of (s.passi || [])){
+      if(/olio neutro/i.test(p.t)){ p.t = p.t.replace(/olio neutro/i, "olio extravergine d'oliva").replace(/con le foglie d'alloro/i, "con le 3 foglie d'alloro"); tocca = true; }
+      if(/fuoco basso 1 ora/i.test(p.t)){
+        p.t = 'Trasferisci tutto in una cottura a bassa temperatura (forno a bassa temperatura o slow cooker) e prosegui per 10-12 ore, controllando ogni tanto e aggiungendo acqua se serve per non far attaccare. Il gulasch è pronto quando la carne è molto tenera e la salsa un po\' densa.';
+        tocca = true;
+      }
+    }
+    if(tocca){ scrivi({ ricette: RICETTE }); sincronizzaPiattoRicetta(r); }
+  }
+  /* Olio EVO: se era stato creato con 0 grassi, correggilo a 100. */
+  const oe = FOODS.find(x => norm(x.n) === norm("Olio extravergine d'oliva"));
+  if(oe && oe.cho === 0 && oe.f === 0){ const i = FOODS.indexOf(oe); const agg = sanificaAlimento({ ...oe, f:100 }); if(agg){ FOODS[i] = agg; scrivi({ alimenti: FOODS }); } }
+  scrivi({ gulaschManzoDettagli1: true });
 }
 
 /* Foto del Chanchan-yaki (copertina e passaggi), compatte. */
