@@ -581,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-17.5';
+const VERSIONE = '2026-10-17.6';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -5189,11 +5189,11 @@ importaRicettario('itGulasch',
         { n:'Spezzatino di vitello',   q:'1500', u:'g' },
         { n:'Cipolla bianca',          q:'150',  u:'g' },
         { n:'Aglio',                   q:'10',   ua:'n',  qa:'2' },
-        { n:'Concentrato di pomodoro', q:'90',   ua:'cm', qa:'6' },
-        { n:'Farina 00',               q:'60',   ua:'cm', qa:'6' },
+        { n:'Concentrato di pomodoro', q:'30',   ua:'cm', qa:'2' },
+        { n:'Farina 00',               q:'20',   ua:'cm', qa:'2' },
         { n:'Paprika dolce',           q:'2',    ua:'cn', qa:'1' },
         { n:'Cumino macinato',         q:'1,5',  ua:'cc', qa:'1' },
-        { n:'Vino rosso',              q:'150',  u:'g' },
+        { n:'Vino rosso',              q:'125',  u:'g' },
         { n:'Burro',                   q:'20',   u:'g' },
         { n:'Olio di semi',            u:'qb' },
         { n:'Alloro',                  u:'qb' },
@@ -5209,7 +5209,7 @@ importaRicettario('itGulasch',
         { t: 'Copri e cuoci a fuoco basso 1 ora e mezza - 2 ore, mescolando ogni tanto e aggiungendo acqua per non far attaccare. Il gulasch è pronto quando la carne è molto tenera e la salsa un po\' densa.', foto: null } ] }
     ],
     cottura: [],
-    porzG: 331
+    porzG: 310
   }]);
 
 /* Una tantum: aggiunge 20 g di burro al Gulasch (insieme all'olio),
@@ -5247,8 +5247,8 @@ if(!leggi().gulaschCucchiai1){
   const r = RICETTE.find(x => /gulasch/i.test(x.n));
   if(r){
     const mapVoci = {
-      [norm('Concentrato di pomodoro')]: ['cm','6'],
-      [norm('Farina 00')]:               ['cm','6'],
+      [norm('Concentrato di pomodoro')]: ['cm','2'],
+      [norm('Farina 00')]:               ['cm','2'],
       [norm('Paprika dolce')]:           ['cn','1'],
       [norm('Cumino macinato')]:         ['cc','1']
     };
@@ -5289,6 +5289,31 @@ if(!leggi().gulaschQuantita2){
     }
   }
   scrivi({ gulaschQuantita2: true });
+}
+
+/* Una tantum: vino rosso a 1 bicchiere (125 g), concentrato di pomodoro
+   e farina a 2 cucchiai, anche nelle copie già salvate; porzione 310 g. */
+if(!leggi().gulaschQuantita3){
+  const r = RICETTE.find(x => /gulasch/i.test(x.n));
+  if(r){
+    const target = {
+      [norm('Vino rosso')]:              { q:'125', ua:'',   qa:'' },
+      [norm('Concentrato di pomodoro')]: { q:'30',  ua:'cm', qa:'2' },
+      [norm('Farina 00')]:               { q:'20',  ua:'cm', qa:'2' }
+    };
+    let tocca = false;
+    for(const s of r.sezioni) for(const v of s.voci){
+      const t = target[norm(v.n)];
+      if(t && (v.q !== t.q || v.ua !== t.ua || String(v.qa) !== t.qa)){ v.q = t.q; v.ua = t.ua; v.qa = t.qa; tocca = true; }
+    }
+    if(tocca){
+      scrivi({ ricette: RICETTE });
+      sincronizzaPiattoRicetta(r);
+      const j = PIATTI.findIndex(pl => pl.daRicetta === r.id);
+      if(j >= 0){ const agg = sanificaPiatto({ ...PIATTI[j], porzG: 310 }); if(agg){ PIATTI[j] = agg; scrivi({ piatti: PIATTI }); } }
+    }
+  }
+  scrivi({ gulaschQuantita3: true });
 }
 
 /* Foto del Chanchan-yaki (copertina e passaggi), compatte. */
