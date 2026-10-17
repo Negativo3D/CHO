@@ -581,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-17.1';
+const VERSIONE = '2026-10-17.2';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -4086,6 +4086,17 @@ if(!leggi().pwRimossa1){
    le ricette aggiunte se non esistono già (con piatto generato,
    porzione, perdita in cottura e onda quadra se indicate). Serve per
    i ricettari tematici, come quello coreano. */
+/* Valori per gli ingredienti "q.b." (spezie, erbe, sale) che altrimenti
+   non sarebbero in anagrafica: servono perché una ricetta è modificabile
+   solo se tutti i suoi ingredienti esistono tra gli alimenti. */
+const INGREDIENTI_EXTRA = {
+  [norm('Prezzemolo')]:  { e:'🌿', cho:6,  f:0.8, p:3,   ig:'basso', cat:'Verdura e legumi' },
+  [norm('Alloro')]:      { e:'🌿', cho:48, f:8,   p:8,   ig:'basso', cat:'Altro' },
+  [norm('Peperoncino')]: { e:'🌶️', cho:9,  f:0.4, p:1.9, ig:'basso', cat:'Verdura e legumi' },
+  [norm('Sale grosso')]: { e:'🧂', cho:0,  f:0,   p:0,   ig:'basso', cat:'Altro' },
+  [norm('Sale fino')]:   { e:'🧂', cho:0,  f:0,   p:0,   ig:'basso', cat:'Altro' },
+  [norm('Sale')]:        { e:'🧂', cho:0,  f:0,   p:0,   ig:'basso', cat:'Altro' }
+};
 function importaRicettario(chiave, alimenti, ricette){
   const primaVolta = !leggi()[chiave];
   /* Gli alimenti del ricettario si inseriscono solo la prima volta, così
@@ -4099,6 +4110,18 @@ function importaRicettario(chiave, alimenti, ricette){
     }
     if(toccaAlimenti) scrivi({ alimenti: FOODS });
   }
+  /* Ogni ingrediente delle ricette dev'essere anche in anagrafica,
+     altrimenti la ricetta non è modificabile. Si creano i mancanti
+     (valori noti dalla mappa, oppure 0 CHO di default per spezie/sale
+     q.b.), sempre, anche quando la ricetta è già presente. */
+  let toccaExtra = false;
+  for(const r of (ricette || [])) for(const s of (r.sezioni || [])) for(const v of (s.voci || [])){
+    if(!v.n || FOODS.some(f => norm(f.n) === norm(v.n))) continue;
+    const base = INGREDIENTI_EXTRA[norm(v.n)] || { e:'🧂', cho:0, f:0, p:0, ig:'basso', cat:'Altro' };
+    const nuovo = sanificaAlimento({ n:v.n, ...base });
+    if(nuovo){ FOODS.push(nuovo); toccaExtra = true; }
+  }
+  if(toccaExtra) scrivi({ alimenti: FOODS });
   /* Le ricette del ricettario vivono nel codice: le riportiamo sempre in
      memoria se mancano, anche quando il flag è già impostato ma un
      salvataggio precedente non è andato a buon fine (per esempio per
