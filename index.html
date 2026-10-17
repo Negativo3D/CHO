@@ -581,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-14.5';
+const VERSIONE = '2026-10-17.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -5138,6 +5138,54 @@ importaRicettario('itBigoliSarde',
     ],
     cottura: [],
     porzG: 350
+  }]);
+
+/* ---------- gulasch ----------
+   Spezzatino di vitello in umido; dosi scalate a 1500 g di carne (×3
+   rispetto alla ricetta base da 500 g). L'acqua/brodo (~3 L) non è tra
+   gli ingredienti contati: è liquido di cottura e non apporta
+   carboidrati. */
+importaRicettario('itGulasch',
+  [
+    { n:'Cipolla bianca',          e:'🧅', cho:6,   f:0.1, p:1.1, ig:'basso', cat:'Verdura e legumi' },
+    { n:'Spezzatino di vitello',   e:'🥩', cho:0,   f:8,   p:20,  ig:'basso', cat:'Altro' },
+    { n:'Paprika dolce',           e:'🌶️', cho:34,  f:13,  p:14,  ig:'basso', cat:'Altro',
+      porz:[['1 cucchiaio (7 g)',7],['100 g',100]] },
+    { n:'Cumino macinato',         e:'🫘', cho:44,  f:22,  p:18,  ig:'basso', cat:'Altro',
+      porz:[['1 cucchiaino (2 g)',2],['100 g',100]] },
+    { n:'Concentrato di pomodoro', e:'🥫', cho:19,  f:0.5, p:4.6, ig:'basso', cat:'Altro',
+      porz:[['1 cucchiaio (15 g)',15],['100 g',100]] },
+    { n:'Vino rosso',              e:'🍷', cho:2.6, f:0,   p:0.1, ig:'basso', cat:'Bevande',
+      porz:[['1 bicchiere (125 g)',125],['100 g',100]] }
+  ],
+  [{
+    n: 'Gulasch di vitello',
+    paese: 'IT',
+    sezioni: [
+      { titolo: 'Ingredienti', voci: [
+        { n:'Spezzatino di vitello',   q:'1500', u:'g' },
+        { n:'Cipolla bianca',          q:'900',  u:'g' },
+        { n:'Aglio',                   q:'25',   u:'g' },
+        { n:'Concentrato di pomodoro', q:'90',   u:'g' },
+        { n:'Farina 00',               q:'60',   u:'g' },
+        { n:'Paprika dolce',           q:'21',   u:'g' },
+        { n:'Cumino macinato',         q:'6',    u:'g' },
+        { n:'Vino rosso',              q:'150',  u:'g' },
+        { n:'Olio di semi',            u:'qb' },
+        { n:'Alloro',                  u:'qb' },
+        { n:'Noce moscata',            u:'qb' },
+        { n:'Peperoncino',             u:'qb' },
+        { n:'Pepe nero',               u:'qb' },
+        { n:'Sale grosso',             u:'qb' } ] }
+    ],
+    passi: [
+      { titolo: 'Preparazione', passi: [
+        { t: 'Taglia la cipolla e l\'aglio a cubetti e rosolali con le foglie d\'alloro in un po\' d\'olio neutro.', foto: null },
+        { t: 'Aggiungi la carne; quando è ben rosolata unisci le spezie (paprika, cumino, noce moscata, sale e pepe e, se vuoi, il peperoncino), spolvera con la farina e aggiungi il concentrato di pomodoro mescolando. Sfuma con un po\' di vino rosso (facoltativo) e, una volta evaporato, versa l\'acqua o il brodo di carne (circa 3 litri per questa dose).', foto: null },
+        { t: 'Copri e cuoci a fuoco basso 1 ora e mezza - 2 ore, mescolando ogni tanto e aggiungendo acqua per non far attaccare. Il gulasch è pronto quando la carne è molto tenera e la salsa un po\' densa.', foto: null } ] }
+    ],
+    cottura: [],
+    porzG: 459
   }]);
 
 /* Foto del Chanchan-yaki (copertina e passaggi), compatte. */
