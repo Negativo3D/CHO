@@ -581,7 +581,7 @@ function ico(n, s=22, pieno=false){
 /* ---------- memoria sul telefono ---------- */
 /* Numero di versione dell'app: va aumentato a ogni pubblicazione.
    Il controllo aggiornamenti confronta questo valore con quello online. */
-const VERSIONE = '2026-10-18.3';
+const VERSIONE = '2026-10-20.1';
 
 const CHIAVE = 'atlante-cho-v1';
 function leggi(){ try{ return JSON.parse(localStorage.getItem(CHIAVE)) || {}; }catch(e){ return {}; } }
@@ -5542,6 +5542,51 @@ importaRicettario('jpRisoBianco',
     ],
     cottura: [],
     porzG: 125
+  }]);
+
+/* Gomoku-mame: soia giapponese con verdure (contorno washoku). L'acqua
+   degli shiitake (circa 250 ml) è liquido di cottura che si riduce: non
+   si conta tra gli ingredienti (niente carboidrati), resta nei passi. La
+   porzione è 1/4 del piatto (somma ingredienti / 4). I liquidi sono
+   convertiti in grammi (45 ml salsa di soia ~54 g, 30 ml mirin ~34 g). */
+importaRicettario('jpGomokuMame',
+  [
+    { n:'Soia cotta e scolata',    e:'🫘', cho:7,  f:9,   p:16,  ig:'basso', cat:'Verdura e legumi',
+      porz:[['1 porzione',80],['100 g',100]] },
+    { n:'Radice di loto (renkon)', e:'🪷', cho:16, f:0.1, p:2.6, ig:'medio', cat:'Verdura e legumi',
+      porz:[['100 g',100]] },
+    { n:'Konjac (konnyaku)',       e:'🍥', cho:1,  f:0,   p:0.1, ig:'basso', cat:'Verdura e legumi',
+      porz:[['100 g',100]] },
+    /* Mirin è definito più sotto (migrazione jpAlimentiFoto1), che gira
+       dopo questo seed: lo si definisce anche qui con i valori corretti
+       così su un'installazione nuova non viene creato a 0 CHO. */
+    { n:'Mirin',                   e:'🍶', cho:43, f:0,   p:0.3, ig:'alto',  cat:'Altro',
+      porz:[['1 cucchiaio (18 g)',18],['100 g',100]] }
+  ],
+  [{
+    n: 'Gomoku-mame (soia giapponese con verdure)',
+    paese: 'JP',
+    sezioni: [
+      { titolo: 'Ingredienti (4 persone)', voci: [
+        { n:'Soia cotta e scolata',    q:'300', u:'g' },
+        { n:'Carote',                  q:'100', u:'g' },
+        { n:'Radice di loto (renkon)', q:'100', u:'g' },
+        { n:'Konjac (konnyaku)',       q:'100', u:'g' },
+        { n:'Funghi shiitake secchi',  q:'14',  ua:'n', qa:'4' },
+        { n:'Salsa di soia',           q:'54',  u:'g' },
+        { n:'Mirin',                   q:'34',  u:'g' },
+        { n:'Zucchero',                q:'15',  u:'g' } ] }
+    ],
+    passi: [
+      { titolo: 'Preparazione', passi: [
+        { t: 'Funghi: reidrata gli shiitake secchi (circa 250 ml d\'acqua), tagliali a cubetti di circa 1 cm e conserva l\'acqua di ammollo filtrata.', foto: null },
+        { t: 'Verdure: taglia carote, radice di loto e konjac a cubetti di 1 cm. Sbollenta il konjac per 3-5 minuti.', foto: null },
+        { t: 'Cottura: metti in casseruola la soia, le verdure, i funghi e l\'acqua degli shiitake filtrata (circa 250 ml). Porta a leggero bollore, poi cuoci coperto per circa 10 minuti.', foto: null },
+        { t: 'Condimento: aggiungi zucchero, salsa di soia e mirin. Prosegui a fuoco basso per 15-20 minuti, finché le verdure sono tenere e il liquido si è ridotto.', foto: null },
+        { t: 'Riposo: lascia riposare 10 minuti prima di servire, per far assorbire meglio i sapori. Si serve tiepido o a temperatura ambiente.', foto: null } ] }
+    ],
+    cottura: [],
+    porzG: 179
   }]);
 
 /* Una tantum: normalizza il salmone del Chanchan-yaki a 1 kg tondo (da
